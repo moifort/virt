@@ -7,6 +7,7 @@ import { buildNature } from './nature.js';
 import { GRID, HALF, PATHS, SEGMENTS, WORLD_SIZE, ZONES, buildSides, buildTerrain, buildWater } from './terrain.js';
 import { buildBase, planBase } from './base.js';
 import { bake } from './kit.js';
+import { buildRailway } from './railway.js';
 import { buildVillages } from './village.js';
 import { buildAgora, buildAtelier, buildLibrary, buildMoot, buildPods, buildPort, buildPub } from './zones.js';
 
@@ -50,6 +51,7 @@ export function createWorld(scene) {
   buildNature(scene, rng);
   buildLife(scene, rng, animated);
   buildBase(scene, rooms, animated);
+  buildRailway(scene, animated);
 
   return {
     update(t, dt) {
