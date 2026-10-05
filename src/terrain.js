@@ -48,11 +48,11 @@ const beachBand = (v) => smoothstep(-30, -18, v) * smoothstep(64, 50, v);
 export const placeZone = (id, name, hint, u, v, r) => ({ id, name, hint, u, v, r, x: toX(u, v), z: toZ(u, v) });
 export const ZONES = [
   placeZone('agora', 'Agora', "l'Arbre-Mère", 0, 0, 12),
-  placeZone('library', 'La Bibliothèque', 'bureau de Bob', 34, -34, 16),
-  placeZone('moot', 'Salle du Moot', 'réunions', 32, 38, 17),
+  placeZone('library', 'La Bibliothèque', 'bureau de Bob', 34, -34, 13),
+  placeZone('moot', 'Salle du Moot', 'réunions', 30, 36, 15),
   placeZone('pub', 'Le Pub', 'après le travail', -22, -40, 12),
-  placeZone('pods', 'Bulles focus', 'concentration', -6, 60, 15),
-  placeZone('atelier', "L'Atelier", 'prototypes', 8, -54, 14),
+  placeZone('pods', 'Bulles focus', 'concentration', 2, 52, 13),
+  placeZone('atelier', "L'Atelier", 'prototypes', 8, -54, 12),
   // The harbour has no ground of its own: its boardwalks start from the foot of the main
   // village, a dozen metres up from the water's edge, and run out over the sea.
   placeZone('port', 'Le Port', 'pause au bord de l\'eau', HARBOUR_U, leftShore(HARBOUR_U) + 12, 1),
