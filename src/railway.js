@@ -1,75 +1,111 @@
-// An old Italian railway across the mountain, as on the Cinque Terre line: stone arch viaducts
-// over the ravines, tunnels through the ridges, catenary masts, and a vintage three-car train
-// in the old "castano e isabella" livery shuttling back and forth.
+// An old Italian railway, as on the Cinque Terre line: the train bursts out of a tunnel in the
+// mountain, crosses the hollow where the mountain meets the right-hand ridge on a stone viaduct
+// with a great central arch, and dives into the ridge. A vintage three-car train in the old
+// "castano e isabella" livery shuttles back and forth. The terrain itself is left untouched.
 import * as THREE from 'three';
 import { PAL } from './style.js';
 import { INK, at, bake, ball, box, cyl, live, ring } from './kit.js';
-import { SQUARE, groundAt, toX, toZ } from './terrain.js';
+import { groundAt, toX, toZ } from './terrain.js';
 
-const RAIL_U = 84;
-const START_V = -24;
-const END_V = SQUARE.v1;
+// The line runs straight across the angle between the mountain (A) and the ridge (B), in (u, v).
+const A = { u: 108, v: 25 };
+const B = { u: 35, v: 95 };
+const LEVEL = 24;
 const STONE = 0xe2cfae;
 const CASTANO = 0x7a4a3a;
 const ISABELLA = 0xe8d6a8;
 const TUNNEL_CLEARANCE = 5;
+const PIER_GAP = 8;
 
-const groundAlong = (v) => groundAt(toX(RAIL_U, v), toZ(RAIL_U, v));
+const start = new THREE.Vector3(toX(A.u, A.v), 0, toZ(A.u, A.v));
+const end = new THREE.Vector3(toX(B.u, B.v), 0, toZ(B.u, B.v));
+const LENGTH = start.distanceTo(end);
+const dir = end.clone().sub(start).normalize();
+const groundAlong = (s) => groundAt(start.x + dir.x * s, start.z + dir.z * s);
+const inTunnel = (s) => groundAlong(s) > LEVEL + TUNNEL_CLEARANCE;
 
-export function buildRailway(scene, animated) {
-  // Lay the line at a constant level, around the median of the ground it crosses.
-  const profile = [];
-  for (let v = START_V; v <= END_V; v++) profile.push(groundAlong(v));
-  const level = [...profile].sort((a, b) => a - b)[Math.floor(profile.length * 0.55)] + 1;
-  const inTunnel = (v) => groundAlong(v) > level + TUNNEL_CLEARANCE;
-
-  // Local frame: x runs along the shore (v), z = 0 on the track centre line.
+function buildLine() {
+  // Local frame: x runs along the line from A, z = 0 on the track centre line, y = 0 at rail level.
   const line = new THREE.Group();
-  line.position.set(toX(RAIL_U, 0), level, toZ(RAIL_U, 0));
-  line.rotation.y = Math.PI / 4;
+  line.position.set(start.x, LEVEL, start.z);
+  line.rotation.y = Math.atan2(-dir.z, dir.x);
 
-  let previous = inTunnel(START_V);
-  for (let v = START_V; v < END_V; v += 1) {
-    const ground = groundAlong(v) - level;
-    const tunnel = inTunnel(v);
-    // Tunnel portals where the line enters or leaves a ridge.
+  let previous = true;
+  let open0 = Infinity;
+  let open1 = -Infinity;
+  for (let s = 0; s < LENGTH; s += 1) {
+    const tunnel = inTunnel(s);
     if (tunnel !== previous) {
-      const x = tunnel ? v - 0.5 : v - 0.5;
-      at(box(0.8, 5.4, 4.6, STONE), x, 2.2, 0, line);
-      at(box(0.9, 4.2, 3.2, 0x2b2533), x + (tunnel ? 0.05 : -0.05), 1.6, 0, line);
-      at(box(1.0, 0.6, 5.2, PAL.ochre), x, 5.1, 0, line);
+      // Tunnel portal: stone face, dark mouth, arch and an ochre coping.
+      const x = s + (tunnel ? -0.4 : 0.4);
+      const side = tunnel ? 1 : -1;
+      at(box(1.2, 6.2, 5.6, STONE), x, 2.6, 0, line);
+      at(box(1.3, 4.2, 3.4, 0x2b2533), x + side * 0.05, 1.7, 0, line);
+      const arch = at(ring(1.7, 0.45, STONE, Math.PI, 12), x + side * 0.1, 3.8, 0, line);
+      arch.rotation.y = Math.PI / 2;
+      at(box(1.4, 0.6, 6.2, PAL.ochre), x, 5.9, 0, line);
     }
     previous = tunnel;
     if (tunnel) continue;
-    // Track: ballast, sleepers and two rails.
-    at(box(1.05, 0.25, 3.2, 0xb8a890), v + 0.5, -0.12, 0, line);
-    at(box(0.3, 0.12, 2.6, 0x6a4a3a), v + 0.25, 0.05, 0, line);
-    at(box(0.3, 0.12, 2.6, 0x6a4a3a), v + 0.75, 0.05, 0, line);
-    for (const z of [-0.72, 0.72]) at(box(1.0, 0.1, 0.1, 0x5a5a6a), v + 0.5, 0.16, z, line);
-    // Over the ravines: a stone viaduct with arches.
-    if (ground < -1.2) {
-      at(box(1.0, 0.9, 3.6, STONE), v + 0.5, -0.7, 0, line);
-      if (v % 6 === 0) {
-        const h = -ground + 0.5;
-        at(box(1.4, h, 3.2, STONE), v + 0.5, -h / 2 - 0.6, 0, line);
-        at(box(1.8, 0.5, 3.6, PAL.ochre), v + 0.5, -h - 0.4, 0, line);
-        if (groundAlong(v + 6) - level < -1.2) {
-          // The arch springs from pillar to pillar under the deck.
-          const arch = at(ring(2.4, 0.5, STONE, Math.PI, 12), v + 3.5, -3.6, 0, line);
-          arch.scale.z = 3;
-        }
-      }
-    }
-    // Catenary masts.
-    if (v % 8 === 0) {
-      at(cyl(0.08, 0.1, 4.2, INK, 5), v + 0.5, 2.1, -1.9, line);
-      at(box(0.08, 0.08, 2.0, INK), v + 0.5, 4.0, -0.9, line);
+    open0 = Math.min(open0, s);
+    open1 = Math.max(open1, s + 1);
+    at(box(1.05, 0.25, 3.2, 0xb8a890), s + 0.5, -0.12, 0, line);
+    at(box(0.3, 0.12, 2.6, 0x6a4a3a), s + 0.25, 0.05, 0, line);
+    at(box(0.3, 0.12, 2.6, 0x6a4a3a), s + 0.75, 0.05, 0, line);
+    for (const z of [-0.72, 0.72]) at(box(1.0, 0.1, 0.1, 0x5a5a6a), s + 0.5, 0.16, z, line);
+    if (s % 7 === 0) {
+      at(cyl(0.08, 0.1, 4.2, INK, 5), s + 0.5, 2.1, -1.9, line);
+      at(box(0.08, 0.08, 2.0, INK), s + 0.5, 4.0, -0.9, line);
     }
   }
-  at(box(END_V - START_V, 0.04, 0.04, INK), (START_V + END_V) / 2, 3.95, 0, line);
-  scene.add(bake(line));
+  at(box(open1 - open0, 0.04, 0.04, INK), (open0 + open1) / 2, 3.95, 0, line);
+  return { line, open0, open1 };
+}
 
-  // The train.
+function buildViaduct(line, open0, open1) {
+  const crown = -1.25;
+  const below = (s) => groundAlong(s) < LEVEL - 1.2;
+  // The deepest point gets a great double-width arch; ordinary spans march out from it.
+  let deepest = open0;
+  for (let s = open0; s < open1; s += 0.5) if (groundAlong(s) < groundAlong(deepest)) deepest = s;
+  const piers = [deepest - PIER_GAP, deepest + PIER_GAP];
+  while (below(piers[0] - PIER_GAP) && piers[0] - PIER_GAP > open0) piers.unshift(piers[0] - PIER_GAP);
+  while (below(piers[piers.length - 1] + PIER_GAP) && piers[piers.length - 1] + PIER_GAP < open1) piers.push(piers[piers.length - 1] + PIER_GAP);
+  const first = piers[0] - PIER_GAP / 2;
+  const last = piers[piers.length - 1] + PIER_GAP / 2;
+
+  // Deck and parapets along the whole viaduct.
+  at(box(last - first, 1.0, 3.8, STONE), (first + last) / 2, -0.75, 0, line);
+  for (const z of [-1.95, 1.95]) {
+    at(box(last - first, 0.6, 0.25, STONE), (first + last) / 2, 0.3, z, line);
+    for (let x = first + 1; x < last; x += 2) at(box(0.3, 0.8, 0.3, PAL.ochre), x, 0.4, z, line);
+  }
+  // Piers down to the ground, with a cutwater cap.
+  for (const p of piers) {
+    const h = LEVEL + crown - groundAlong(p) + 1;
+    at(box(1.6, h, 3.4, STONE), p, crown - h / 2, 0, line);
+    at(box(2.0, 0.4, 3.8, PAL.ochre), p, crown - h + 1.2, 0, line);
+  }
+  // Arches between piers, spandrels filled up to the deck; half arches at both abutments.
+  const spans = [[first, piers[0]], ...piers.slice(1).map((p, i) => [piers[i], p]), [piers[piers.length - 1], last]];
+  for (const [a, b] of spans) {
+    const mid = (a + b) / 2;
+    const R = (b - a) / 2 - 0.8;
+    const bottom = Math.min(groundAlong(a), groundAlong(b), groundAlong(mid)) - LEVEL;
+    for (let x = a; x < b; x += 0.5) {
+      const dx = Math.abs(x + 0.25 - mid);
+      const archTop = dx < R ? crown - R + Math.sqrt(R * R - dx * dx) : bottom;
+      const h = crown - Math.max(archTop, bottom);
+      if (h > 0.05) at(box(0.52, h, 3.4, STONE), x + 0.25, crown - h / 2, 0, line);
+    }
+    if (R > 1) {
+      const arch = at(ring(R, 0.5, PAL.ochre, Math.PI, 16), mid, crown - R, 0, line);
+      arch.scale.z = 3.4;
+    }
+  }
+}
+
+function buildTrain(line, animated) {
   const train = live(new THREE.Group());
   const cars = 3;
   const carLength = 6.4;
@@ -106,11 +142,10 @@ export function buildRailway(scene, animated) {
   }
   line.add(train);
 
-  // Shuttle along the line: out through the island's edge and back. Cars vanish inside
-  // tunnels and past the edge of the island.
+  // Shuttle from one tunnel to the other; cars vanish while they are underground.
   const half = (cars * pitch) / 2;
-  const from = START_V - half;
-  const to = END_V + half;
+  const from = half;
+  const to = LENGTH - half;
   animated.push((t) => {
     const span = to - from;
     const cycle = (t * 7) % (span * 2);
@@ -119,7 +154,14 @@ export function buildRailway(scene, animated) {
     train.rotation.y = forward ? 0 : Math.PI;
     for (const { car, offset } of carGroups) {
       const x = train.position.x + (forward ? offset : -offset);
-      car.visible = x > START_V + carLength / 2 && x < END_V - carLength / 2 && !inTunnel(x);
+      car.visible = !inTunnel(x - carLength / 2) || !inTunnel(x + carLength / 2);
     }
   });
+}
+
+export function buildRailway(scene, animated) {
+  const { line, open0, open1 } = buildLine();
+  buildViaduct(line, open0, open1);
+  scene.add(bake(line));
+  buildTrain(line, animated);
 }
