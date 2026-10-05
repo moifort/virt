@@ -192,16 +192,16 @@ function buildVineyard(scene, rng) {
       if (rng() > 0.06) {
         const tired = rng() < 0.12;
         place(vines, x, y + 0.72, z, 0.98, 0.78 + rng() * 0.22, 0.42, tired ? VINE[4] : pick(rng, VINE.slice(0, 4)));
-        place(vines, x, y + 0.18, z, 0.08, 0.4, 0.08, 0x6a5444);
+        place(posts, x, y + 0.18, z, 0.08, 0.4, 0.08, 0x6a5444);
         if (rng() < 0.3) place(grapes, x + (rng() - 0.5) * 0.3, y + 0.5, z + 0.24, 0.16, 0.22, 0.14, 0x4a3468);
       }
       run++;
     }
   }
   const color = new THREE.Color();
-  const instance = (geo, list, flat) => {
+  const instance = (geo, list, look) => {
     if (!list.length) return;
-    const mesh = new THREE.InstancedMesh(geo, paint(0xffffff, { flat }), list.length);
+    const mesh = new THREE.InstancedMesh(geo, paint(0xffffff, look), list.length);
     list.forEach((it, i) => {
       mesh.setMatrixAt(i, it.m);
       mesh.setColorAt(i, color.setHex(it.c));
@@ -209,9 +209,9 @@ function buildVineyard(scene, rng) {
     mesh.castShadow = mesh.receiveShadow = true;
     scene.add(mesh);
   };
-  instance(new THREE.IcosahedronGeometry(0.62, 0), vines, true);
-  instance(new THREE.BoxGeometry(1, 1, 1), [...posts, ...wires], false);
-  instance(new THREE.IcosahedronGeometry(0.5, 0), grapes, true);
+  instance(new THREE.IcosahedronGeometry(0.62, 1), vines, { leaf: true, deciduous: true });
+  instance(new THREE.BoxGeometry(1, 1, 1), [...posts, ...wires], {});
+  instance(new THREE.IcosahedronGeometry(0.5, 0), grapes, { flat: true });
 }
 
 export function buildEstate(scene, rng) {

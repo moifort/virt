@@ -439,13 +439,21 @@ bool pxGlass = max(max(abs(pxBase.r - 0.040), abs(pxBase.g - 0.032)), abs(pxBase
     float pxPatch = pxHash(floor(vWorld.xz / 2.5));
     float pxLum = dot(pxAlb, vec3(0.3, 0.6, 0.1));
     vec3 pxFall = (pxPatch < 0.14 ? vec3(1.9, 0.75, 0.2) : pxPatch < 0.3 ? vec3(2.0, 1.25, 0.25) : vec3(1.3, 1.05, 0.5)) * pxLum;
-    // Most of the maquis is evergreen: only some plants turn.
-    float pxTurns = step(pxPatch, 0.42);
-    #ifdef BLOSSOM
+    // This is an evergreen coast: pines, oaks, olives and most of the maquis keep their green
+    // all year and only warm a little. The grass yellows in patches. Vines and orchards are
+    // the ones that blaze in autumn and stand bare and brown in winter.
+    float pxTurns = step(pxPatch, 0.42) * 0.6;
+    float pxFades = 0.3 + 0.3 * step(0.5, pxPatch);
+    #ifdef LEAF
+      pxTurns = step(pxPatch, 0.2) * 0.35;
+      pxFades = 0.12;
+    #endif
+    #if defined(BLOSSOM) || defined(DECIDUOUS)
       pxTurns = 1.0;
+      pxFades = 0.75;
     #endif
     pxAlb = mix(pxAlb, pxFall, uSeason.x * 0.85 * pxTurns);
-    pxAlb = mix(pxAlb, vec3(pxLum) * vec3(1.05, 0.98, 0.8), uSeason.y * (0.35 + 0.4 * step(0.5, pxPatch)));
+    pxAlb = mix(pxAlb, vec3(pxLum) * vec3(1.05, 0.98, 0.8), uSeason.y * pxFades);
     pxAlb = mix(pxAlb, pxAlb * vec3(0.92, 1.14, 0.8) + vec3(0.0, 0.02, 0.0), uSeason.z);
   }
   #ifdef LEAF
@@ -559,12 +567,13 @@ gNormal = vec4(normal * 0.5 + 0.5, 1.0);
 `;
 
 const cache = new Map();
-const FLAGS = { terrain: 'TERRAIN', water: 'WATER', sway: 'SWAY', glow: 'GLOW', leaf: 'LEAF', blossom: 'BLOSSOM', roof: 'ROOF', wall: 'WALL', flow: 'FLOW', cascade: 'CASCADE' };
+const FLAGS = { terrain: 'TERRAIN', water: 'WATER', sway: 'SWAY', glow: 'GLOW', leaf: 'LEAF', blossom: 'BLOSSOM', deciduous: 'DECIDUOUS', roof: 'ROOF', wall: 'WALL', flow: 'FLOW', cascade: 'CASCADE' };
 
 /**
  * @param {number} color sRGB hex
- * @param {{terrain?: boolean, water?: boolean, sway?: boolean, glow?: boolean, leaf?: boolean, blossom?: boolean, roof?: boolean, wall?: boolean, flow?: boolean, cascade?: boolean, flat?: boolean, doubleSide?: boolean, backSide?: boolean, map?: THREE.Texture}} [opts]
- *   `leaf` is foliage (painted in clumps, rustling), `blossom` an orchard crown that flowers and
+ * @param {{terrain?: boolean, water?: boolean, sway?: boolean, glow?: boolean, leaf?: boolean, blossom?: boolean, deciduous?: boolean, roof?: boolean, wall?: boolean, flow?: boolean, cascade?: boolean, flat?: boolean, doubleSide?: boolean, backSide?: boolean, map?: THREE.Texture}} [opts]
+ *   `leaf` is foliage (painted in clumps, rustling, evergreen unless `deciduous`), `blossom` an
+ *   orchard crown that flowers and
  *   sheds, `roof` tiles, `wall` aged plaster, `flow` rain water running off a roof, `cascade` a
  *   stream or a waterfall.
  */

@@ -22,8 +22,10 @@ const KINDS = {
   cone: { shape: new THREE.ConeGeometry(0.5, 1, 8), paint: { flat: true } },
   // Half disc standing in the XY plane, flat side down (fanlights, arched openings).
   arch: { shape: new THREE.CylinderGeometry(0.5, 0.5, 1, 10, 1, false, -Math.PI / 2, Math.PI).rotateX(-Math.PI / 2), paint: {} },
-  // Greenery, a lit lamp, and rain water running off a roof (its colour is how much it carries).
+  // Evergreen greenery, vines that turn with the seasons, a lit lamp, and rain water running
+  // off a roof (its colour is how much it carries).
   leaf: { shape: ballShape, paint: { leaf: true } },
+  vine: { shape: ballShape, paint: { leaf: true, deciduous: true } },
   lamp: { shape: ballShape, paint: { glow: true } },
   flow: { shape: boxShape, paint: { flow: true }, shadow: false },
 };
@@ -371,7 +373,7 @@ export function buildVillages(scene, rng, animated) {
       if (slopeAt(x, z) > 0.3 || !isWild(x, z, -1)) continue;
       if (placed.some((p) => Math.hypot(p[0] - x, p[1] - z) < 3)) continue;
       parts.at(new THREE.Vector3(x, groundAt(x, z), z), yaw);
-      parts.add('leaf', 0, 0.55, 0, 0.85, 0.95 + rng() * 0.3, 0.6, pick(rng, [0x6a9e5e, 0x66a070, 0x82b06a, 0x8ab464]));
+      parts.add('vine', 0, 0.55, 0, 0.85, 0.95 + rng() * 0.3, 0.6, pick(rng, [0x6a9e5e, 0x66a070, 0x82b06a, 0x8ab464]));
       if (Math.round(v / 0.95) % 3 === 0) parts.add('cyl', 0.55, 0.6, 0, 0.06, 1.2, 0.06, WOOD);
       if (rng() < 0.2) parts.add('ball', 0.2, 0.45, 0.3, 0.14, 0.14, 0.14, 0x6d4a8f);
     }
