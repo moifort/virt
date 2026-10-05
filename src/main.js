@@ -36,7 +36,7 @@ scene.add(sun, sun.target);
 const world = createWorld(scene);
 const player = new Player();
 player.position.set(2, groundAt(2, 20), 20);
-scene.add(player.root);
+scene.add(player.root, player.fx);
 
 function resize() {
   pixels.setSize(innerWidth, innerHeight);
