@@ -273,6 +273,93 @@ export function mushroom(rng) {
   return g;
 }
 
+// ---------------------------------------------------------------- Wheat fields
+
+/** Golden wheat fields on the plain: rectangles aligned with the shore, swaying in the wind. */
+const FIELDS = [];
+const inField = (x, z) => {
+  const u = toU(x, z);
+  const v = toV(x, z);
+  return FIELDS.some((f) => u > f.u0 - 1 && u < f.u1 + 1 && v > f.v0 - 1 && v < f.v1 + 1);
+};
+
+function planFields(rng) {
+  for (let tries = 0; tries < 400 && FIELDS.length < 9; tries++) {
+    const u0 = -28 + rng() * 60;
+    const v0 = -60 + rng() * 120;
+    const f = { u0, v0, u1: u0 + 7 + rng() * 6, v1: v0 + 10 + rng() * 8 };
+    if (FIELDS.some((o) => f.u0 < o.u1 + 3 && f.u1 > o.u0 - 3 && f.v0 < o.v1 + 3 && f.v1 > o.v0 - 3)) continue;
+    let ok = true;
+    for (let u = f.u0; u <= f.u1 && ok; u += 2) {
+      for (let v = f.v0; v <= f.v1 && ok; v += 2) {
+        const x = toX(u, v);
+        const z = toZ(u, v);
+        ok = region(x, z) === 'plain' && isWild(x, z, 0.5) && slopeAt(x, z) < 0.3;
+      }
+    }
+    if (ok) FIELDS.push(f);
+  }
+}
+
+function buildWheat(scene, rng) {
+  // Each field is a dense golden mass (so no ink lines inside it), bristling with short ears
+  // that sway in the wind; a few poppies dot the wheat.
+  const carpets = new THREE.Group();
+  const ear = mergeGeometries([
+    new THREE.ConeGeometry(0.07, 0.32, 3).translate(0, 0.16, 0).toNonIndexed(),
+    new THREE.ConeGeometry(0.06, 0.26, 3).rotateZ(0.35).translate(0.07, 0.13, 0.04).toNonIndexed(),
+  ]);
+  const spots = [];
+  for (const f of FIELDS) {
+    const cu = (f.u0 + f.u1) / 2;
+    const cv = (f.v0 + f.v1) / 2;
+    const cx = toX(cu, cv);
+    const cz = toZ(cu, cv);
+    let top = -Infinity;
+    for (let u = f.u0; u <= f.u1; u += 1) for (let v = f.v0; v <= f.v1; v += 1) top = Math.max(top, groundAt(toX(u, v), toZ(u, v)));
+    top += 0.75;
+    const carpet = at(box(f.v1 - f.v0, top - groundAt(cx, cz) + 1, f.u1 - f.u0, 0xe2b84e), cx, (top + groundAt(cx, cz) - 1) / 2, cz, carpets);
+    carpet.rotation.y = Math.PI / 4;
+    for (let u = f.u0 + 0.2; u <= f.u1 - 0.2; u += 0.45) {
+      for (let v = f.v0 + 0.2; v <= f.v1 - 0.2; v += 0.4) {
+        const x = toX(u + (rng() - 0.5) * 0.3, v + (rng() - 0.5) * 0.3);
+        const z = toZ(u + (rng() - 0.5) * 0.3, v + (rng() - 0.5) * 0.3);
+        spots.push([x, top - 0.05, z, rng() < 0.015 ? PAL.red : pick(rng, [0xf0d27a, 0xe8c45a, 0xf5dc8a, 0xdcb24a])]);
+      }
+    }
+  }
+  scene.add(bake(carpets));
+  const mesh = new THREE.InstancedMesh(ear, paint(0xffffff, { sway: true }), spots.length);
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const c = new THREE.Color();
+  spots.forEach(([x, y, z, color], i) => {
+    q.setFromAxisAngle(UP, rng() * Math.PI * 2);
+    m.compose(new THREE.Vector3(x, y, z), q, new THREE.Vector3(1, 0.8 + rng() * 0.5, 1));
+    mesh.setMatrixAt(i, m);
+    mesh.setColorAt(i, c.setHex(color));
+  });
+  mesh.receiveShadow = true;
+  scene.add(mesh);
+
+  // Hay bales at the edge of some fields.
+  const bales = new THREE.Group();
+  for (const f of FIELDS) {
+    if (rng() < 0.4) continue;
+    for (let k = 0; k < 3; k++) {
+      const u = f.u0 - 1.6;
+      const v = f.v0 + 1.5 + k * 1.9;
+      const x = toX(u, v);
+      const z = toZ(u, v);
+      const bale = at(cyl(0.75, 0.75, 1.1, 0xe2c06a, 12), x, groundAt(x, z) + 0.72, z, bales);
+      bale.rotation.set(Math.PI / 2, 0, Math.PI / 4 + rng() * 0.3);
+      at(cyl(0.77, 0.77, 0.08, 0xc8a04a, 12), 0, 0.25, 0, bale);
+      at(cyl(0.77, 0.77, 0.08, 0xc8a04a, 12), 0, -0.25, 0, bale);
+    }
+  }
+  scene.add(bake(bales));
+}
+
 // ---------------------------------------------------------------- Planting
 
 /** Bakes a species prototype into one geometry per material. */
@@ -292,7 +379,7 @@ function grow(scene, rng, build, { count, variants = 3, maxR = 112, margin = 0, 
   const s = new THREE.Vector3();
   for (let i = 0, n = 0; i < count * 15 && n < count; i++) {
     randomSpot(rng, p, maxR);
-    if (!isWild(p.x, p.z, margin) || slopeAt(p.x, p.z) > maxSlope || !where(p.x, p.z)) continue;
+    if (!isWild(p.x, p.z, margin) || inField(p.x, p.z) || slopeAt(p.x, p.z) > maxSlope || !where(p.x, p.z)) continue;
     q.setFromAxisAngle(UP, rng() * Math.PI * 2);
     s.setScalar(size[0] + rng() * (size[1] - size[0]));
     p.y -= sink;
@@ -313,6 +400,8 @@ function grow(scene, rng, build, { count, variants = 3, maxR = 112, margin = 0, 
 
 export function buildNature(scene, rng) {
   const on = (...regions) => (x, z) => regions.includes(region(x, z));
+  planFields(rng);
+  buildWheat(scene, rng);
 
   // Ground cover: grass tufts swaying in the wind.
   const blades = [];
@@ -326,6 +415,7 @@ export function buildNature(scene, rng) {
   scatterInstanced(scene, rng, mergeGeometries(blades), paint(0xffffff, { sway: true }), 5000, (r, p, s, c) => {
     randomSpot(r, p, 125);
     if (!isWild(p.x, p.z, -1.5) || slopeAt(p.x, p.z) > 0.5) return false;
+    if (inField(p.x, p.z)) return false;
     const lush = fbm(p.x * 0.05 + 3, p.z * 0.05 - 8, 3);
     if (lush < 0.5 && r() < 0.85) return false;
     s.setScalar(0.7 + r() * 0.8);
@@ -342,6 +432,7 @@ export function buildNature(scene, rng) {
   scatterInstanced(scene, rng, mergeGeometries(petals), paint(0xffffff, { sway: true }), 2600, (r, p, s, c) => {
     randomSpot(r, p, 125);
     if (!isWild(p.x, p.z, -1) || slopeAt(p.x, p.z) > 0.4) return false;
+    if (inField(p.x, p.z)) return false;
     if (fbm(p.x * 0.06 - 4, p.z * 0.06 + 9, 2) < 0.5) return false;
     s.setScalar(0.8 + r() * 0.7);
     c.setHex(pick(r, [PAL.pink, PAL.saffron, PAL.ivory, PAL.lilac, PAL.coral, PAL.blue]));
@@ -352,6 +443,7 @@ export function buildNature(scene, rng) {
   scatterInstanced(scene, rng, new THREE.DodecahedronGeometry(0.22, 0), paint(0xffffff, { flat: true }), 1400, (r, p, s, c) => {
     randomSpot(r, p, 125);
     if (!isWild(p.x, p.z, -2) || region(p.x, p.z) === 'mountain') return false;
+    if (inField(p.x, p.z)) return false;
     s.set(0.6 + r() * 1.2, 0.4 + r() * 0.6, 0.6 + r() * 1.2);
     c.setHex(pick(r, [STONE, PAL.lilac, PAL.peach, PAL.rose, 0xd8cdb8]));
     return true;
@@ -361,6 +453,7 @@ export function buildNature(scene, rng) {
   scatterInstanced(scene, rng, new THREE.DodecahedronGeometry(1, 0), paint(0xffffff, { flat: true }), 70, (r, p, s, c) => {
     randomSpot(r, p, 125);
     if (!isWild(p.x, p.z)) return false;
+    if (inField(p.x, p.z)) return false;
     s.set(0.6 + r() * 1.4, 0.5 + r() * 1.5, 0.6 + r() * 1.4);
     p.y += s.y * 0.3;
     c.setHex(pick(r, [PAL.lilac, PAL.rose, PAL.peach, STONE]));

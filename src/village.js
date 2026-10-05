@@ -205,48 +205,48 @@ export function buildVillages(scene, rng) {
   const placed = [];
   const yaw = Math.PI / 4;
 
+  // Houses packed in rows along the terraces, as in Manarola: a main village around its
+  // campanile at the foot of the mountain, and a hamlet clinging to the right-hand headland.
+  const bell = { v: 12, u: footU(12) + 12 };
   const villages = [
-    { v: -56, spread: 30, u: (v) => footU(v) + 2 + rng() * 32, n: 22 },
-    { v: -4, spread: 30, u: (v) => footU(v) + 2 + rng() * 32, n: 22 },
-    { v: 50, spread: 28, u: (v) => footU(v) + 2 + rng() * 32, n: 20 },
-    { v: -84, spread: 22, u: () => -75 + rng() * 55, n: 18 },
-    { v: 84, spread: 22, u: () => -75 + rng() * 55, n: 18 },
+    { v0: -14, v1: 36, u0: (v) => footU(v) + 2, u1: (v) => footU(v) + 28 },
+    { v0: 72, v1: 96, u0: () => -62, u1: () => -28 },
   ];
   for (const village of villages) {
-    for (let tries = 0, n = 0; tries < 500 && n < village.n; tries++) {
-      const v = village.v + (rng() - 0.5) * village.spread;
-      const u = village.u(v);
-      const x = toX(u, v);
-      const z = toZ(u, v);
-      if (!isWild(x, z, -1) || slopeAt(x, z) > 1.1) continue;
-      if (placed.some((p) => Math.hypot(p[0] - x, p[1] - z) < 3.8)) continue;
-      placed.push([x, z]);
-      parts.at(new THREE.Vector3(x, groundAt(x, z) - 1.2, z), yaw);
-      house(parts, rng, 2.6 + rng() * 1.4, 2.6 + rng() * 1.2, 2 + Math.floor(rng() * 3));
-      n++;
+    for (let v = village.v0; v <= village.v1; v += 3.5) {
+      for (let u = village.u0(v); u <= village.u1(v); u += 3.3) {
+        const jv = v + (rng() - 0.5) * 0.4;
+        const ju = u + (rng() - 0.5) * 0.3;
+        const x = toX(ju, jv);
+        const z = toZ(ju, jv);
+        if (rng() < 0.08 || Math.hypot(ju - bell.u, jv - bell.v) < 3.5) continue;
+        if (!isWild(x, z, -2) || slopeAt(x, z) > 1.7 || groundAt(x, z) < 1) continue;
+        placed.push([x, z]);
+        parts.at(new THREE.Vector3(x, groundAt(x, z) - 1.4, z), yaw);
+        house(parts, rng, 2.8 + rng() * 0.6, 2.6 + rng() * 0.5, 2 + Math.floor(rng() * 3));
+      }
     }
   }
 
-  for (const v of [-56, -4, 50]) {
-    const u = footU(v) + 6;
-    const x = toX(u, v);
-    const z = toZ(u, v);
-    if (!isWild(x, z, -2)) continue;
+  {
+    const x = toX(bell.u, bell.v);
+    const z = toZ(bell.u, bell.v);
     parts.at(new THREE.Vector3(x, groundAt(x, z) - 0.5, z), yaw);
     campanile(parts, rng);
+    placed.push([x, z]);
   }
 
   // Vineyards: rows of vines on posts, following the terraces.
-  for (let v = -110; v < 110; v += 1.1) {
-    for (let u = 40; u < 140; u += 1.7) {
+  for (let v = -110; v < 110; v += 0.95) {
+    for (let u = 40; u < 150; u += 1.6) {
       const x = toX(u, v);
       const z = toZ(u, v);
-      if (u < footU(v) + 1 || fbm(v * 0.03 + 5, u * 0.03, 2) < 0.48) continue;
+      if (u < footU(v) + 1 || fbm(v * 0.03 + 5, u * 0.03, 2) < 0.36) continue;
       if (slopeAt(x, z) > 0.3 || !isWild(x, z, -1)) continue;
       if (placed.some((p) => Math.hypot(p[0] - x, p[1] - z) < 3)) continue;
       parts.at(new THREE.Vector3(x, groundAt(x, z), z), yaw);
       parts.add('ball', 0, 0.55, 0, 0.85, 0.95 + rng() * 0.3, 0.6, pick(rng, [PAL.grassDeep, 0x5f9c6a, PAL.grass, 0x7fae5a]));
-      if (Math.round(v / 1.1) % 3 === 0) parts.add('cyl', 0.55, 0.6, 0, 0.06, 1.2, 0.06, WOOD);
+      if (Math.round(v / 0.95) % 3 === 0) parts.add('cyl', 0.55, 0.6, 0, 0.06, 1.2, 0.06, WOOD);
       if (rng() < 0.2) parts.add('ball', 0.2, 0.45, 0.3, 0.14, 0.14, 0.14, 0x6d4a8f);
     }
   }
