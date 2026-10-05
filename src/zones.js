@@ -492,51 +492,99 @@ export function gozzo(rng, sail = false) {
   return g;
 }
 
+/** Tall striped lighthouse on an octagonal base, with a gallery and a glowing lantern room. */
 export function lighthouse(parent, x, y, z) {
   const g = at(new THREE.Group(), x, y, z, parent);
-  at(cyl(1.6, 1.9, 1.4, STONE, 12, { flat: true }), 0, 0.7, 0, g);
-  for (let i = 0; i < 4; i++) at(cyl(0.95 - i * 0.07, 1.02 - i * 0.07, 1.6, i % 2 ? PAL.red : PAL.ivory, 12), 0, 2.2 + i * 1.6, 0, g);
-  at(box(1.0, 0.9, 1.0, PAL.saffron, { glow: true }), 0, 8.2, 0, g);
-  at(cone(0.95, 1, PAL.red, 8), 0, 9.15, 0, g);
-  at(cyl(1.15, 1.15, 0.12, INK, 12), 0, 7.7, 0, g);
+  at(cyl(3.6, 4.0, 2.4, STONE, 8, { flat: true }), 0, 1.2, 0, g);
+  at(cyl(3.8, 3.8, 0.2, PAL.cream, 8), 0, 2.5, 0, g);
+  const stripes = 6;
+  for (let i = 0; i < stripes; i++) {
+    const r0 = 1.9 - i * 0.12;
+    at(cyl(r0 - 0.12, r0, 2.4, i % 2 ? PAL.red : PAL.ivory, 14), 0, 3.8 + i * 2.4, 0, g);
+  }
+  for (let i = 0; i < 4; i++) at(box(0.4, 0.7, 0.1, 0x3b3346), 0, 4.5 + i * 3.3, 1.85 - i * 0.18, g);
+  const top = 2.6 + stripes * 2.4;
+  at(cyl(1.75, 1.75, 0.3, INK, 14), 0, top + 0.15, 0, g);
+  at(ring(1.65, 0.06, INK, Math.PI * 2, 18), 0, top + 0.95, 0, g).rotation.x = Math.PI / 2;
+  for (let k = 0; k < 12; k++) at(cyl(0.04, 0.04, 0.8, INK, 4), Math.cos((k / 12) * Math.PI * 2) * 1.65, top + 0.6, Math.sin((k / 12) * Math.PI * 2) * 1.65, g);
+  at(cyl(1.05, 1.05, 1.6, PAL.saffron, 10, { glow: true }), 0, top + 1.1, 0, g);
+  for (let k = 0; k < 6; k++) at(box(0.08, 1.6, 0.08, INK), Math.cos((k / 6) * Math.PI * 2) * 1.07, top + 1.1, Math.sin((k / 6) * Math.PI * 2) * 1.07, g);
+  at(solid(new THREE.SphereGeometry(1.25, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), paint(PAL.red)), 0, top + 1.9, 0, g);
+  at(cyl(0.06, 0.06, 1.2, INK, 4), 0, top + 3.4, 0, g);
+  at(ball(0.22, PAL.saffron, { glow: true }, 6, 4), 0, top + 4.0, 0, g);
 }
 
 export function buildPort(g, rng, animated) {
-  // Local +z points to the open sea, local x runs along the shore.
-  g.rotation.y = Math.PI / 4;
-  const surface = WATER_LEVEL;
-  at(box(26, 4.2, 2.2, STONE, { flat: true }), 0, -2.1, 13, g);
-  at(box(26, 0.25, 2.4, PAL.cream), 0, 0.1, 13, g);
-  for (let x = -11; x <= 11; x += 4.4) at(cyl(0.2, 0.25, 0.6, INK, 6), x, 0.4, 13.7, g);
-
-  // Breakwater and lighthouse.
-  for (let z = 15; z < 34; z += 1.9) {
-    const block = at(solid(new THREE.BoxGeometry(2.6, 2.6, 2.6), paint(pick(rng, [STONE, PAL.lilac, 0xd9cbb5]), { flat: true })), 10 + (rng() - 0.5) * 0.6, surface + 0.3, z, g);
-    block.rotation.set(rng() * 0.5, rng() * 3, rng() * 0.5);
+  // Local +z points to the open sea, found by looking for the deepest water around the port.
+  let best = { depth: Infinity, angle: 0 };
+  for (let k = 0; k < 48; k++) {
+    const angle = (k / 48) * Math.PI * 2;
+    const depth = groundAt(g.position.x + Math.sin(angle) * 30, g.position.z + Math.cos(angle) * 30);
+    if (depth < best.depth) best = { depth, angle };
   }
-  lighthouse(g, 10, surface + 1, 35.5);
+  g.rotation.y = best.angle;
+  const surface = WATER_LEVEL;
+  const Q = 17;
 
-  // Wooden pier.
-  for (let i = 0; i < 18; i++) at(box(2.4, 0.15, 0.55, PAL.wood), -4, 0.05, 14.6 + i * 0.62, g);
-  for (let z = 15; z < 26; z += 2.6) for (const x of [-5.1, -2.9]) at(cyl(0.12, 0.12, 3.4, DARK_WOOD, 6), x, -1.6, z, g);
-  lantern(g, -2.6, 0.1, 25.2);
+  // Quay wall with bollards and lamps.
+  at(box(46, 4.8, 2.6, STONE, { flat: true }), 0, -2.4, Q, g);
+  at(box(46, 0.25, 2.8, PAL.cream), 0, 0.1, Q, g);
+  for (let x = -21; x <= 21; x += 4.2) at(cyl(0.22, 0.28, 0.65, INK, 6), x, 0.42, Q + 0.9, g);
+  for (const x of [-18, -6, 6, 18]) lantern(g, x, 0.2, Q - 0.6);
 
-  // Moored boats, bobbing.
-  [[-7.5, 18, 0.1], [-0.6, 17.5, -0.1], [-0.4, 23, 0.05], [-7.8, 23.5, -0.08], [4.5, 20, 0.3]].forEach(([x, z, yaw], i) => {
-    const boat = at(live(gozzo(rng, i === 4)), x, surface, z, g);
+  // A stone mole to the left, a long curved breakwater to the right ending at the lighthouse.
+  const block = (x, z, size) => {
+    const b = at(solid(new THREE.BoxGeometry(size, size, size), paint(pick(rng, [STONE, PAL.lilac, 0xd9cbb5]), { flat: true })), x, surface + 0.2, z, g);
+    b.rotation.set(rng() * 0.5, rng() * 3, rng() * 0.5);
+  };
+  for (let z = Q + 2; z < Q + 22; z += 2.2) {
+    block(-21, z, 3.2);
+    block(-23, z + 1, 2.4);
+  }
+  at(box(3, 0.4, 20, STONE), -21, surface + 1.7, Q + 11, g);
+  for (let t = 0; t <= 1; t += 0.035) {
+    const x = 21 - Math.sin(t * 1.3) * 12;
+    const z = Q + 2 + t * 34;
+    block(x, z, 3.4);
+    block(x + 2.2, z + 0.6, 2.6);
+  }
+  lighthouse(g, 21 - Math.sin(1.3) * 12, surface + 0.6, Q + 39);
+
+  // Two wooden piers.
+  for (const px of [-9, 5]) {
+    for (let i = 0; i < 28; i++) at(box(2.6, 0.16, 0.56, PAL.wood), px, 0.05, Q + 1.6 + i * 0.62, g);
+    for (let z = Q + 2; z < Q + 19; z += 2.8) for (const dx of [-1.2, 1.2]) at(cyl(0.13, 0.13, 3.6, DARK_WOOD, 6), px + dx, -1.7, z, g);
+    lantern(g, px + 1.1, 0.13, Q + 18.6);
+  }
+
+  // Moored boats along the piers, bobbing.
+  const moorings = [];
+  for (const px of [-9, 5]) for (const side of [-1, 1]) for (let k = 0; k < 3; k++) moorings.push([px + side * 2.6, Q + 4 + k * 5, (rng() - 0.5) * 0.2]);
+  moorings.forEach(([x, z, yaw], i) => {
+    const boat = at(live(gozzo(rng, i % 5 === 4)), x, surface, z, g);
     boat.rotation.y = yaw;
     animated.push((t) => {
       boat.position.y = surface + Math.sin(t * 1.3 + i) * 0.08;
       boat.rotation.z = Math.sin(t * 1.1 + i * 2) * 0.05;
     });
   });
+
+  // A harbour crane.
+  const crane = at(new THREE.Group(), 15, 0, Q - 2, g);
+  at(cyl(0.35, 0.5, 9, PAL.saffron, 8), 0, 4.5, 0, crane);
+  const boom = at(box(0.4, 0.4, 8, PAL.saffron), 0, 8.6, 3, crane);
+  boom.rotation.x = -0.25;
+  at(box(1.4, 1.2, 1.6, PAL.coral), 0, 9.2, -0.8, crane);
+  at(cyl(0.02, 0.02, 5, INK, 3), 0, 7.6, 6.6, crane);
+  at(box(0.5, 0.3, 0.3, INK), 0, 5.1, 6.6, crane);
+
   // Boats pulled up on the quay, crates and a café terrace.
-  for (const [x, z, yaw] of [[-10, 8, 0.4], [-8, 6.5, 0.2]]) {
+  for (const [x, z, yaw] of [[-12, 9, 0.4], [-9.5, 7.5, 0.2], [-14.5, 10.5, 0.6]]) {
     const boat = at(gozzo(rng), x, 0.15, z, g);
     boat.rotation.set(0, yaw, 0.12);
   }
-  for (let i = 0; i < 5; i++) at(box(0.9, 0.7, 0.9, pick(rng, [PAL.wood, PAL.ochre, PAL.teal])), 6 + (i % 3) * 1, 0.35 + Math.floor(i / 3) * 0.7, 9 + (i % 2) * 0.4, g).rotation.y = rng();
-  for (const [x, z, color] of [[2, 6, PAL.coral], [6, 4, PAL.teal], [-3, 4, PAL.saffron]]) {
+  for (let i = 0; i < 7; i++) at(box(0.9, 0.7, 0.9, pick(rng, [PAL.wood, PAL.ochre, PAL.teal])), 8 + (i % 3), 0.35 + Math.floor(i / 3) * 0.7, 12 + (i % 2) * 0.4, g).rotation.y = rng();
+  for (const [x, z, color] of [[2, 6, PAL.coral], [6, 4, PAL.teal], [-3, 4, PAL.saffron], [-7, 2, PAL.pink]]) {
     at(cyl(0.7, 0.7, 0.08, PAL.ivory, 12), x, 1.05, z, g);
     at(cyl(0.07, 0.07, 3, INK, 6), x, 1.5, z, g);
     const parasol = at(cone(2, 0.8, color, 8), x, 3.2, z, g);

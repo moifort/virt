@@ -19,10 +19,11 @@ export const toX = (u, v) => (-u + v) / Math.SQRT2;
 export const toZ = (u, v) => (-u - v) / Math.SQRT2;
 export const toU = (x, z) => (-x - z) / Math.SQRT2;
 export const toV = (x, z) => (x - z) / Math.SQRT2;
-// Headlands: toward both ends of the bay the land reaches far out to sea.
-export const headland = (v) => smoothstep(52, 96, Math.abs(v) + (fbm(v * 0.05, 9.4, 2) - 0.5) * 16);
-export const coastU = (v) => -40 + (fbm(v * 0.02, 3.1, 3) - 0.5) * 20 - headland(v) * 58;
-export const footU = (v) => 50 + (fbm(v * 0.025, 7.7, 3) - 0.5) * 18;
+// To the right a headland reaches far out to sea; to the left the land falls back and the sea opens.
+export const headland = (v) => smoothstep(52, 96, v + (fbm(v * 0.05, 9.4, 2) - 0.5) * 16);
+export const openSea = (v) => smoothstep(-35, -105, v);
+export const coastU = (v) => -40 + (fbm(v * 0.02, 3.1, 3) - 0.5) * 20 - headland(v) * 58 + openSea(v) * 95;
+export const footU = (v) => 50 + (fbm(v * 0.025, 7.7, 3) - 0.5) * 18 + openSea(v) * 70;
 
 export const placeZone = (id, name, hint, u, v, r) => ({ id, name, hint, u, v, r, x: toX(u, v), z: toZ(u, v) });
 export const ZONES = [
@@ -32,14 +33,14 @@ export const ZONES = [
   placeZone('pub', 'Le Pub', 'après le travail', -22, -40, 12),
   placeZone('pods', 'Bulles focus', 'concentration', 2, 52, 13),
   placeZone('atelier', "L'Atelier", 'prototypes', 8, -54, 12),
-  placeZone('port', 'Le Port', 'pause au bord de l\'eau', -42, 10, 12),
+  placeZone('port', 'Le Port', 'pause au bord de l\'eau', 4, -72, 16),
 ];
 export const zone = (id) => ZONES.find((z) => z.id === id);
 
 export const PATHS = [
   ...ZONES.slice(1).map((z) => [0, 0, z.x, z.z]),
   [zone('pub').x, zone('pub').z, zone('port').x, zone('port').z],
-  [zone('port').x, zone('port').z, zone('pods').x, zone('pods').z],
+  [zone('atelier').x, zone('atelier').z, zone('port').x, zone('port').z],
 ];
 
 // ---------------------------------------------------------------- Ground
