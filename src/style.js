@@ -146,7 +146,9 @@ vec3 terrainColor(vec3 w, vec3 n) {
 
   float slope = 1.0 - n.y;
   vec3 col = slope > 0.42 + (pxNoise(w.xz * 0.8) - 0.5) * 0.12 ? cliff : flat_;
-  if (w.y < ${(WATER_LEVEL + 0.35).toFixed(2)}) col = ${lin(PAL.wetSand)};
+  // White sand just above the waterline, wet sand at the water's edge.
+  if (w.y < ${(WATER_LEVEL + 1.2).toFixed(2)} && slope < 0.3) col = speck > 0.9 ? ${lin(0xeee2c8)} : ${lin(0xfbf5e6)};
+  if (w.y < ${(WATER_LEVEL + 0.35).toFixed(2)}) col = ${lin(0xe6d8b8)};
   return col;
 }
 #endif

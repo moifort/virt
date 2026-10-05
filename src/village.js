@@ -205,11 +205,11 @@ export function buildVillages(scene, rng) {
   const placed = [];
   const yaw = Math.PI / 4;
 
-  // Houses packed in rows along the terraces, as in Manarola: a main village around its
-  // campanile at the foot of the mountain, and a hamlet clinging to the right-hand headland.
-  const bell = { v: 12, u: footU(12) + 12 };
+  // Houses packed in rows along the terraces, as in Manarola: the main village on the
+  // left-hand slopes above the sea, and a hamlet clinging to the right-hand headland.
+  const bell = { v: -48, u: footU(-48) + 12 };
   const villages = [
-    { v0: -14, v1: 36, u0: (v) => footU(v) + 2, u1: (v) => footU(v) + 28 },
+    { v0: -68, v1: -28, u0: (v) => footU(v) + 2, u1: (v) => footU(v) + 30 },
     { v0: 72, v1: 96, u0: () => -62, u1: () => -28 },
   ];
   for (const village of villages) {
@@ -241,7 +241,9 @@ export function buildVillages(scene, rng) {
     for (let u = 40; u < 150; u += 1.6) {
       const x = toX(u, v);
       const z = toZ(u, v);
-      if (u < footU(v) + 1 || fbm(v * 0.03 + 5, u * 0.03, 2) < 0.36) continue;
+      // Vineyards everywhere on the flanks, densest where the old village stood.
+      const vineyard = v > -16 && v < 42 && u < footU(v) + 34;
+      if (u < footU(v) + 1 || (!vineyard && fbm(v * 0.03 + 5, u * 0.03, 2) < 0.36)) continue;
       if (slopeAt(x, z) > 0.3 || !isWild(x, z, -1)) continue;
       if (placed.some((p) => Math.hypot(p[0] - x, p[1] - z) < 3)) continue;
       parts.at(new THREE.Vector3(x, groundAt(x, z), z), yaw);

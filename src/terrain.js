@@ -22,8 +22,14 @@ export const toV = (x, z) => (x - z) / Math.SQRT2;
 // To the right a headland reaches far out to sea; to the left the land falls back and the sea opens.
 export const headland = (v) => smoothstep(52, 96, v + (fbm(v * 0.05, 9.4, 2) - 0.5) * 16);
 export const openSea = (v) => smoothstep(-35, -105, v);
-export const coastU = (v) => -40 + (fbm(v * 0.02, 3.1, 3) - 0.5) * 20 - headland(v) * 58 + openSea(v) * 95;
-export const footU = (v) => 50 + (fbm(v * 0.025, 7.7, 3) - 0.5) * 18 + openSea(v) * 70;
+// Past the harbour the water runs all the way up the left side.
+const farLeft = (v) => smoothstep(-74, -94, v);
+// Pass `u` to make the left shore wander instead of running in a straight line.
+const wander = (u) => (u === undefined ? 0 : (fbm(u * 0.035, 4.2, 3) - 0.5) * 30);
+export const coastU = (v, u) => -40 + (fbm(v * 0.02, 3.1, 3) - 0.5) * 20 - headland(v) * 58 + openSea(v) * 95 + farLeft(v + wander(u)) * 260;
+export const footU = (v, u) => 50 + (fbm(v * 0.025, 7.7, 3) - 0.5) * 18 + openSea(v) * 70 + farLeft(v + wander(u)) * 260;
+// A white sand beach along the middle of the bay.
+const beachBand = (v) => smoothstep(-30, -18, v) * smoothstep(64, 50, v);
 
 export const placeZone = (id, name, hint, u, v, r) => ({ id, name, hint, u, v, r, x: toX(u, v), z: toZ(u, v) });
 export const ZONES = [
@@ -50,19 +56,22 @@ export function heightAt(x, z) {
   const v = toV(x, z);
   let h = 0.7 + (fbm(x * 0.03, z * 0.03, 3) - 0.5) * 2.2;
   // The mountain: steep terraced slopes, like the Ligurian coast.
-  const foot = footU(v);
+  const foot = footU(v, u);
   const back = smoothstep(foot, foot + 95, u) * (62 + (fbm(x * 0.015, z * 0.015, 3) - 0.5) * 30) + Math.max(0, u - foot) * 0.08;
   // Side ridges run down from the mountain and plunge into the sea, closing the bay.
   const ridge = headland(v) * (16 + smoothstep(-110, 70, u) * 46 + (fbm(x * 0.03, z * 0.03, 3) - 0.5) * 14);
   h += Math.max(back, ridge);
   // The sea: sheer cliffs under the headlands, softer coves in the bay.
-  const coast = coastU(v);
+  const coast = coastU(v, u);
   const sheer = (4 + fbm(v * 0.04 + 11, 2.3, 2) * 14) * (1 - headland(v) * 0.75);
   h -= smoothstep(coast + 2, coast - sheer, u) * (9 + headland(v) * 20);
   // Terraces: shelves and short dry-stone walls.
   const step = 2.4;
   const shelf = Math.floor(h / step) * step;
   h = shelf + smoothstep(0.72, 1, (h - shelf) / step) * step;
+  // The beach: a smooth gentle slope down into turquoise shallows, no terraces.
+  const beach = beachBand(v) * smoothstep(coast + 14, coast + 8, u) * smoothstep(coast - 5, coast + 1, u);
+  h += (WATER_LEVEL + 0.25 + Math.max(0, u - coast) * 0.08 - h) * beach;
   // Work areas sit on level pads.
   for (const zn of ZONES) h += (0 - h) * smoothstep(zn.r + 7, zn.r + 1, Math.hypot(x - zn.x, z - zn.z));
   return h;
