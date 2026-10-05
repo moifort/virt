@@ -559,14 +559,12 @@ export function buildPort(g, rng, animated) {
   const surface = WATER_LEVEL;
   const Q = 17;
 
-  // An old rustic quay: irregular dry-stone blocks topped with a weathered timber boardwalk,
-  // wooden mooring posts, and lamps.
-  for (let x = -22.5; x <= 22.5; x += 1.6 + rng() * 0.6) {
-    const w = 1.6 + rng() * 0.8;
-    const stone = at(box(w, 4.4 + rng() * 0.6, 2.4 + rng() * 0.6, pick(rng, [0xd9c7a8, 0xc9b49a, 0xe2cfae, 0xbfae9a]), { flat: true }), x, -2.2 - rng() * 0.3, Q + (rng() - 0.5) * 0.4, g);
-    stone.rotation.set((rng() - 0.5) * 0.12, (rng() - 0.5) * 0.2, (rng() - 0.5) * 0.12);
-  }
-  for (let x = -22.5; x < 22.5; x += 0.62) at(box(0.56, 0.14, 3.2, pick(rng, [PAL.wood, 0xa8764f, 0x9a6a48])), x + 0.31, 0.12, Q - 0.2, g);
+  // A timber quay: a plank boardwalk carried on driven piles and faced with boards, with
+  // mooring posts and lamps. Everything in the harbour is wood.
+  const TIMBER = [PAL.wood, 0xa8764f, 0x9a6a48];
+  for (let x = -22.5; x <= 22.5; x += 1.5) at(cyl(0.2, 0.24, 5.2, DARK_WOOD, 6), x, -2.3, Q + 1.35, g);
+  for (let k = 0; k < 4; k++) at(box(45.2, 0.5, 0.12, TIMBER[k % 3]), 0, -0.3 - k * 0.56, Q + 1.15, g);
+  for (let x = -22.5; x < 22.5; x += 0.62) at(box(0.56, 0.14, 3.2, pick(rng, TIMBER)), x + 0.31, 0.12, Q - 0.2, g);
   for (const z of [Q - 1.6, Q + 1.2]) at(box(45, 0.12, 0.2, DARK_WOOD), 0, 0.02, z, g);
   for (let x = -21; x <= 21; x += 4.2) {
     at(cyl(0.16, 0.2, 1.2, DARK_WOOD, 6), x, 0.5, Q + 1.3, g);
@@ -574,24 +572,45 @@ export function buildPort(g, rng, animated) {
   }
   for (const x of [-18, -6, 6, 18]) lantern(g, x, 0.2, Q - 0.9);
 
-  // A stone mole to the left, a long curved breakwater to the right ending at the lighthouse.
-  const block = (x, z, size) => {
-    const b = at(solid(new THREE.BoxGeometry(size, size, size), paint(pick(rng, [STONE, 0xb9ad9c, 0xd9cbb5]), { flat: true })), x, surface + 0.2, z, g);
-    b.rotation.set(rng() * 0.5, rng() * 3, rng() * 0.5);
+  // A straight jetty to the left, and a long curved boardwalk to the right, out to the lighthouse.
+  const plank = (x, z, yaw, width) => {
+    at(box(width, 0.14, 0.56, pick(rng, TIMBER)), x, 0.05, z, g).rotation.y = yaw;
   };
-  for (let z = Q + 2; z < Q + 22; z += 2.2) {
-    block(-21, z, 3.2);
-    block(-23, z + 1, 2.4);
+  const pile = (x, z) => at(cyl(0.14, 0.16, 4.2, DARK_WOOD, 6), x, -1.7, z, g);
+  for (let z = Q + 1.6; z < Q + 21; z += 0.62) plank(-21, z + 0.31, 0, 3);
+  for (let z = Q + 2.4; z < Q + 21; z += 3) for (const dx of [-1.4, 1.4]) pile(-21 + dx, z);
+  lantern(g, -20, 0.13, Q + 20.4);
+  const curve = (t) => [21 - Math.sin(t * 1.3) * 12, Q + 1.6 + t * 27];
+  const steps = 68;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const [x, z] = curve(t);
+    const [nx, nz] = curve(t + 0.01);
+    const yaw = Math.atan2(nx - x, nz - z);
+    plank(x, z, yaw, 2.8);
+    if (i % 5 === 2) {
+      for (const side of [-1.3, 1.3]) pile(x + Math.cos(yaw) * side, z - Math.sin(yaw) * side);
+      // Handrail posts on the seaward side.
+      at(cyl(0.05, 0.06, 1.0, DARK_WOOD, 5), x + Math.cos(yaw) * 1.3, 0.6, z - Math.sin(yaw) * 1.3, g);
+    }
+    if (i % 5 === 2 && i + 5 <= steps) {
+      const [ax, az] = curve((i + 5) / steps);
+      const [bx, bz] = curve((i + 5) / steps + 0.01);
+      const byaw = Math.atan2(bx - ax, bz - az);
+      const x0 = x + Math.cos(yaw) * 1.3;
+      const z0 = z - Math.sin(yaw) * 1.3;
+      const x1 = ax + Math.cos(byaw) * 1.3;
+      const z1 = az - Math.sin(byaw) * 1.3;
+      const rail = at(box(0.06, 0.06, Math.hypot(x1 - x0, z1 - z0), DARK_WOOD), (x0 + x1) / 2, 1.05, (z0 + z1) / 2, g);
+      rail.rotation.y = Math.atan2(x1 - x0, z1 - z0);
+    }
   }
-  // Timber walkway along the top of the mole.
-  for (let z = Q + 1; z < Q + 21; z += 0.62) at(box(3, 0.14, 0.56, pick(rng, [PAL.wood, 0xa8764f])), -21, surface + 1.8, z + 0.31, g);
-  for (let t = 0; t <= 1; t += 0.035) {
-    const x = 21 - Math.sin(t * 1.3) * 12;
-    const z = Q + 2 + t * 34;
-    block(x, z, 3.4);
-    block(x + 2.2, z + 0.6, 2.6);
-  }
-  lighthouse(g, 21 - Math.sin(1.3) * 12, surface + 0.6, Q + 39);
+  // The lighthouse stands at the end on a timber platform over a cluster of piles.
+  const [lx, lz] = curve(1);
+  at(cyl(4.8, 4.8, 0.3, PAL.wood, 8, { flat: true }), lx, 0.02, lz + 4, g);
+  at(cyl(4.9, 4.9, 0.12, DARK_WOOD, 8, { flat: true }), lx, -0.2, lz + 4, g);
+  for (let k = 0; k < 8; k++) pile(lx + Math.cos((k / 8) * Math.PI * 2) * 4.3, lz + 4 + Math.sin((k / 8) * Math.PI * 2) * 4.3);
+  lighthouse(g, lx, 0.15, lz + 4);
 
   // Two wooden piers.
   for (const px of [-9, 5]) {
@@ -628,6 +647,7 @@ export function buildPort(g, rng, animated) {
   // A few fishmongers' stalls along the quay.
   for (const [x, z, yaw] of [[-15, Q - 2.6, 0], [-3.5, Q - 2.6, 0], [12.5, Q - 2.6, 0], [17, 6, -0.4]]) fishStall(g, rng, x, z, yaw);
   furnishPort(g, rng);
+  harbourCats(g, rng, animated);
 }
 
 export function buildAgora(g, rng) {
@@ -817,6 +837,109 @@ function furnishAtelier(g, rng, animated) {
   at(cyl(0.26, 0.26, 0.16, INK, 10), 0, 0.26, 1.6, ape).rotation.z = Math.PI / 2;
   for (const x of [-0.72, 0.72]) at(cyl(0.26, 0.26, 0.16, INK, 10), x, 0.26, -1.0, ape).rotation.z = Math.PI / 2;
   at(ball(0.1, WARM_LIGHT, { glow: true }, 4, 3), 0, 0.8, 2.0, ape);
+}
+
+const CAT_COATS = [
+  [0xd9853a, 0xefe8dc], // ginger and white
+  [0x33303f, 0x33303f], // black
+  [0xefe8dc, 0xefe8dc], // white
+  [0x8a8478, 0x5f5a52], // grey tabby
+  [0xefe8dc, 0xd9853a], // white with ginger patches
+  [0x5f5a52, 0xefe8dc], // tuxedo
+];
+
+/** A harbour cat facing +z: `sit` upright, `sleep` curled in a loaf, or `walk` on four legs. */
+export function harbourCat(rng, animated, pose = 'sit') {
+  const g = live(new THREE.Group());
+  const [fur, mark] = pick(rng, CAT_COATS);
+  const head = new THREE.Group();
+  at(ball(0.15, fur, {}, 8, 6), 0, 0, 0, head).scale.set(1.05, 0.9, 0.95);
+  at(ball(0.07, mark, {}, 6, 4), 0, -0.04, 0.11, head);
+  for (const s of [-1, 1]) {
+    at(cone(0.055, 0.12, fur, 4), s * 0.085, 0.14, -0.01, head);
+    at(box(0.03, 0.035, 0.02, 0x2b2533), s * 0.06, 0.02, 0.135, head);
+  }
+  const tail = new THREE.Group();
+  const tip = at(cyl(0.03, 0.045, 0.5, fur, 5), 0, 0.25, 0, tail);
+  at(ball(0.04, mark, {}, 5, 4), 0, 0.26, 0, tip);
+  const legs = [];
+  const phase = rng() * 10;
+  if (pose === 'sit') {
+    at(ball(0.2, fur, {}, 8, 6), 0, 0.2, -0.04, g).scale.set(0.9, 1.0, 1.05);
+    at(ball(0.16, fur, {}, 8, 6), 0, 0.36, 0.04, g).scale.set(0.85, 1.1, 0.85);
+    at(ball(0.09, mark, {}, 6, 4), 0, 0.32, 0.15, g);
+    for (const s of [-1, 1]) at(cyl(0.04, 0.045, 0.3, fur, 5), s * 0.07, 0.15, 0.14, g);
+    at(head, 0, 0.6, 0.1, g);
+    at(tail, 0.12, 0.05, -0.18, g).rotation.set(0, 0, -1.45);
+  } else if (pose === 'sleep') {
+    at(ball(0.22, fur, {}, 8, 6), 0, 0.13, 0, g).scale.set(1.0, 0.6, 1.45);
+    at(ball(0.12, mark, {}, 6, 4), 0.06, 0.2, -0.1, g).scale.set(1, 0.5, 1.2);
+    at(head, 0.05, 0.16, 0.3, g).rotation.set(0.3, 0.5, 0);
+    at(tail, -0.16, 0.05, -0.2, g).rotation.set(1.3, 0, 0.9);
+  } else {
+    at(ball(0.16, fur, {}, 8, 6), 0, 0.3, 0, g).scale.set(0.8, 0.8, 1.9);
+    at(ball(0.1, mark, {}, 6, 4), 0, 0.24, 0.12, g).scale.set(0.8, 0.6, 1.4);
+    for (const [x, z] of [[-0.07, 0.2], [0.07, 0.2], [-0.07, -0.2], [0.07, -0.2]]) {
+      const hip = at(new THREE.Group(), x, 0.26, z, g);
+      at(cyl(0.035, 0.04, 0.26, fur, 5), 0, -0.13, 0, hip);
+      at(ball(0.045, mark, {}, 5, 4), 0, -0.25, 0.01, hip);
+      legs.push(hip);
+    }
+    at(head, 0, 0.44, 0.36, g);
+    at(tail, 0, 0.36, -0.3, g).rotation.x = -0.5;
+  }
+  animated.push((t) => {
+    if (pose === 'sleep') {
+      g.scale.y = 1 + Math.sin(t * 1.8 + phase) * 0.04; // breathing
+      return;
+    }
+    tail.rotation[pose === 'sit' ? 'y' : 'z'] = Math.sin(t * 1.4 + phase) * 0.35;
+    head.rotation.y = Math.sin(t * 0.5 + phase) * 0.6 * (pose === 'sit' ? 1 : 0.3);
+    legs.forEach((leg, i) => (leg.rotation.x = Math.sin(t * 9 + (i % 3 ? Math.PI : 0)) * 0.6 * (g.userData.moving ? 1 : 0)));
+  });
+  return g;
+}
+
+/** The cats of the harbour: begging at the fish stalls, dozing in the sun, patrolling the planks. */
+function harbourCats(g, rng, animated) {
+  const Q = 17;
+  const deck = 0.19;
+  const put = (pose, x, y, z, yaw) => {
+    const cat = at(harbourCat(rng, animated, pose), x, y, z, g);
+    cat.rotation.y = yaw;
+    return cat;
+  };
+  // Waiting for scraps by the fishmongers.
+  put('sit', -13.4, deck, Q - 1.2, Math.PI + 0.5);
+  put('sit', -4.8, deck, Q - 1.3, Math.PI - 0.4);
+  put('sit', -2.4, deck, Q - 1.1, Math.PI + 0.3);
+  put('sit', 11.2, deck, Q - 1.2, Math.PI - 0.5);
+  // Watching the water from the end of a pier, and from the jetty.
+  put('sit', -9.4, 0.13, Q + 18.4, 0.2);
+  put('sit', -21.6, 0.12, Q + 19.6, -0.3);
+  // Asleep in the last of the sun.
+  put('sleep', 15.2, deck, Q - 0.2, 0.8);
+  put('sleep', -10.8, 0.05, 8.8, 2.2);
+  put('sleep', 8.4, 1.45, 12.2, 1.2);
+  put('sleep', 5.6, 0.13, Q + 9, -0.6);
+  // On patrol: back and forth along the quay and a pier, pausing at each end.
+  for (const [ax, az, bx, bz, y, speed] of [[-20, Q - 0.6, 19, Q - 0.6, deck, 1.1], [5.4, Q + 2, 5.4, Q + 17, 0.13, 0.9], [-7, 6, 9, 9, 0.02, 1.0]]) {
+    const cat = put('walk', ax, y, az, 0);
+    const length = Math.hypot(bx - ax, bz - az);
+    const travel = length / speed;
+    const rest = 4 + rng() * 5;
+    const offset = rng() * 30;
+    animated.push((t) => {
+      const clock = (t + offset) % ((travel + rest) * 2);
+      const back = clock >= travel + rest;
+      const local = back ? clock - travel - rest : clock;
+      const k = Math.min(1, local / travel);
+      const p = back ? 1 - k : k;
+      cat.position.set(ax + (bx - ax) * p, y, az + (bz - az) * p);
+      cat.rotation.y = Math.atan2(bx - ax, bz - az) + (back ? Math.PI : 0);
+      cat.userData.moving = k < 1;
+    });
+  }
 }
 
 function furnishPort(g, rng) {
