@@ -331,7 +331,7 @@ export function buildVillages(scene, rng, animated) {
   const SUNK = 1.4; // houses are dug into the slope: their street door is this far up
 
   // Houses packed in rows along the slope, as in Manarola, inside an organic blob.
-  const villages = VILLAGES.map((village) => ({ cu: village.u, cv: village.v, radius: village.r, bell: village.bell }));
+  const villages = VILLAGES.map((village) => ({ cu: village.u, cv: village.v, radius: village.r, bell: village.bell, waterfront: village.waterfront }));
   for (const village of villages) {
     for (let v = village.cv - village.radius - 4; v <= village.cv + village.radius + 4; v += 3.4) {
       for (let u = village.cu - village.radius - 4; u <= village.cu + village.radius + 4; u += 3.2) {
@@ -345,9 +345,10 @@ export function buildVillages(scene, rng, animated) {
         const x = toX(ju, jv);
         const z = toZ(ju, jv);
         if (rng() < 0.05 || (village.bell && Math.hypot(ju - village.cu, jv - village.cv) < 3.5)) continue;
-        if (!isWild(x, z, -2) || slopeAt(x, z) > 1.8 || groundAt(x, z) < WATER_LEVEL + 1.3) continue;
+        // The lowest houses of a waterfront village stand in the shallows, the sea at their doors.
+        if (!isWild(x, z, -2, WATER_LEVEL + (village.waterfront ? -1.5 : 1.3)) || slopeAt(x, z) > 1.8) continue;
         placed.push([x, z]);
-        parts.at(new THREE.Vector3(x, groundAt(x, z) - SUNK, z), yaw);
+        parts.at(new THREE.Vector3(x, Math.max(groundAt(x, z), WATER_LEVEL + 0.45) - SUNK, z), yaw);
         // Taller houses toward the heart of the village.
         const floors = 2 + Math.floor(rng() * 2) + (d < edge * 0.5 ? 1 : 0);
         house(parts, rng, 2.8 + rng() * 0.6, 2.6 + rng() * 0.5, floors, SUNK);

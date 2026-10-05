@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { mulberry32, pick } from './noise.js';
 import { PAL, WATER_LEVEL, paint, solid } from './style.js';
 import { DARK_WOOD, INK, SCREEN, STONE, WARM_LIGHT, at, bake, ball, box, cone, cyl, lamplight, lantern, live, plant, ring, screen } from './kit.js';
-import { SUN_DIR, ZONES, groundAt } from './terrain.js';
+import { SUN_DIR, ZONES, groundAt, toX, toZ } from './terrain.js';
 
 /** Shelves of books along a wall. axis 'x' runs along x facing +z; axis 'z' runs along z facing +x. */
 export function bookshelf(parent, books, rng, { axis, from, to, at: fixed, y0, rows = 5, rowH = 1.18 }) {
@@ -627,17 +627,114 @@ function fishStall(parent, rng, x, z, yaw) {
   at(box(0.9, 0.4, 0.6, PAL.blue), -0.6, 0.0, 1.1, s);
 }
 
-export function buildPort(g, rng, animated) {
-  // Local +z points to the open sea, found by looking for the deepest water around the port.
+/** The bearing of the open sea from a point of the shore: toward the deepest water around it. */
+function seaward(x, z) {
   let best = { depth: Infinity, angle: 0 };
   for (let k = 0; k < 48; k++) {
     const angle = (k / 48) * Math.PI * 2;
-    const depth = groundAt(g.position.x + Math.sin(angle) * 30, g.position.z + Math.cos(angle) * 30);
+    const depth = groundAt(x + Math.sin(angle) * 30, z + Math.cos(angle) * 30);
     if (depth < best.depth) best = { depth, angle };
   }
-  g.rotation.y = best.angle;
+  return best.angle;
+}
+
+/** Mussels crowding a pile where the tide washes it: blue-black shells, a pale barnacle or two. */
+function mussels(parent, rng, x, z, radius = 0.17) {
+  for (let k = 0; k < 9; k++) {
+    const a = rng() * Math.PI * 2;
+    const shell = at(ball(0.1 + rng() * 0.05, rng() < 0.12 ? 0xcfcabb : pick(rng, [0x23283c, 0x2f3550, 0x1b1f30, 0x343a5a]), { flat: true }, 5, 4), x + Math.cos(a) * radius, WATER_LEVEL - 0.25 + rng() * 0.85, z + Math.sin(a) * radius, parent);
+    shell.scale.set(0.8, 1.5, 0.8);
+  }
+}
+
+/**
+ * The lighthouse, out at sea where it has always stood, and the way to it: a boardwalk on
+ * timber piles running out from the shore and curving round to its platform. The piles are
+ * black with mussels at the waterline.
+ */
+export function buildLighthouseWalk(scene, rng) {
+  const g = new THREE.Group();
+  g.position.set(toX(4, -72), 0, toZ(4, -72));
+  g.rotation.y = seaward(g.position.x, g.position.z);
+  const TIMBER = [PAL.wood, 0xa8764f, 0x9a6a48];
+  const Q = 17;
+  const plank = (x, z, yaw, width) => {
+    at(box(width, 0.14, 0.56, pick(rng, TIMBER)), x, 0.05, z, g).rotation.y = yaw;
+  };
+  const pile = (x, z) => {
+    at(cyl(0.14, 0.16, 4.2, DARK_WOOD, 6), x, -1.7, z, g);
+    mussels(g, rng, x, z);
+  };
+  // A point of the walk, in the world, to know whether it is over land or water.
+  const sin = Math.sin(g.rotation.y);
+  const cos = Math.cos(g.rotation.y);
+  const ground = (x, z) => groundAt(g.position.x + x * cos + z * sin, g.position.z - x * sin + z * cos);
+
+  // From the shore straight out over the shallows...
+  let shore = Q + 1.6;
+  while (shore > -60 && ground(21, shore) < 0.1) shore -= 0.62;
+  for (let z = shore; z < Q + 1.6; z += 0.62) {
+    plank(21, z + 0.31, 0, 2.8);
+    if (Math.round((z - shore) / 0.62) % 5 === 2 && ground(21, z) < WATER_LEVEL - 0.2) for (const dx of [-1.3, 1.3]) pile(21 + dx, z);
+  }
+  lantern(g, 22, 0.13, shore + 1.5);
+  // ...then curving round to the lighthouse, with a handrail on the seaward side.
+  const curve = (t) => [21 - Math.sin(t * 1.3) * 12, Q + 1.6 + t * 27];
+  const steps = 68;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const [x, z] = curve(t);
+    const [nx, nz] = curve(t + 0.01);
+    const yaw = Math.atan2(nx - x, nz - z);
+    plank(x, z, yaw, 2.8);
+    if (i % 5 === 2) {
+      for (const side of [-1.3, 1.3]) pile(x + Math.cos(yaw) * side, z - Math.sin(yaw) * side);
+      at(cyl(0.05, 0.06, 1.0, DARK_WOOD, 5), x + Math.cos(yaw) * 1.3, 0.6, z - Math.sin(yaw) * 1.3, g);
+      // Cross-beams under the deck, mussels along them too.
+      at(box(3.0, 0.16, 0.16, DARK_WOOD), x, -0.9, z, g).rotation.y = yaw;
+    }
+    if (i % 5 === 2 && i + 5 <= steps) {
+      const [ax, az] = curve((i + 5) / steps);
+      const [bx, bz] = curve((i + 5) / steps + 0.01);
+      const byaw = Math.atan2(bx - ax, bz - az);
+      const x0 = x + Math.cos(yaw) * 1.3;
+      const z0 = z - Math.sin(yaw) * 1.3;
+      const x1 = ax + Math.cos(byaw) * 1.3;
+      const z1 = az - Math.sin(byaw) * 1.3;
+      const rail = at(box(0.06, 0.06, Math.hypot(x1 - x0, z1 - z0), DARK_WOOD), (x0 + x1) / 2, 1.05, (z0 + z1) / 2, g);
+      rail.rotation.y = Math.atan2(x1 - x0, z1 - z0);
+    }
+    if (i % 17 === 8) lantern(g, x - Math.cos(yaw) * 1.1, 0.13, z + Math.sin(yaw) * 1.1);
+  }
+  // The lighthouse stands at the end on a timber platform over a cluster of piles.
+  const [lx, lz] = curve(1);
+  at(cyl(4.8, 4.8, 0.3, PAL.wood, 8, { flat: true }), lx, 0.02, lz + 4, g);
+  at(cyl(4.9, 4.9, 0.12, DARK_WOOD, 8, { flat: true }), lx, -0.2, lz + 4, g);
+  for (let k = 0; k < 8; k++) pile(lx + Math.cos((k / 8) * Math.PI * 2) * 4.3, lz + 4 + Math.sin((k / 8) * Math.PI * 2) * 4.3);
+  lighthouse(g, lx, 0.15, lz + 4);
+  scene.add(bake(g));
+}
+
+export function buildPort(g, rng, animated) {
+  // Local +z points to the open sea.
+  g.rotation.y = seaward(g.position.x, g.position.z);
   const surface = WATER_LEVEL;
   const Q = 17;
+
+  // The quay is held by a palisade wherever it meets the water: timber piles driven side by
+  // side, a taller mooring post now and then.
+  const rim = ZONES.find((zn) => zn.id === 'port').r + 1.1;
+  const sin = Math.sin(g.rotation.y);
+  const cos = Math.cos(g.rotation.y);
+  for (let k = 0, n = Math.round((rim * Math.PI * 2) / 0.5); k < n; k++) {
+    const a = (k / n) * Math.PI * 2;
+    const [x, z] = [Math.sin(a) * rim, Math.cos(a) * rim];
+    const [ox, oz] = [Math.sin(a) * (rim + 1.6), Math.cos(a) * (rim + 1.6)];
+    if (groundAt(g.position.x + ox * cos + oz * sin, g.position.z - ox * sin + oz * cos) > WATER_LEVEL - 0.2) continue;
+    const tall = k % 9 === 0;
+    at(cyl(0.24, 0.26, tall ? 4.4 : 3.6, [PAL.wood, 0xa8764f, 0x9a6a48, DARK_WOOD][k % 4], 6), x, tall ? -1.3 : -1.6, z, g);
+    if (k % 4 === 0) mussels(g, rng, x + Math.sin(a) * 0.1, z + Math.cos(a) * 0.1, 0.26);
+  }
 
   // A timber quay: a plank boardwalk carried on driven piles and faced with boards, with
   // mooring posts and lamps. Everything in the harbour is wood.
@@ -664,7 +761,7 @@ export function buildPort(g, rng, animated) {
     prop.rotation.z += dt * 3;
   });
 
-  // A straight jetty to the left, and a long curved boardwalk to the right, out to the lighthouse.
+  // A straight jetty to the left.
   const plank = (x, z, yaw, width) => {
     at(box(width, 0.14, 0.56, pick(rng, TIMBER)), x, 0.05, z, g).rotation.y = yaw;
   };
@@ -672,38 +769,6 @@ export function buildPort(g, rng, animated) {
   for (let z = Q + 1.6; z < Q + 21; z += 0.62) plank(-21, z + 0.31, 0, 3);
   for (let z = Q + 2.4; z < Q + 21; z += 3) for (const dx of [-1.4, 1.4]) pile(-21 + dx, z);
   lantern(g, -20, 0.13, Q + 20.4);
-  const curve = (t) => [21 - Math.sin(t * 1.3) * 12, Q + 1.6 + t * 27];
-  const steps = 68;
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const [x, z] = curve(t);
-    const [nx, nz] = curve(t + 0.01);
-    const yaw = Math.atan2(nx - x, nz - z);
-    plank(x, z, yaw, 2.8);
-    if (i % 5 === 2) {
-      for (const side of [-1.3, 1.3]) pile(x + Math.cos(yaw) * side, z - Math.sin(yaw) * side);
-      // Handrail posts on the seaward side.
-      at(cyl(0.05, 0.06, 1.0, DARK_WOOD, 5), x + Math.cos(yaw) * 1.3, 0.6, z - Math.sin(yaw) * 1.3, g);
-    }
-    if (i % 5 === 2 && i + 5 <= steps) {
-      const [ax, az] = curve((i + 5) / steps);
-      const [bx, bz] = curve((i + 5) / steps + 0.01);
-      const byaw = Math.atan2(bx - ax, bz - az);
-      const x0 = x + Math.cos(yaw) * 1.3;
-      const z0 = z - Math.sin(yaw) * 1.3;
-      const x1 = ax + Math.cos(byaw) * 1.3;
-      const z1 = az - Math.sin(byaw) * 1.3;
-      const rail = at(box(0.06, 0.06, Math.hypot(x1 - x0, z1 - z0), DARK_WOOD), (x0 + x1) / 2, 1.05, (z0 + z1) / 2, g);
-      rail.rotation.y = Math.atan2(x1 - x0, z1 - z0);
-    }
-  }
-  // The lighthouse stands at the end on a timber platform over a cluster of piles.
-  const [lx, lz] = curve(1);
-  at(cyl(4.8, 4.8, 0.3, PAL.wood, 8, { flat: true }), lx, 0.02, lz + 4, g);
-  at(cyl(4.9, 4.9, 0.12, DARK_WOOD, 8, { flat: true }), lx, -0.2, lz + 4, g);
-  for (let k = 0; k < 8; k++) pile(lx + Math.cos((k / 8) * Math.PI * 2) * 4.3, lz + 4 + Math.sin((k / 8) * Math.PI * 2) * 4.3);
-  lighthouse(g, lx, 0.15, lz + 4);
-
   // Two wooden piers.
   for (const px of [-9, 5]) {
     for (let i = 0; i < 28; i++) at(box(2.6, 0.16, 0.56, PAL.wood), px, 0.05, Q + 1.6 + i * 0.62, g);

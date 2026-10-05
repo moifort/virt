@@ -7,13 +7,13 @@ export { WATER_LEVEL };
 // The map is an island of its own in an endless sea, laid out along its bay (u from the open
 // sea toward the mountain, v along the shore). The square is only the bounds of what can be
 // walked and planted: the land falls into the water well inside it on every side.
-export const SQUARE = { u0: -100, u1: 250, v0: -145, v1: 148 };
+export const SQUARE = { u0: -100, u1: 272, v0: -145, v1: 148 };
 const SEA_FLOOR = -14;
 // The sun is low over the sea, a little to the left: it lights the slopes that face the bay.
 export const SUN_DIR = new THREE.Vector3(-0.5, 0.36, 1).normalize();
 
-export const WORLD_SIZE = 570;
-export const SEGMENTS = 570;
+export const WORLD_SIZE = 600;
+export const SEGMENTS = 600;
 export const CELL = WORLD_SIZE / SEGMENTS;
 export const HALF = WORLD_SIZE / 2;
 export const UP = new THREE.Vector3(0, 1, 0);
@@ -49,13 +49,11 @@ export const ZONES = [
 ];
 export const zone = (id) => ZONES.find((z) => z.id === id);
 
-// The villages, in (u, v), all of a size: the main one climbing from its harbour up the
-// left-hand slopes, a hamlet on the right headland, and a third high on the mountain behind,
-// looking out over the sea. `bell` gives a village its campanile.
+// The villages, in (u, v): the main one climbing from its harbour up the
+// left-hand slopes with its feet in the water, and a hamlet on the right headland.
 export const VILLAGES = [
-  { u: footU(-56) + 6, v: -56, r: 17, bell: true },
+  { u: footU(-56) + 6, v: -61, r: 17, bell: true, waterfront: true },
   { u: -46, v: 84, r: 10 },
-  { u: 150, v: -24, r: 17, bell: true },
 ];
 const hub = { x: toX(VILLAGES[0].u, VILLAGES[0].v), z: toZ(VILLAGES[0].u, VILLAGES[0].v) };
 
@@ -122,15 +120,14 @@ export function cultivated(u, v) {
   return worked;
 }
 
+
 // A small island stands off the back of the mountain: sheer rock all round, pines on top.
-const ISLET = { u: 224, v: -114, r: 12 };
-// The pebble cove beside the harbour, along the left shore: where it lies along u, and the
-// line of its water's edge.
-export const COVE = { u0: 76, u1: 104 };
-const coveShore = (u) => -85 - wander(u);
-const inCove = (u) => smoothstep(COVE.u0 - 4, COVE.u0 + 3, u) * smoothstep(COVE.u1 + 4, COVE.u1 - 3, u);
-/** A point of the cove's water line, `inland` metres up the beach (negative: out in the water). */
-export const coveAt = (u, inland = 0) => ({ x: toX(u, coveShore(u) + inland), z: toZ(u, coveShore(u) + inland) });
+const ISLET = { u: 250, v: -122, r: 11 };
+// The far shores of the island, where the mountain comes down to the sea: the water's edge on
+// the left (a v for each u), behind (a u for each v) and on the right (a v for each u).
+const leftShore = (u) => -85 - wander(u);
+const farShore = (v) => 238 + (fbm(v * 0.03 + 2, 6.1, 3) - 0.5) * 22;
+const rightShore = (u) => 128 + (fbm(u * 0.03 - 4, 1.7, 3) - 0.5) * 18;
 
 /** The lie of the land before the stream has cut its bed into it. */
 function landAt(x, z) {
@@ -140,11 +137,15 @@ function landAt(x, z) {
   // The mountain rises behind the bay, as steep as the Ligurian coast. Behind its first crest
   // it carries on and climbs to its true summit.
   const foot = footU(v, u);
-  const massif = 38 * smoothstep(1, 0, Math.hypot((u - 172) / 52, (v + 5) / 85) + (fbm(x * 0.012 + 4, z * 0.012 - 6, 2) - 0.5) * 0.4) ** 1.3;
+  const massif = 30 * smoothstep(1, 0, Math.hypot((u - 165) / 55, (v + 5) / 85) + (fbm(x * 0.012 + 4, z * 0.012 - 6, 2) - 0.5) * 0.4) ** 1.3;
   const back = smoothstep(foot, foot + 80, u) * (40 + (fbm(x * 0.015, z * 0.015, 3) - 0.5) * 20) + Math.max(0, u - foot) * 0.05 + massif * smoothstep(foot, foot + 50, u);
   // Side ridges run down from the mountain and plunge into the sea, closing the bay.
   const ridge = headland(v) * (13 + smoothstep(-110, 70, u) * 30 + (fbm(x * 0.03, z * 0.03, 3) - 0.5) * 10);
-  const mountain = Math.max(back, ridge);
+  // On its far sides — to the left, behind and to the right — the mountain comes down to the
+  // sea in long slopes rather than cliffs: `inland` is how far a point lies from those shores.
+  const inland = Math.min(v - leftShore(u), farShore(v) - u, rightShore(u) - v);
+  const ease = smoothstep(-4, 64, inland + (fbm(x * 0.02 + 9, z * 0.02, 2) - 0.5) * 18);
+  const mountain = Math.max(back, ridge) * ease;
   const estate = estateWeight(u, v);
   const worked = cultivated(u, v);
   // Its flanks are no smooth ramp: spurs and gullies run down them, outcrops of bare rock break
@@ -163,32 +164,34 @@ function landAt(x, z) {
   const coast = coastU(v, u);
   const sheer = (4 + fbm(v * 0.04 + 11, 2.3, 2) * 14) * (1 - headland(v) * 0.75);
   h -= smoothstep(coast + 2, coast - sheer, u) * (9 + headland(v) * 20);
-  // On its far sides, behind and to the right, the mountain falls straight into the water.
-  const farShore = 214 + (fbm(v * 0.03 + 2, 6.1, 3) - 0.5) * 24;
-  const rightShore = 128 + (fbm(u * 0.03 - 4, 1.7, 3) - 0.5) * 18;
-  const steep = 12 + fbm(x * 0.04 + 15, z * 0.04, 2) * 16;
-  h += (-9.5 - h) * Math.max(smoothstep(farShore - steep, farShore + 2, u), smoothstep(rightShore - steep, rightShore + 2, v));
+  // Past the water's edge of those far shores the bed shelves away very gently, so the sea
+  // stays shallow and turquoise a long way out. (They are only shores landward of the bay.)
+  const bay = coast - farLeft(v + wander(u)) * 260;
+  const shore = smoothstep(bay - 8, bay + 40, u);
+  h += (Math.max(-9.5, WATER_LEVEL - 0.1 + inland * 0.14) - h) * smoothstep(4, -4, inland) * shore;
   // Terraces: shelves and short dry-stone walls where the land is worked, and on the plain.
   // The shelves follow the lie of the land rather than level lines. The wild slopes keep their
   // fall, only eased here and there into natural benches.
   const step = 2.4;
   const shift = estate > 0 ? plotShift(u, v) * step * estate : 0;
-  const wander = (fbm(x * 0.035 + 7, z * 0.035 + 1, 2) - 0.5) * 5 * lift * (1 - estate);
-  const level = h + shift + wander;
+  const drift = (fbm(x * 0.035 + 7, z * 0.035 + 1, 2) - 0.5) * 5 * lift * (1 - estate);
+  const level = h + shift + drift;
   const shelf = Math.floor(level / step) * step;
-  const terraced = shelf + smoothstep(0.72, 1, (level - shelf) / step) * step - shift - wander;
+  const terraced = shelf + smoothstep(0.72, 1, (level - shelf) / step) * step - shift - drift;
   const benches = smoothstep(0.45, 0.7, fbm(x * 0.02 - 3, z * 0.02 + 8, 2)) * 0.45;
   h += (terraced - h) * Math.max(worked, smoothstep(3, 0.5, mountain), benches);
   // The beach: a smooth gentle slope down into turquoise shallows, no terraces.
   const beach = beachBand(v) * smoothstep(coast + 14, coast + 8, u) * smoothstep(coast - 5, coast + 1, u);
   h += (WATER_LEVEL + 0.25 + Math.max(0, u - coast) * 0.08 - h) * beach;
-  // The cove beside the harbour: a shingle beach shelving very gently, so the water stays
-  // shallow and turquoise a long way out.
-  const inland = v - coveShore(u);
-  const shingle = inCove(u) * smoothstep(-24, -16, inland) * smoothstep(13, 7, inland);
-  h += (WATER_LEVEL + (inland > 0 ? 0.3 + inland * 0.1 : -0.12 + inland * 0.13) - h) * shingle;
-  // Work areas sit on level pads.
-  for (const zn of ZONES) h += (0 - h) * smoothstep(zn.r + 7, zn.r + 1, Math.hypot(x - zn.x, z - zn.z));
+  // Along those shores lie beaches of white sand, one cove after another, except under the
+  // main village, whose houses stand with their feet in the water.
+  const strand = shore * smoothstep(0.4, 0.48, fbm(u * 0.022 + 31, v * 0.022 - 17, 2)) * smoothstep(34, 52, Math.hypot(u - VILLAGES[0].u, v - VILLAGES[0].v + 14));
+  h += (WATER_LEVEL + 0.3 + inland * 0.1 - h) * strand * smoothstep(-1, 1, inland) * smoothstep(16, 9, inland);
+  // Work areas sit on level pads; the harbour's is a quay, with a wall straight down to the water.
+  for (const zn of ZONES) {
+    const d = Math.hypot(x - zn.x, z - zn.z);
+    h += (0 - h) * (zn.id === 'port' ? smoothstep(zn.r + 1.6, zn.r + 0.4, d) : smoothstep(zn.r + 7, zn.r + 1, d));
+  }
   h += (VILLA.y - h) * smoothstep(VILLA.r + 4, VILLA.r + 0.5, Math.hypot(x - VILLA.x, z - VILLA.z));
   h += (RAIL.level - 0.05 - h) * stationYard(x, z);
   // The islet off the back of the mountain.
@@ -294,17 +297,18 @@ export function segmentDistance(x, z, [ax, az, bx, bz]) {
   return Math.hypot(px - dx * h, pz - dz * h);
 }
 
-/** True where nature may grow: off the work pads, off the paths, above water. */
-/** True inside the diorama square, at least `margin` from its edges. */
+
+/** True inside the bounds of the map, at least `margin` from its edges. */
 export function inSquare(x, z, margin = 0) {
   const u = toU(x, z);
   const v = toV(x, z);
   return u > SQUARE.u0 + margin && u < SQUARE.u1 - margin && v > SQUARE.v0 + margin && v < SQUARE.v1 - margin;
 }
 
-export function isWild(x, z, margin = 0) {
+/** True where things may grow or be built: off the work pads, the paths and the clearings, above `floor`. */
+export function isWild(x, z, margin = 0, floor = WATER_LEVEL + 0.4) {
   if (!inSquare(x, z, 2)) return false;
-  if (groundAt(x, z) < WATER_LEVEL + 0.4) return false;
+  if (groundAt(x, z) < floor) return false;
   for (const zn of ZONES) if (Math.hypot(x - zn.x, z - zn.z) < zn.r + 3 + margin) return false;
   for (const p of PATHS) if (segmentDistance(x, z, p) < 2.6 + margin) return false;
   for (const c of CLEARINGS) if (Math.hypot(x - c.x, z - c.z) < c.r + margin) return false;

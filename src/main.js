@@ -73,17 +73,24 @@ addEventListener('keyup', (e) => {
 addEventListener('blur', () => keys.clear());
 
 // Isometric-style view: the pitch is fixed and the yaw rests on one of the four corners of the
-// diorama. Dragging turns the island; on release it settles on the nearest corner.
+// island (A and E turn it to the next). Dragging with the mouse slides the view over the map to
+// look around; as soon as the avatar walks again, the view comes back to him.
 const snapYaw = (yaw) => Math.round(yaw / (Math.PI / 2)) * (Math.PI / 2);
 let yawTarget = view.yaw;
 let dragging = false;
+const pan = new THREE.Vector3();
 renderer.domElement.addEventListener('pointerdown', () => (dragging = true));
-addEventListener('pointerup', () => {
-  if (dragging) yawTarget = snapYaw(yawTarget);
-  dragging = false;
-});
+addEventListener('pointerup', () => (dragging = false));
 addEventListener('pointermove', (e) => {
-  if (dragging) yawTarget -= e.movementX * 0.006;
+  if (!dragging) return;
+  // The map follows the hand: a screen pixel is so many metres across, and more than that
+  // along the ground up the screen, which the view looks at aslant.
+  const metres = view.viewHeight / innerHeight;
+  pan.addScaledVector(view.right, -e.movementX * metres);
+  pan.x += (view.forward.x / Math.hypot(view.forward.x, view.forward.z)) * ((e.movementY * metres) / Math.sin(view.pitch));
+  pan.z += (view.forward.z / Math.hypot(view.forward.x, view.forward.z)) * ((e.movementY * metres) / Math.sin(view.pitch));
+  pan.y = 0;
+  pan.clampLength(0, 320);
 });
 addEventListener('wheel', (e) => (view.viewHeight = clamp(view.viewHeight * (1 + Math.sign(e.deltaY) * 0.1), 24, 260)), {
   passive: true,
@@ -123,14 +130,29 @@ renderer.setAnimationLoop(() => {
   GLOBALS.uTime.value = t;
   GLOBALS.uCloud.value.set(t * 0.035, t * 0.012);
 
-  focus.copy(player.position).y += 1.4;
+  // Seen from far off the pixels are drawn finer, so the picture stays readable instead of
+  // breaking up into grain: two screen pixels to an art pixel up close, down to one far out.
+  const grain = view.viewHeight > 190 ? 1 : view.viewHeight > 120 ? 1.5 : 2;
+  if (grain !== pixels.pixelSize) {
+    pixels.pixelSize = grain;
+    resize();
+  }
+
+  if (player.step) pan.multiplyScalar(Math.exp(-dt * 6));
+  focus.copy(player.position).add(pan).y += 1.4;
   view.update(focus, pixels.lowRes, pixels.offset);
   scene.fog.color.copy(climate.skyHorizon);
   scene.fog.near = view.distance + 60 - 240 * (1 - climate.visibility);
   scene.fog.far = view.distance + 520 * climate.visibility;
 
-  sun.target.position.copy(player.position);
-  sun.position.copy(player.position).addScaledVector(climate.lightDir, 120);
+  // Shadows are cast over whatever the view takes in, wider as it draws back.
+  const reach = Math.max(60, view.viewHeight * 0.62);
+  if (reach !== sun.shadow.camera.right) {
+    Object.assign(sun.shadow.camera, { left: -reach, right: reach, top: reach, bottom: -reach, far: 260 + reach });
+    sun.shadow.camera.updateProjectionMatrix();
+  }
+  sun.target.position.copy(player.position).add(pan);
+  sun.position.copy(sun.target.position).addScaledVector(climate.lightDir, 120 + reach * 0.5);
   // The road the low sun, or the moon, lays on the sea runs through the middle of the view.
   const level = Math.hypot(climate.lightDir.x, climate.lightDir.z) || 1;
   const across = { x: -climate.lightDir.z / level, z: climate.lightDir.x / level };

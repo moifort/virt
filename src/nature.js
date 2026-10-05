@@ -8,7 +8,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { fbm, pick } from './noise.js';
 import { PAL, WATER_LEVEL, paint, solid } from './style.js';
 import { at, bake, ball, box, cone, cyl, lantern } from './kit.js';
-import { COVE, PATHS, UP, ZONES, anywhere, coastU, coveAt, cultivated, footU, groundAt, isWild, scatterInstanced, slopeAt, toU, toV, toX, toZ } from './terrain.js';
+import { PATHS, UP, ZONES, anywhere, coastU, cultivated, footU, groundAt, isWild, scatterInstanced, slopeAt, toU, toV, toX, toZ } from './terrain.js';
 
 const BARK = 0x7d5a48;
 const DARK_BARK = 0x5e463c;
@@ -429,36 +429,16 @@ export function buildNature(scene, rng) {
 
   // Rocks standing in the shallows, with the swell breaking white around them.
   const port = ZONES.find((zn) => zn.id === 'port');
-  scatterInstanced(scene, rng, new THREE.DodecahedronGeometry(1, 0), paint(0xffffff, { flat: true }), 130, (r, p, s, c) => {
+  scatterInstanced(scene, rng, new THREE.DodecahedronGeometry(1, 0), paint(0xffffff, { flat: true }), 170, (r, p, s, c) => {
     anywhere(r, p);
     const u = toU(p.x, p.z);
     const v = toV(p.x, p.z);
-    // Off the rocky shores only: the sandy beach, the cove and the harbour stay clear.
+    // In the shallows off the rocky shores and the coves; the bay beach and the harbour stay clear.
     if (p.y > WATER_LEVEL - 0.3 || p.y < WATER_LEVEL - 2.6 || (v > -32 && v < 52 && u < 0)) return false;
-    if (Math.hypot(p.x - port.x, p.z - port.z) < port.r + 22 || (u > COVE.u0 - 6 && u < COVE.u1 + 6 && v < -60)) return false;
-    s.set(0.8 + r() * 1.6, 0.9 + r() * 1.4, 0.8 + r() * 1.6);
+    if (Math.hypot(p.x - port.x, p.z - port.z) < port.r + 10) return false;
+    s.set(0.5 + r() * 1.3, 0.6 + r() * 1.1, 0.5 + r() * 1.3);
     p.y = WATER_LEVEL - 0.3;
     c.setHex(pick(r, [0x8f8678, 0x9d9484, 0x7f7a70]));
-    return true;
-  });
-
-  // The cove beside the harbour: pebbles strewn up the shingle, and smooth stones standing in
-  // the clear shallows.
-  const SHINGLE = [0xf4f1ea, 0xd6d2ca, 0xb4b0aa, 0xd8c4a0, 0x9a9690];
-  scatterInstanced(scene, rng, new THREE.DodecahedronGeometry(0.3, 1), paint(0xffffff, { flat: true }), 260, (r, p, s, c) => {
-    const at = coveAt(COVE.u0 + r() * (COVE.u1 - COVE.u0), -5 + r() * 14);
-    p.set(at.x, groundAt(at.x, at.z), at.z);
-    if (p.y > WATER_LEVEL + 1.4 || p.y < WATER_LEVEL - 0.7) return false;
-    s.set(0.5 + r() * 1.3, 0.35 + r() * 0.5, 0.5 + r() * 1.3);
-    c.setHex(pick(r, SHINGLE));
-    return true;
-  });
-  scatterInstanced(scene, rng, new THREE.DodecahedronGeometry(1, 1), paint(0xffffff, { flat: true }), 16, (r, p, s, c) => {
-    const at = coveAt(COVE.u0 + r() * (COVE.u1 - COVE.u0), -15 + r() * 13);
-    p.set(at.x, WATER_LEVEL - 0.25, at.z);
-    if (groundAt(at.x, at.z) > WATER_LEVEL - 0.2) return false;
-    s.set(0.6 + r() * 1.1, 0.5 + r() * 0.7, 0.6 + r() * 1.1);
-    c.setHex(pick(r, [0xb8b4ac, 0xa6a29c, 0xcfc8ba]));
     return true;
   });
 

@@ -5,14 +5,14 @@ import { mulberry32 } from './noise.js';
 import { GLOBALS, PATH_COUNT } from './style.js';
 import { buildLife } from './life.js';
 import { buildNature } from './nature.js';
-import { COVE, GRID, HALF, PATHS, SEGMENTS, WORLD_SIZE, ZONES, buildTerrain, buildWater, coveAt } from './terrain.js';
+import { GRID, HALF, PATHS, SEGMENTS, WORLD_SIZE, ZONES, buildTerrain, buildWater, zone } from './terrain.js';
 import { buildEstate } from './estate.js';
 import { buildStream } from './stream.js';
 import { bake } from './kit.js';
 import { buildRailway } from './railway.js';
 import { buildSky } from './sky.js';
 import { buildVillages } from './village.js';
-import { buildAgora, buildAtelier, buildLibrary, buildMoot, buildPods, buildPort, buildPub } from './zones.js';
+import { buildAgora, buildAtelier, buildLibrary, buildLighthouseWalk, buildMoot, buildPods, buildPort, buildPub } from './zones.js';
 
 export { LAND_ENDS, SUN_DIR, WATER_LEVEL, ZONES, groundAt, inSquare } from './terrain.js';
 
@@ -31,8 +31,8 @@ export function createWorld(scene) {
   heightTex.needsUpdate = true;
   GLOBALS.uHeight.value = heightTex;
   GLOBALS.uHeightMap.value.set(HALF, WORLD_SIZE, SEGMENTS + 1);
-  const cove = coveAt((COVE.u0 + COVE.u1) / 2, -3);
-  GLOBALS.uCove.value.set(cove.x, cove.z, (COVE.u1 - COVE.u0) / 2 + 10);
+  const port = zone('port');
+  GLOBALS.uQuay.value.set(port.x, port.z, port.r + 1);
 
   scene.add(buildTerrain(), buildWater());
   const builders = {
@@ -51,6 +51,7 @@ export function createWorld(scene) {
     builders[zn.id](g, rng, animated);
     bake(g);
   }
+  buildLighthouseWalk(scene, rng);
   buildStream(scene, rng, animated);
   buildVillages(scene, rng, animated);
   buildEstate(scene, rng);
