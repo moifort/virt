@@ -61,6 +61,25 @@ export const estateWeight = (u, v) => smoothstep(ESTATE.r + 8, ESTATE.r - 4, Mat
 /** Built sites kept clear of wild growth ({ x, z, r }); builders add their own. */
 export const CLEARINGS = [{ x: VILLA.x, z: VILLA.z, r: VILLA.r + 3 }];
 
+// The railway crosses the angle between the mountain (a) and the right-hand ridge (b) at a
+// constant level. Its station stands on a shelf cut into the mountain by the first tunnel:
+// `s` runs along the line from a, `l` across it (negative uphill).
+export const RAIL = { a: { u: 108, v: 25 }, b: { u: 35, v: 95 }, level: 24 };
+export const STATION = { s0: 14, s1: 39, yard: { s0: 14, s1: 33, l0: -13, l1: -3.5 } };
+const railStart = { x: toX(RAIL.a.u, RAIL.a.v), z: toZ(RAIL.a.u, RAIL.a.v) };
+const railEnd = { x: toX(RAIL.b.u, RAIL.b.v), z: toZ(RAIL.b.u, RAIL.b.v) };
+const railLength = Math.hypot(railEnd.x - railStart.x, railEnd.z - railStart.z);
+const railDir = { x: (railEnd.x - railStart.x) / railLength, z: (railEnd.z - railStart.z) / railLength };
+/** World position of a point given along (s) and across (l) the line. */
+export const railPoint = (s, l = 0) => ({ x: railStart.x + railDir.x * s - railDir.z * l, z: railStart.z + railDir.z * s + railDir.x * l });
+function stationYard(x, z) {
+  const s = (x - railStart.x) * railDir.x + (z - railStart.z) * railDir.z;
+  const l = -(x - railStart.x) * railDir.z + (z - railStart.z) * railDir.x;
+  const y = STATION.yard;
+  return smoothstep(y.s0 - 2.5, y.s0, s) * smoothstep(y.s1 + 2.5, y.s1, s) * smoothstep(y.l0 - 2.5, y.l0, l) * smoothstep(y.l1 + 2, y.l1, l);
+}
+for (const s of [18, 25, 32]) CLEARINGS.push({ ...railPoint(s, -8), r: 8 });
+
 /**
  * The estate is a patchwork of plots with wandering outlines. Each plot sets its terraces at
  * its own level, so the shelves never line up from one plot to the next.
@@ -101,6 +120,7 @@ export function heightAt(x, z) {
   // Work areas sit on level pads.
   for (const zn of ZONES) h += (0 - h) * smoothstep(zn.r + 7, zn.r + 1, Math.hypot(x - zn.x, z - zn.z));
   h += (VILLA.y - h) * smoothstep(VILLA.r + 4, VILLA.r + 0.5, Math.hypot(x - VILLA.x, z - VILLA.z));
+  h += (RAIL.level - 0.05 - h) * stationYard(x, z);
   return h;
 }
 
