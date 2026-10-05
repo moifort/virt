@@ -1,6 +1,6 @@
 // Terrain: coastal frame, work areas, heightfield, water.
 import * as THREE from 'three';
-import { fbm, smoothstep } from './noise.js';
+import { fbm, hash, smoothstep } from './noise.js';
 import { GLOBALS, PATH_COUNT, WATER_LEVEL, paint } from './style.js';
 
 export { WATER_LEVEL };
@@ -53,6 +53,26 @@ export const PATHS = [
   [zone('atelier').x, zone('atelier').z, zone('port').x, zone('port').z],
 ];
 
+// The wine estate on the mountain side, left of the railway: a Florentine villa on its own
+// level ground, among vineyards planted on irregular terraces.
+export const ESTATE = { u: 80, v: 5, r: 27 };
+export const VILLA = { u: 82, v: 9, r: 9, y: 12, x: toX(82, 9), z: toZ(82, 9) };
+export const estateWeight = (u, v) => smoothstep(ESTATE.r + 8, ESTATE.r - 4, Math.hypot(u - ESTATE.u, v - ESTATE.v));
+/** Built sites kept clear of wild growth ({ x, z, r }); builders add their own. */
+export const CLEARINGS = [{ x: VILLA.x, z: VILLA.z, r: VILLA.r + 3 }];
+
+/**
+ * The estate is a patchwork of plots with wandering outlines. Each plot sets its terraces at
+ * its own level, so the shelves never line up from one plot to the next.
+ */
+function plotShift(u, v) {
+  const wu = u + (fbm(u * 0.07 + 2, v * 0.07, 2) - 0.5) * 16;
+  const wv = v + (fbm(u * 0.07 - 5, v * 0.07 + 8, 2) - 0.5) * 16;
+  const row = Math.floor(wu / 9);
+  const col = Math.floor((wv + hash(row, 7) * 14) / (10 + hash(row, 3) * 8));
+  return hash(row * 31 + col, col * 17 - row);
+}
+
 // ---------------------------------------------------------------- Ground
 
 export function heightAt(x, z) {
@@ -71,13 +91,16 @@ export function heightAt(x, z) {
   h -= smoothstep(coast + 2, coast - sheer, u) * (9 + headland(v) * 20);
   // Terraces: shelves and short dry-stone walls.
   const step = 2.4;
-  const shelf = Math.floor(h / step) * step;
-  h = shelf + smoothstep(0.72, 1, (h - shelf) / step) * step;
+  const estate = estateWeight(u, v);
+  const shift = estate > 0 ? plotShift(u, v) * step * estate : 0;
+  const shelf = Math.floor((h + shift) / step) * step;
+  h = shelf + smoothstep(0.72, 1, (h + shift - shelf) / step) * step - shift;
   // The beach: a smooth gentle slope down into turquoise shallows, no terraces.
   const beach = beachBand(v) * smoothstep(coast + 14, coast + 8, u) * smoothstep(coast - 5, coast + 1, u);
   h += (WATER_LEVEL + 0.25 + Math.max(0, u - coast) * 0.08 - h) * beach;
   // Work areas sit on level pads.
   for (const zn of ZONES) h += (0 - h) * smoothstep(zn.r + 7, zn.r + 1, Math.hypot(x - zn.x, z - zn.z));
+  h += (VILLA.y - h) * smoothstep(VILLA.r + 4, VILLA.r + 0.5, Math.hypot(x - VILLA.x, z - VILLA.z));
   return h;
 }
 
@@ -130,6 +153,7 @@ export function isWild(x, z, margin = 0) {
   if (groundAt(x, z) < WATER_LEVEL + 0.4) return false;
   for (const zn of ZONES) if (Math.hypot(x - zn.x, z - zn.z) < zn.r + 3 + margin) return false;
   for (const p of PATHS) if (segmentDistance(x, z, p) < 2.6 + margin) return false;
+  for (const c of CLEARINGS) if (Math.hypot(x - c.x, z - c.z) < c.r + margin) return false;
   return true;
 }
 

@@ -6,6 +6,7 @@ import { buildLife } from './life.js';
 import { buildNature } from './nature.js';
 import { GRID, HALF, PATHS, SEGMENTS, WORLD_SIZE, ZONES, buildSides, buildTerrain, buildWater } from './terrain.js';
 import { buildBase, planBase } from './base.js';
+import { buildEstate } from './estate.js';
 import { bake } from './kit.js';
 import { buildRailway } from './railway.js';
 import { buildSky } from './sky.js';
@@ -49,6 +50,7 @@ export function createWorld(scene) {
     bake(g);
   }
   buildVillages(scene, rng);
+  buildEstate(scene, rng);
   buildNature(scene, rng);
   buildLife(scene, rng, animated);
   buildBase(scene, rooms, animated);

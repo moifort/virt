@@ -147,7 +147,8 @@ vec3 terrainColor(vec3 w, vec3 n) {
   float edge = 1.5 + (pxNoise(w.xz * 1.2) - 0.5) * 0.7;
   if (path < edge) flat_ = path < edge - 0.45 ? ${lin(PAL.cream)} : ${lin(PAL.sandDeep)};
 
-  float slope = 1.0 - n.y;
+  // The true facet normal, not the smoothed one: terrace walls stay crisp courses of stone.
+  float slope = 1.0 - min(n.y, abs(normalize(cross(dFdx(w), dFdy(w))).y));
   vec3 col = slope > 0.42 + (pxNoise(w.xz * 0.8) - 0.5) * 0.12 ? cliff : flat_;
   // White sand just above the waterline, wet sand at the water's edge.
   if (w.y < ${(WATER_LEVEL + 1.2).toFixed(2)} && slope < 0.3) col = speck > 0.9 ? ${lin(0xeee2c8)} : ${lin(0xfbf5e6)};

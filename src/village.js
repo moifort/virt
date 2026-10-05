@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { fbm, pick } from './noise.js';
 import { PAL, paint } from './style.js';
-import { footU, groundAt, isWild, slopeAt, toX, toZ, UP } from './terrain.js';
+import { estateWeight, footU, groundAt, isWild, slopeAt, toX, toZ, UP } from './terrain.js';
 
 const SHAPES = {
   box: new THREE.BoxGeometry(1, 1, 1),
@@ -251,6 +251,7 @@ export function buildVillages(scene, rng) {
       // Vineyards everywhere on the flanks, densest where the old village stood.
       const vineyard = v > -16 && v < 42 && u < footU(v) + 34;
       if (u < footU(v) + 1 || (!vineyard && fbm(v * 0.03 + 5, u * 0.03, 2) < 0.36)) continue;
+      if (estateWeight(u, v) > 0.25) continue; // the estate plants its own rows
       if (slopeAt(x, z) > 0.3 || !isWild(x, z, -1)) continue;
       if (placed.some((p) => Math.hypot(p[0] - x, p[1] - z) < 3)) continue;
       parts.at(new THREE.Vector3(x, groundAt(x, z), z), yaw);

@@ -21,7 +21,7 @@ scene.fog = new THREE.Fog(0xffffff, 1, 2);
 const SKY_TOP = new THREE.Color(0x6f7fc4);
 const SKY_HORIZON = new THREE.Color(0xffb680);
 GLOBALS.uSunTint.value.set(0xffd9a6);
-GLOBALS.uShadowTint.value.set(0x8f88c8);
+GLOBALS.uShadowTint.value.set(0x8a8ab4);
 GLOBALS.uGlow.value = 0.9;
 scene.fog.color.copy(SKY_HORIZON);
 

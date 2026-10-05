@@ -68,7 +68,7 @@ function stonePine(rng) {
 }
 
 /** Italian cypress: a slim dark spindle. */
-function cypress(rng) {
+export function cypress(rng) {
   const g = new THREE.Group();
   const H = 5.5 + rng() * 3.5;
   at(cyl(0.1, 0.15, 0.7, BARK, 5), 0, 0.35, 0, g);
@@ -80,7 +80,7 @@ function cypress(rng) {
 }
 
 /** Old olive tree: short gnarled forked trunk, airy silver-green crown. */
-function oliveTree(rng) {
+export function oliveTree(rng) {
   const g = new THREE.Group();
   const H = 1.5 + rng() * 0.7;
   const trunk = at(cyl(0.2, 0.36, H, OLIVE_BARK, 6, { flat: true }), 0, H / 2, 0, g);
@@ -96,7 +96,7 @@ function oliveTree(rng) {
 }
 
 /** Lemon tree of the Ligurian terraces. */
-function lemonTree(rng) {
+export function lemonTree(rng) {
   const g = new THREE.Group();
   at(cyl(0.11, 0.16, 1.3, BARK, 5), 0, 0.65, 0, g);
   const crown = at(ball(1.1, 0x3f7645, { flat: true }, 8, 6), 0, 1.95, 0, g);
