@@ -554,11 +554,20 @@ export function buildPort(g, rng, animated) {
   const surface = WATER_LEVEL;
   const Q = 17;
 
-  // Quay wall with bollards and lamps.
-  at(box(46, 4.8, 2.6, STONE, { flat: true }), 0, -2.4, Q, g);
-  at(box(46, 0.25, 2.8, PAL.cream), 0, 0.1, Q, g);
-  for (let x = -21; x <= 21; x += 4.2) at(cyl(0.22, 0.28, 0.65, INK, 6), x, 0.42, Q + 0.9, g);
-  for (const x of [-18, -6, 6, 18]) lantern(g, x, 0.2, Q - 0.6);
+  // An old rustic quay: irregular dry-stone blocks topped with a weathered timber boardwalk,
+  // wooden mooring posts, and lamps.
+  for (let x = -22.5; x <= 22.5; x += 1.6 + rng() * 0.6) {
+    const w = 1.6 + rng() * 0.8;
+    const stone = at(box(w, 4.4 + rng() * 0.6, 2.4 + rng() * 0.6, pick(rng, [0xd9c7a8, 0xc9b49a, 0xe2cfae, 0xbfae9a]), { flat: true }), x, -2.2 - rng() * 0.3, Q + (rng() - 0.5) * 0.4, g);
+    stone.rotation.set((rng() - 0.5) * 0.12, (rng() - 0.5) * 0.2, (rng() - 0.5) * 0.12);
+  }
+  for (let x = -22.5; x < 22.5; x += 0.62) at(box(0.56, 0.14, 3.2, pick(rng, [PAL.wood, 0xa8764f, 0x9a6a48])), x + 0.31, 0.12, Q - 0.2, g);
+  for (const z of [Q - 1.6, Q + 1.2]) at(box(45, 0.12, 0.2, DARK_WOOD), 0, 0.02, z, g);
+  for (let x = -21; x <= 21; x += 4.2) {
+    at(cyl(0.16, 0.2, 1.2, DARK_WOOD, 6), x, 0.5, Q + 1.3, g);
+    at(cyl(0.2, 0.2, 0.06, INK, 6), x, 0.6, Q + 1.3, g);
+  }
+  for (const x of [-18, -6, 6, 18]) lantern(g, x, 0.2, Q - 0.9);
 
   // A stone mole to the left, a long curved breakwater to the right ending at the lighthouse.
   const block = (x, z, size) => {
@@ -569,7 +578,8 @@ export function buildPort(g, rng, animated) {
     block(-21, z, 3.2);
     block(-23, z + 1, 2.4);
   }
-  at(box(3, 0.4, 20, STONE), -21, surface + 1.7, Q + 11, g);
+  // Timber walkway along the top of the mole.
+  for (let z = Q + 1; z < Q + 21; z += 0.62) at(box(3, 0.14, 0.56, pick(rng, [PAL.wood, 0xa8764f])), -21, surface + 1.8, z + 0.31, g);
   for (let t = 0; t <= 1; t += 0.035) {
     const x = 21 - Math.sin(t * 1.3) * 12;
     const z = Q + 2 + t * 34;
