@@ -1,37 +1,60 @@
-// Cinque Terre villages: tall narrow houses in ochre, salmon and faded red, stacked on the
-// terraces, with framed windows, green shutters, balconies, laundry, tile and Ligurian slate
-// roofs, roof terraces and chimneys.
+// Old Ligurian fishing villages: tall narrow houses in ochre, salmon and faded red, stacked on
+// the slope, with framed windows, green shutters, balconies, laundry, tile and slate roofs,
+// roof terraces and chimneys. They are lived in: bougainvillea and wisteria climb the fronts,
+// a lamp hangs by the door, gutters run under the eaves and empty through a spout when it
+// rains, smoke rises from the chimneys when it is cold.
 // Every part is a unit shape instanced with its own matrix and colour: thousands of details,
 // a handful of draw calls.
 import * as THREE from 'three';
 import { fbm, pick } from './noise.js';
 import { PAL, paint } from './style.js';
+import { lamplight } from './kit.js';
 import { VILLAGES, cultivated, estateWeight, footU, groundAt, isWild, slopeAt, toX, toZ, UP } from './terrain.js';
 
-const SHAPES = {
-  box: new THREE.BoxGeometry(1, 1, 1),
-  pyramid: new THREE.ConeGeometry(Math.SQRT1_2, 1, 4).rotateY(Math.PI / 4),
-  cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 10),
-  ball: new THREE.SphereGeometry(0.5, 8, 6),
-  cone: new THREE.ConeGeometry(0.5, 1, 8),
+const ballShape = new THREE.SphereGeometry(0.5, 8, 6);
+const boxShape = new THREE.BoxGeometry(1, 1, 1);
+// What parts are made of: a unit shape and the way it is painted.
+const KINDS = {
+  box: { shape: boxShape, paint: { wall: true } },
+  pyramid: { shape: new THREE.ConeGeometry(Math.SQRT1_2, 1, 4).rotateY(Math.PI / 4), paint: { flat: true, roof: true } },
+  cyl: { shape: new THREE.CylinderGeometry(0.5, 0.5, 1, 10), paint: {} },
+  ball: { shape: ballShape, paint: {} },
+  cone: { shape: new THREE.ConeGeometry(0.5, 1, 8), paint: { flat: true } },
   // Half disc standing in the XY plane, flat side down (fanlights, arched openings).
-  arch: new THREE.CylinderGeometry(0.5, 0.5, 1, 10, 1, false, -Math.PI / 2, Math.PI).rotateX(-Math.PI / 2),
+  arch: { shape: new THREE.CylinderGeometry(0.5, 0.5, 1, 10, 1, false, -Math.PI / 2, Math.PI).rotateX(-Math.PI / 2), paint: {} },
+  // Greenery, a lit lamp, and rain water running off a roof (its colour is how much it carries).
+  leaf: { shape: ballShape, paint: { leaf: true } },
+  lamp: { shape: ballShape, paint: { glow: true } },
+  flow: { shape: boxShape, paint: { flow: true }, shadow: false },
 };
-const FLAT = new Set(['pyramid', 'cone']);
 
-const WALLS = [0xe2b25c, 0xd99a86, 0xd9735a, 0xeec26a, 0xf1b98f, 0xf2c79a, 0xe58f6b, 0xc9604c, 0xf5e1b8, 0xf0a97a, 0xe8d2a0];
+const WALLS = [0xe6ba6c, 0xdfa590, 0xdc826a, 0xefca7c, 0xf1bf98, 0xf3cea4, 0xe89a78, 0xcf705c, 0xf5e4c0, 0xf0b287, 0xead8aa, 0xe8c4b0, 0xd9d2b0];
 const TRIM = [PAL.ivory, PAL.cream, 0xf7e9cf];
-const SHUTTER = [0x3f6f4a, 0x4a7a54, 0x35604a, 0x5a7a48];
+const SHUTTER = [0x4a7a58, 0x56866a, 0x3f6c56, 0x6a8a58, 0x5a86a0, 0x7a6a4a];
 const GLASS = 0x3b3346;
-const SLATE = 0x7d7f8a;
-const TILE = 0xc8643c;
+const SLATE = 0x8a8c98;
+const TILE = 0xcc6e48;
 const WOOD = 0x8a5a41;
 const STONE = 0xd9cbb5;
+const IRON = 0x4a4654;
+const WARM_LIGHT = 0xffe2a6;
+// How much water a spout or a dripping eave carries, as the red of its instance colour.
+const POURING = 0xffffff;
+const DRIPPING = 0x8c8c8c;
+// Climbers on the house fronts: (foliage, flower, flower highlight).
+const CLIMBERS = [
+  [0x4f8456, 0xd9508a, 0xee82b0], // bougainvillea
+  [0x5a8c5c, 0xa890d8, 0xc8b4ea], // wisteria
+  [0x4a7c52, 0xf7efe6, 0xffffff], // jasmine
+  [0x456f4c, 0x5a8858, 0x6f9c64], // ivy
+];
 
 /** Collects instanced parts, positioned in the local frame of the current building. */
 class Parts {
   constructor() {
-    this.lists = new Map(Object.keys(SHAPES).map((k) => [k, []]));
+    this.lists = new Map(Object.keys(KINDS).map((k) => [k, []]));
+    this.lights = [];
+    this.chimneys = [];
     this.frame = new THREE.Matrix4();
     this._local = new THREE.Matrix4();
     this._q = new THREE.Quaternion();
@@ -42,35 +65,42 @@ class Parts {
     this.frame.compose(position, new THREE.Quaternion().setFromAxisAngle(UP, yaw), new THREE.Vector3(1, 1, 1));
   }
 
-  add(shape, x, y, z, sx, sy, sz, color, rx = 0, ry = 0, rz = 0) {
+  add(kind, x, y, z, sx, sy, sz, color, rx = 0, ry = 0, rz = 0) {
     this._q.setFromEuler(this._e.set(rx, ry, rz));
     this._local.compose(new THREE.Vector3(x, y, z), this._q, new THREE.Vector3(sx, sy, sz));
-    this.lists.get(shape).push({ m: this.frame.clone().multiply(this._local), c: color });
+    this.lists.get(kind).push({ m: this.frame.clone().multiply(this._local), c: color });
   }
 
   /** Adds a part on a face: `face` 0 = front (+z), 1 = right (+x), 2 = left (-x), 3 = back (-z). */
-  onFace(face, w, d, shape, across, y, out, sx, sy, sz, color) {
+  onFace(face, w, d, kind, across, y, out, sx, sy, sz, color) {
     const [x, z, ry] = [
       [across, d / 2 + out, 0],
       [w / 2 + out, -across, Math.PI / 2],
       [-w / 2 - out, across, -Math.PI / 2],
       [-across, -d / 2 - out, Math.PI],
     ][face];
-    this.add(shape, x, y, z, sx, sy, sz, color, 0, ry);
+    this.add(kind, x, y, z, sx, sy, sz, color, 0, ry);
+  }
+
+  /** A point of the current building, in the world. */
+  world(x, y, z) {
+    return new THREE.Vector3(x, y, z).applyMatrix4(this.frame);
   }
 
   build(scene) {
     const c = new THREE.Color();
-    for (const [shape, items] of this.lists) {
+    for (const [kind, items] of this.lists) {
       if (!items.length) continue;
-      const mesh = new THREE.InstancedMesh(SHAPES[shape], paint(0xffffff, { flat: FLAT.has(shape) }), items.length);
+      const mesh = new THREE.InstancedMesh(KINDS[kind].shape, paint(0xffffff, KINDS[kind].paint), items.length);
       items.forEach((it, i) => {
         mesh.setMatrixAt(i, it.m);
         mesh.setColorAt(i, c.setHex(it.c));
       });
-      mesh.castShadow = mesh.receiveShadow = true;
+      mesh.castShadow = KINDS[kind].shadow !== false;
+      mesh.receiveShadow = true;
       scene.add(mesh);
     }
+    for (const { p, reach } of this.lights) lamplight(scene, p.x, p.y, p.z, reach);
   }
 }
 
@@ -87,13 +117,29 @@ function windowOn(parts, rng, face, w, d, across, y) {
     parts.onFace(face, w, d, 'box', across, y + 0.08, 0.075, 0.42, 0.04, 0.02, trim);
     if (state < 0.8) for (const s of [-1, 1]) parts.onFace(face, w, d, 'box', across + s * 0.44, y, 0.04, 0.24, 0.76, 0.05, parts.shutter);
   }
-  if (rng() < 0.3) {
+  if (rng() < 0.34) {
     parts.onFace(face, w, d, 'box', across, y - 0.6, 0.18, 0.56, 0.16, 0.2, TILE);
-    for (let k = -1; k <= 1; k++) parts.onFace(face, w, d, 'ball', across + k * 0.17, y - 0.46, 0.2, 0.17, 0.17, 0.17, pick(rng, [0xc9443c, 0xd9735a, PAL.grassDeep, 0xe58f6b]));
+    for (let k = -1; k <= 1; k++) parts.onFace(face, w, d, 'ball', across + k * 0.17, y - 0.46, 0.2, 0.17, 0.17, 0.17, pick(rng, [0xd9584a, 0xe2826a, 0xf08aa8, 0xf6d24a, 0xf7efe6]));
+    parts.onFace(face, w, d, 'leaf', across, y - 0.52, 0.2, 0.5, 0.14, 0.16, 0x5a9050);
   }
 }
 
-function house(parts, rng, w, d, floors) {
+/** A climber rooted by the wall and spreading as it goes up: leaves, then flowers on top. */
+function climber(parts, rng, face, w, d, across, top) {
+  const [leaf, flower, bright] = pick(rng, CLIMBERS);
+  const lean = (rng() - 0.5) * 0.5;
+  for (let y = 0.4; y < top; y += 0.42) {
+    const spread = 0.25 + (y / top) * (0.5 + rng() * 0.5);
+    for (let k = 0; k < 2 + Math.floor(spread * 3); k++) {
+      const x = across + lean * y + (rng() - 0.5) * 2 * spread;
+      const size = 0.42 + rng() * 0.3;
+      parts.onFace(face, w, d, 'leaf', x, y + (rng() - 0.5) * 0.3, 0.1, size, size * 0.9, 0.3, leaf);
+      if (y > top * 0.3 && rng() < 0.75) parts.onFace(face, w, d, 'ball', x + (rng() - 0.5) * 0.4, y + 0.1 + (rng() - 0.5) * 0.3, 0.2, size * 0.6, size * 0.55, 0.26, rng() < 0.6 ? flower : bright);
+    }
+  }
+}
+
+function house(parts, rng, w, d, floors, sunk) {
   const H = 1.2 + floors * 1.7;
   const wall = pick(rng, WALLS);
   parts.trim = pick(rng, TRIM);
@@ -103,12 +149,18 @@ function house(parts, rng, w, d, floors) {
   for (let f = 1; f < floors; f++) parts.add('box', 0, 1.2 + f * 1.7 - 0.1, 0, w + 0.1, 0.12, d + 0.1, parts.trim);
   parts.add('box', 0, H + 0.09, 0, w + 0.26, 0.18, d + 0.26, parts.trim);
 
-  // Door with its step and fanlight.
+  // Door with its step and fanlight, and a lamp on its bracket that is lit all night.
   const doorX = (rng() - 0.5) * (w - 1.2);
   parts.onFace(0, w, d, 'box', doorX, 0.95, 0.03, 0.95, 1.65, 0.05, parts.trim);
-  parts.onFace(0, w, d, 'box', doorX, 0.85, 0.05, 0.72, 1.45, 0.05, pick(rng, [WOOD, 0x3f6f4a, 0x5a4034]));
+  parts.onFace(0, w, d, 'box', doorX, 0.85, 0.05, 0.72, 1.45, 0.05, pick(rng, [WOOD, 0x4a7a58, 0x5a4034, 0x4a6a8a, 0x8a3a3a]));
   parts.onFace(0, w, d, 'arch', doorX, 1.58, 0.04, 0.72, 0.72, 0.05, GLASS);
   parts.onFace(0, w, d, 'box', doorX, 0.08, 0.2, 1.1, 0.16, 0.42, STONE);
+  if (rng() < 0.6) {
+    const side = doorX > 0 ? -1 : 1;
+    parts.onFace(0, w, d, 'box', doorX + side * 0.72, 2.1, 0.16, 0.05, 0.05, 0.3, IRON);
+    parts.onFace(0, w, d, 'lamp', doorX + side * 0.72, 1.92, 0.3, 0.24, 0.3, 0.24, WARM_LIGHT);
+    parts.lights.push({ p: parts.world(doorX + side * 0.72, 1.9, d / 2 + 1), reach: 4.2 });
+  }
 
   // Windows on the three visible faces, floor by floor.
   for (let f = 0; f < floors; f++) {
@@ -132,32 +184,75 @@ function house(parts, rng, w, d, floors) {
     parts.add('box', 0, y - 0.05, d / 2 + 0.38, bw, 0.12, 0.76, STONE);
     parts.add('box', 0, y + 0.55, d / 2 + 0.74, bw, 0.06, 0.06, parts.shutter);
     for (let k = 0; k <= 4; k++) parts.add('box', -bw / 2 + (bw * k) / 4, y + 0.27, d / 2 + 0.74, 0.05, 0.55, 0.05, parts.shutter);
-    for (const s of [-1, 1]) parts.add('ball', s * (bw / 2 - 0.25), y + 0.25, d / 2 + 0.45, 0.32, 0.32, 0.32, pick(rng, [PAL.grassDeep, 0xc9443c, 0xd9735a]));
-    if (rng() < 0.45) {
+    for (const s of [-1, 1]) parts.add('leaf', s * (bw / 2 - 0.25), y + 0.25, d / 2 + 0.45, 0.34, 0.34, 0.34, pick(rng, [0x5a9050, 0x4f8456, 0x6a9c5c]));
+    for (const s of [-1, 1]) if (rng() < 0.6) parts.add('ball', s * (bw / 2 - 0.25), y + 0.42, d / 2 + 0.5, 0.2, 0.18, 0.2, pick(rng, [0xd9584a, 0xf08aa8, 0xf6d24a]));
+    if (rng() < 0.5) {
       parts.add('box', 0, y + 1.25, d / 2 + 0.7, bw, 0.02, 0.02, 0xd8d4e0);
-      for (let k = 0; k < 3; k++) parts.add('box', -bw / 3 + (k * bw) / 3, y + 1.0, d / 2 + 0.7, 0.36, 0.48, 0.03, pick(rng, [PAL.ivory, 0x8fa8c8, 0xd9735a, PAL.ivory, 0xe8d2a0]));
+      for (let k = 0; k < 3; k++) parts.add('box', -bw / 3 + (k * bw) / 3, y + 1.0, d / 2 + 0.7, 0.36, 0.48, 0.03, pick(rng, [PAL.ivory, 0x9ab4d0, 0xe2826a, PAL.ivory, 0xe8d2a0, 0xb8d0b0]));
     }
+  }
+
+  // A striped awning over a ground-floor window, a bench or a row of pots by the door.
+  if (rng() < 0.22) {
+    const stripe = pick(rng, [0xd9584a, 0x58a0a0, 0xe6b450, 0x5a86a0]);
+    for (let k = 0; k < 5; k++) parts.add('box', -0.6 + k * 0.3, 2.9, d / 2 + 0.42, 0.3, 0.05, 0.9, k % 2 ? PAL.ivory : stripe, 0.4);
+  }
+  if (rng() < 0.5) {
+    const x = doorX > 0 ? doorX - 1.3 : doorX + 1.3;
+    if (rng() < 0.5) {
+      parts.add('box', x, sunk + 0.45, d / 2 + 0.4, 1.1, 0.08, 0.36, WOOD);
+      for (const s of [-1, 1]) parts.add('box', x + s * 0.45, sunk + 0.22, d / 2 + 0.4, 0.08, 0.44, 0.3, WOOD);
+    } else {
+      for (const s of [-1, 0, 1]) {
+        parts.add('cyl', x + s * 0.4, sunk + 0.2, d / 2 + 0.36, 0.3, 0.36, 0.3, TILE);
+        parts.add('leaf', x + s * 0.4, sunk + 0.55, d / 2 + 0.36, 0.42, 0.46, 0.42, pick(rng, [0x5a9050, 0x4f8456, 0x74a862]));
+      }
+    }
+  }
+  // Bougainvillea, wisteria, jasmine or ivy up the front or a side wall.
+  if (rng() < 0.42) {
+    const face = pick(rng, [0, 0, 1, 2]);
+    const span = face === 0 ? w : d;
+    climber(parts, rng, face, w, d, (rng() < 0.5 ? -1 : 1) * (span / 2 - 0.35), H * (0.5 + rng() * 0.5));
   }
 
   // Roof: hipped tiles or slate with a chimney, or a roof terrace with a parasol or a pergola.
   const roof = rng();
   if (roof < 0.68) {
-    const color = rng() < 0.45 ? SLATE : pick(rng, [TILE, 0xb8583a, 0xd0734a]);
+    const color = rng() < 0.4 ? SLATE : pick(rng, [TILE, 0xbc6444, 0xd47c54, 0xc87850]);
     parts.add('pyramid', 0, H + 0.18 + (roof < 0.4 ? 0.5 : 0.36), 0, w + 0.45, roof < 0.4 ? 1.0 : 0.72, d + 0.45, color);
     parts.add('box', w * 0.25, H + 0.8, -d * 0.2, 0.36, 1.1, 0.36, wall);
     parts.add('box', w * 0.25, H + 1.4, -d * 0.2, 0.52, 0.1, 0.52, parts.trim);
     parts.add('pyramid', w * 0.25, H + 1.55, -d * 0.2, 0.5, 0.2, 0.5, TILE);
+    parts.chimneys.push(parts.world(w * 0.25, H + 1.8, -d * 0.2));
+    // The gutter under the front eave empties through a spout at one corner: a thread of
+    // water down to the street while it rains. Drops fall from the eaves long after, and
+    // freeze there as icicles.
+    const side = rng() < 0.5 ? -1 : 1;
+    parts.add('box', 0, H + 0.2, d / 2 + 0.27, w + 0.5, 0.09, 0.1, IRON);
+    parts.add('box', side * (w / 2 + 0.3), H + 0.17, d / 2 + 0.36, 0.1, 0.1, 0.3, IRON);
+    parts.add('flow', side * (w / 2 + 0.3), (H + 0.1 + sunk) / 2, d / 2 + 0.5, 0.1, H + 0.1 - sunk, 0.1, POURING);
+    parts.add('flow', side * (w / 2 + 0.3), sunk + 0.06, d / 2 + 0.5, 0.5, 0.1, 0.5, POURING);
+    for (const x of [-0.31, 0.12, 0.38]) {
+      if (rng() < 0.7) parts.add('flow', x * w, (H + 0.14 + sunk) / 2, d / 2 + 0.34, 0.07, H + 0.14 - sunk, 0.07, DRIPPING);
+    }
+    for (const z of [-0.24, 0.2]) {
+      if (rng() < 0.5) parts.add('flow', -side * (w / 2 + 0.28), (H + 0.14 + sunk) / 2, z * d, 0.07, H + 0.14 - sunk, 0.07, DRIPPING);
+    }
   } else {
     for (const [x, z, sx, sz] of [[0, d / 2, w, 0.12], [0, -d / 2, w, 0.12], [w / 2, 0, 0.12, d], [-w / 2, 0, 0.12, d]]) parts.add('box', x, H + 0.4, z, sx + 0.1, 0.45, sz + 0.1, parts.trim);
     if (rng() < 0.5) {
       parts.add('cyl', -w * 0.2, H + 1.2, 0, 0.06, 1.9, 0.06, 0x3b3346);
-      parts.add('cone', -w * 0.2, H + 2.1, 0, 2.2, 0.55, 2.2, pick(rng, [0xe9e0c8, 0xc9443c, 0x4a7a54]));
+      parts.add('cone', -w * 0.2, H + 2.1, 0, 2.2, 0.55, 2.2, pick(rng, [0xe9e0c8, 0xd9584a, 0x56866a]));
     } else {
-      // A vine pergola for the shade.
+      // A vine pergola for the shade, with a lantern under it for the evenings.
       for (const sx of [-1, 1]) for (const sz of [-1, 1]) parts.add('box', sx * (w / 2 - 0.5), H + 1.1, sz * (d / 2 - 0.5), 0.08, 1.5, 0.08, WOOD);
-      parts.add('box', 0, H + 1.9, 0, w - 0.6, 0.14, d - 0.6, 0x5f8a45);
+      parts.add('box', 0, H + 1.86, 0, w - 0.6, 0.06, d - 0.6, WOOD);
+      for (let k = 0; k < 7; k++) parts.add('leaf', (rng() - 0.5) * (w - 0.8), H + 1.98, (rng() - 0.5) * (d - 0.8), 0.9, 0.3, 0.9, pick(rng, [0x5f8e4c, 0x6c9a54, 0x54844a]));
+      parts.add('lamp', 0, H + 1.6, 0, 0.22, 0.26, 0.22, WARM_LIGHT);
+      parts.lights.push({ p: parts.world(0, H + 1.6, 0), reach: 3.4 });
     }
-    for (let k = 0; k < 3; k++) parts.add('ball', (rng() - 0.5) * (w - 0.8), H + 0.45, (rng() - 0.5) * (d - 0.8), 0.5, 0.45, 0.5, pick(rng, [PAL.grassDeep, PAL.grass, 0xc9443c]));
+    for (let k = 0; k < 3; k++) parts.add('leaf', (rng() - 0.5) * (w - 0.8), H + 0.45, (rng() - 0.5) * (d - 0.8), 0.5, 0.45, 0.5, pick(rng, [0x5a9050, 0x74a862, 0x4f8456]));
   }
 
   // A television aerial here and there.
@@ -187,15 +282,53 @@ function campanile(parts, rng) {
   parts.add('pyramid', 0, 15.6, 0, 2.6, 2.8, 2.6, rng() < 0.5 ? SLATE : TILE);
   parts.add('box', 0, 17.5, 0, 0.08, 1.0, 0.08, 0x3b3346);
   parts.add('box', 0, 17.7, 0, 0.5, 0.08, 0.08, 0x3b3346);
+  parts.lights.push({ p: parts.world(0, 2, 2.2), reach: 7 });
 }
 
-export function buildVillages(scene, rng) {
+/**
+ * Wood smoke from the chimneys: a few puffs rising, swelling and thinning on the wind. Fires
+ * are lit when it is cold, and for supper every evening.
+ */
+function buildSmoke(scene, rng, chimneys, animated) {
+  const PUFFS = 4;
+  const hearths = chimneys.filter(() => rng() < 0.45);
+  if (!hearths.length) return;
+  const mesh = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.5, 0), paint(0xe6e2e6, { flat: true }), hearths.length * PUFFS);
+  mesh.frustumCulled = false;
+  scene.add(mesh);
+  const phases = hearths.map(() => rng() * 10);
+  const m = new THREE.Matrix4();
+  const p = new THREE.Vector3();
+  const q = new THREE.Quaternion();
+  const s = new THREE.Vector3();
+  let strength = 0;
+  animated.push((t, dt, climate) => {
+    const cold = climate ? Math.max(climate.season.winter, climate.season.autumn * 0.5, climate.night * 0.5 * (1 - climate.season.summer), climate.now.snow) : 0;
+    strength += (cold - strength) * Math.min(1, dt);
+    mesh.visible = strength > 0.03;
+    if (!mesh.visible) return;
+    const wind = climate.wind;
+    const blow = 0.4 + climate.now.wind * 2.2;
+    hearths.forEach((hearth, i) => {
+      for (let k = 0; k < PUFFS; k++) {
+        const life = (t * 0.22 + phases[i] + k / PUFFS) % 1;
+        const rise = life * 3.2;
+        p.set(hearth.x + wind.x * blow * life * rise * 0.6 + Math.sin(t + k * 2 + phases[i]) * 0.12, hearth.y + rise, hearth.z + wind.y * blow * life * rise * 0.6);
+        s.setScalar((0.25 + life * 0.75) * Math.sin(Math.min(1, (1 - life) * 2.2) * Math.PI * 0.5) * strength);
+        mesh.setMatrixAt(i * PUFFS + k, m.compose(p, q, s));
+      }
+    });
+    mesh.instanceMatrix.needsUpdate = true;
+  });
+}
+
+export function buildVillages(scene, rng, animated) {
   const parts = new Parts();
   const placed = [];
   const yaw = Math.PI / 4;
+  const SUNK = 1.4; // houses are dug into the slope: their street door is this far up
 
-  // Houses packed in rows along the terraces, as in Manarola, inside an organic blob:
-  // the main village on the left-hand slopes above the sea, a hamlet on the right headland.
+  // Houses packed in rows along the slope, as in Manarola, inside an organic blob.
   const bell = VILLAGES[0];
   const villages = VILLAGES.map((village) => ({ cu: village.u, cv: village.v, radius: village.r }));
   for (const village of villages) {
@@ -213,10 +346,10 @@ export function buildVillages(scene, rng) {
         if (rng() < 0.05 || Math.hypot(ju - bell.u, jv - bell.v) < 3.5) continue;
         if (!isWild(x, z, -2) || slopeAt(x, z) > 1.8 || groundAt(x, z) < 0.5) continue;
         placed.push([x, z]);
-        parts.at(new THREE.Vector3(x, groundAt(x, z) - 1.4, z), yaw);
+        parts.at(new THREE.Vector3(x, groundAt(x, z) - SUNK, z), yaw);
         // Taller houses toward the heart of the village.
         const floors = 2 + Math.floor(rng() * 2) + (d < edge * 0.5 ? 1 : 0);
-        house(parts, rng, 2.8 + rng() * 0.6, 2.6 + rng() * 0.5, floors);
+        house(parts, rng, 2.8 + rng() * 0.6, 2.6 + rng() * 0.5, floors, SUNK);
       }
     }
   }
@@ -240,11 +373,12 @@ export function buildVillages(scene, rng) {
       if (slopeAt(x, z) > 0.3 || !isWild(x, z, -1)) continue;
       if (placed.some((p) => Math.hypot(p[0] - x, p[1] - z) < 3)) continue;
       parts.at(new THREE.Vector3(x, groundAt(x, z), z), yaw);
-      parts.add('ball', 0, 0.55, 0, 0.85, 0.95 + rng() * 0.3, 0.6, pick(rng, [PAL.grassDeep, 0x5f9c6a, PAL.grass, 0x7fae5a]));
+      parts.add('leaf', 0, 0.55, 0, 0.85, 0.95 + rng() * 0.3, 0.6, pick(rng, [0x6a9e5e, 0x66a070, 0x82b06a, 0x8ab464]));
       if (Math.round(v / 0.95) % 3 === 0) parts.add('cyl', 0.55, 0.6, 0, 0.06, 1.2, 0.06, WOOD);
       if (rng() < 0.2) parts.add('ball', 0.2, 0.45, 0.3, 0.14, 0.14, 0.14, 0x6d4a8f);
     }
   }
 
   parts.build(scene);
+  buildSmoke(scene, rng, parts.chimneys, animated);
 }
