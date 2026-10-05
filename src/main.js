@@ -1,41 +1,48 @@
 import * as THREE from 'three';
-import { smoothstep } from './noise.js';
+import { PixelCamera, PixelRenderer } from './pixel.js';
 import { Player } from './player.js';
-import { SEED_COUNT, WATER_LEVEL, createWorld, groundAt } from './world.js';
+import { GLOBALS } from './style.js';
+import { SUN_DIR, ZONES, createWorld, groundAt } from './world.js';
 
 const clamp = THREE.MathUtils.clamp;
 
 // ---------------------------------------------------------------- Renderer, scene, light
 
-const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.setSize(innerWidth, innerHeight);
+const renderer = new THREE.WebGLRenderer({ antialias: false });
 renderer.shadowMap.enabled = true;
 document.body.prepend(renderer.domElement);
+const pixels = new PixelRenderer(renderer, 3);
+const view = new PixelCamera();
 
 const scene = new THREE.Scene();
-scene.fog = new THREE.Fog(0xffffff, 90, 470);
-const camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.1, 2500);
+scene.fog = new THREE.Fog(0xffffff, 1, 2);
 
-const hemi = new THREE.HemisphereLight(0xffffff, 0xffffff, 1.1);
-const sun = new THREE.DirectionalLight(0xffffff, 2.4);
+// Perpetual late afternoon, as in Bob's VR: warm sun, lavender shade.
+const SKY_TOP = new THREE.Color(0x8fd3e0);
+const SKY_HORIZON = new THREE.Color(0xf8d3a8);
+GLOBALS.uSunTint.value.set(0xfff0d6);
+GLOBALS.uShadowTint.value.set(0xb4a6dc);
+GLOBALS.uGlow.value = 0.7;
+scene.fog.color.copy(SKY_HORIZON);
+
+const sun = new THREE.DirectionalLight(0xffffff, 1);
 sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
-Object.assign(sun.shadow.camera, { left: -70, right: 70, top: 70, bottom: -70, near: 1, far: 320 });
-sun.shadow.bias = -0.0004;
-sun.shadow.normalBias = 0.04;
-scene.add(hemi, sun, sun.target);
+Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 260 });
+sun.shadow.bias = -0.0006;
+sun.shadow.normalBias = 0.06;
+scene.add(sun, sun.target);
 
 const world = createWorld(scene);
 const player = new Player();
-player.position.set(0, groundAt(0, 34), 34);
+player.position.set(2, groundAt(2, 20), 20);
 scene.add(player.root);
 
-addEventListener('resize', () => {
-  camera.aspect = innerWidth / innerHeight;
-  camera.updateProjectionMatrix();
-  renderer.setSize(innerWidth, innerHeight);
-});
+function resize() {
+  pixels.setSize(innerWidth, innerHeight);
+}
+addEventListener('resize', resize);
+resize();
 
 // ---------------------------------------------------------------- Input
 // KeyboardEvent.code is layout-independent: WASD on QWERTY is ZQSD on AZERTY.
@@ -44,20 +51,23 @@ const keys = new Set();
 addEventListener('keydown', (e) => {
   keys.add(e.code);
   if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
+  // A / E on AZERTY (KeyQ / KeyE codes) turn the view by an eighth of a turn.
+  if (e.code === 'KeyQ') yawTarget += Math.PI / 4;
+  if (e.code === 'KeyE') yawTarget -= Math.PI / 4;
 });
 addEventListener('keyup', (e) => keys.delete(e.code));
 addEventListener('blur', () => keys.clear());
 
-const view = { yaw: 0, pitch: 0.3, dist: 13 };
+let yawTarget = view.yaw;
 let dragging = false;
 renderer.domElement.addEventListener('pointerdown', () => (dragging = true));
 addEventListener('pointerup', () => (dragging = false));
 addEventListener('pointermove', (e) => {
   if (!dragging) return;
-  view.yaw -= e.movementX * 0.005;
-  view.pitch = clamp(view.pitch + e.movementY * 0.004, -0.1, 1.25);
+  yawTarget -= e.movementX * 0.006;
+  view.pitch = clamp(view.pitch + e.movementY * 0.004, 0.35, 1.2);
 });
-addEventListener('wheel', (e) => (view.dist = clamp(view.dist * (1 + Math.sign(e.deltaY) * 0.1), 5, 45)), {
+addEventListener('wheel', (e) => (view.viewHeight = clamp(view.viewHeight * (1 + Math.sign(e.deltaY) * 0.1), 22, 90)), {
   passive: true,
 });
 
@@ -71,112 +81,59 @@ function readInput() {
   };
 }
 
-// ---------------------------------------------------------------- Day cycle: noon to violet dusk and back
+// ---------------------------------------------------------------- Zone labels
 
-const DAY = { top: 0x78c8c6, horizon: 0xf7e4b6, sun: 0xfff3da, ground: 0xd9a98c };
-const DUSK = { top: 0x5a4b98, horizon: 0xf28e78, sun: 0xffad7a, ground: 0x8a5f8f };
-const tint = (key, k, out) => out.setHex(DAY[key]).lerp(new THREE.Color(DUSK[key]), k);
-const sunDir = new THREE.Vector3();
-const DAY_LENGTH = 150;
+const labelLayer = document.getElementById('labels');
+const labels = ZONES.map((zn) => {
+  const el = document.createElement('div');
+  el.className = 'label';
+  el.innerHTML = `${zn.name}<small>${zn.hint}</small>`;
+  labelLayer.append(el);
+  return { el, anchor: new THREE.Vector3(zn.x, groundAt(zn.x, zn.z) + (zn.id === 'agora' ? 15 : 10), zn.z), zn };
+});
+const projected = new THREE.Vector3();
 
-function updateSky(t) {
-  const phase = (t / DAY_LENGTH) * Math.PI * 2 + 2.2;
-  const elev = 0.08 + 0.85 * (0.5 + 0.5 * Math.sin(phase));
-  const az = phase * 0.5 + 0.8;
-  sunDir.set(Math.cos(elev) * Math.cos(az), Math.sin(elev), Math.cos(elev) * Math.sin(az));
-  const dusk = 1 - smoothstep(0.1, 0.75, elev);
-  const u = world.sky.uniforms;
-  tint('top', dusk, u.uTop.value);
-  tint('horizon', dusk, u.uHorizon.value);
-  tint('sun', dusk, u.uSun.value);
-  u.uSunDir.value.copy(sunDir);
-  scene.fog.color.copy(u.uHorizon.value);
-  sun.color.copy(u.uSun.value);
-  sun.intensity = 1.5 + 1.2 * (1 - dusk);
-  hemi.color.copy(u.uHorizon.value);
-  tint('ground', dusk, hemi.groundColor);
-}
-
-// ---------------------------------------------------------------- Camera
-
-const camTarget = new THREE.Vector3();
-const camWanted = new THREE.Vector3();
-
-function updateCamera(dt, snap = false) {
-  camTarget.copy(player.position).y += 2.2;
-  const cp = Math.cos(view.pitch);
-  camWanted
-    .set(Math.sin(view.yaw) * cp, Math.sin(view.pitch), Math.cos(view.yaw) * cp)
-    .multiplyScalar(view.dist)
-    .add(camTarget);
-  const floor = Math.max(groundAt(camWanted.x, camWanted.z), WATER_LEVEL) + 1.2;
-  camWanted.y = Math.max(camWanted.y, floor);
-  if (snap) camera.position.copy(camWanted);
-  else camera.position.lerp(camWanted, 1 - Math.exp(-dt * 8));
-  camera.lookAt(camTarget);
-}
-
-// ---------------------------------------------------------------- HUD
-
-const $ = (id) => document.getElementById(id);
-const hud = { count: $('count'), arrow: $('arrow'), dist: $('dist'), toast: $('toast'), compass: $('compass') };
-$('total').textContent = SEED_COUNT;
-let toastTimer = 0;
-function toast(text, seconds = 4) {
-  hud.toast.textContent = text;
-  hud.toast.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => hud.toast.classList.remove('show'), seconds * 1000);
-}
-
-function updateCompass() {
-  let best = null;
-  let bestD = Infinity;
-  for (const s of world.seeds) {
-    if (s.collected) continue;
-    const d = Math.hypot(s.position.x - player.position.x, s.position.z - player.position.z);
-    if (d < bestD) [best, bestD] = [s, d];
+function updateLabels() {
+  for (const { el, anchor, zn } of labels) {
+    const d = Math.hypot(player.position.x - zn.x, player.position.z - zn.z);
+    const alpha = 1 - THREE.MathUtils.smoothstep(d, zn.r + 8, zn.r + 30);
+    projected.copy(anchor).project(view.camera);
+    const visible = alpha > 0.01 && Math.abs(projected.x) < 1.1 && Math.abs(projected.y) < 1.1;
+    el.style.opacity = visible ? alpha : 0;
+    if (!visible) continue;
+    // Snap to the art-pixel grid so labels don't shimmer against the pixel scene.
+    const px = pixels.pixelSize;
+    const x = Math.round(((projected.x + 1) / 2) * innerWidth / px) * px;
+    const y = Math.round(((1 - projected.y) / 2) * innerHeight / px) * px;
+    el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
   }
-  hud.compass.classList.toggle('hidden', !best);
-  if (!best) return;
-  // Project the seed direction into the camera's ground frame: up on screen = straight ahead.
-  const dx = best.position.x - player.position.x;
-  const dz = best.position.z - player.position.z;
-  const ahead = -Math.sin(view.yaw) * dx - Math.cos(view.yaw) * dz;
-  const side = Math.cos(view.yaw) * dx - Math.sin(view.yaw) * dz;
-  hud.arrow.style.transform = `rotate(${Math.atan2(side, ahead)}rad)`;
-  hud.dist.textContent = `${Math.round(bestD)} m`;
 }
 
 // ---------------------------------------------------------------- Loop
 
 const clock = new THREE.Clock();
+const focus = new THREE.Vector3();
 let t = 0;
-updateSky(0);
-updateCamera(0, true);
-toast("Trouve les graines de lumière pour réveiller l'Arbre-Mère.", 6);
 
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.05);
   t += dt;
 
-  updateSky(t);
+  view.yaw += (yawTarget - view.yaw) * (1 - Math.exp(-dt * 8));
   player.update(dt, t, readInput(), view.yaw);
-  updateCamera(dt);
-  world.update(t, dt, { sunDir });
+  world.update(t, dt);
 
-  const gathered = world.collectNear(player.position);
-  if (gathered) {
-    hud.count.textContent = gathered;
-    toast(
-      gathered === SEED_COUNT
-        ? "L'Arbre-Mère a refleuri. Le désert respire."
-        : `Graine ${gathered}/${SEED_COUNT} — une branche de l'Arbre-Mère reverdit.`,
-    );
-  }
-  updateCompass();
+  GLOBALS.uTime.value = t;
+  GLOBALS.uCloud.value.set(t * 0.035, t * 0.012);
+
+  focus.copy(player.position).y += 1.4;
+  view.update(focus, pixels.lowRes, pixels.offset);
+  scene.fog.near = view.distance + 40;
+  scene.fog.far = view.distance + 200;
 
   sun.target.position.copy(player.position);
-  sun.position.copy(player.position).addScaledVector(sunDir, 150);
-  renderer.render(scene, camera);
+  sun.position.copy(player.position).addScaledVector(SUN_DIR, 120);
+
+  pixels.render(scene, view.camera, { skyTop: SKY_TOP, skyHorizon: SKY_HORIZON, texelWorld: view.texelWorld });
+  updateLabels();
 });

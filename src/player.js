@@ -1,18 +1,21 @@
 // The wanderer: red cloak, wide hat, scarf in the wind.
 import * as THREE from 'three';
-import { PAL, inked, toon } from './style.js';
+import { PAL, paint, solid } from './style.js';
 import { WATER_LEVEL, WORLD_RADIUS, groundAt } from './world.js';
 
 const GRAVITY = 30;
-const JUMP_SPEED = 11;
-const WALK_SPEED = 8;
-const RUN_SPEED = 17;
+const JUMP_SPEED = 10;
+const WALK_SPEED = 7;
+const RUN_SPEED = 13;
 const SWIM_DEPTH = 0.9;
+const MAX_STEP = 1.1;
 
 const lerpAngle = (a, b, k) => {
   const d = ((((b - a + Math.PI) % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2)) - Math.PI;
   return a + d * k;
 };
+
+const part = (geo, color) => solid(geo, paint(color));
 
 export class Player {
   constructor() {
@@ -23,27 +26,31 @@ export class Player {
     this.heading = 0;
     this.stride = 0;
 
-    const cloak = inked(new THREE.ConeGeometry(0.85, 2.0, 12), toon(PAL.red), 0.05);
+    const cloak = part(new THREE.ConeGeometry(0.85, 2.0, 12), PAL.red);
     cloak.position.y = 1.15;
-    const head = inked(new THREE.SphereGeometry(0.36, 14, 10), toon(PAL.skin), 0.04);
+    const trim = part(new THREE.CylinderGeometry(0.86, 0.9, 0.18, 12), PAL.saffron);
+    trim.position.y = 0.25;
+    const head = part(new THREE.SphereGeometry(0.36, 14, 10), PAL.skin);
     head.position.y = 2.3;
-    const brim = inked(new THREE.CylinderGeometry(1.05, 1.1, 0.07, 20), toon(PAL.ivory), 0.04);
+    const brim = part(new THREE.CylinderGeometry(1.05, 1.1, 0.07, 20), PAL.ivory);
     brim.position.y = 2.55;
-    const crown = inked(new THREE.ConeGeometry(0.42, 0.75, 12), toon(PAL.ivory), 0.04);
+    const crown = part(new THREE.ConeGeometry(0.42, 0.75, 12), PAL.ivory);
     crown.position.y = 2.9;
+    const band = part(new THREE.CylinderGeometry(0.4, 0.42, 0.12, 12), PAL.teal);
+    band.position.y = 2.64;
 
     this.scarf = new THREE.Group();
     this.scarf.position.set(0, 2.05, -0.25);
-    const band = inked(new THREE.BoxGeometry(0.28, 0.05, 1.8), toon(PAL.saffron), 0.03);
-    band.position.z = -0.9;
-    this.scarf.add(band);
+    const cloth = part(new THREE.BoxGeometry(0.28, 0.05, 1.8), PAL.saffron);
+    cloth.position.z = -0.9;
+    this.scarf.add(cloth);
 
     this.body = new THREE.Group();
-    this.body.add(cloak, head, brim, crown, this.scarf);
+    this.body.add(cloak, trim, head, brim, crown, band, this.scarf);
     this.legs = [-0.25, 0.25].map((x) => {
       const pivot = new THREE.Group();
       pivot.position.set(x, 0.6, 0);
-      const leg = inked(new THREE.CylinderGeometry(0.1, 0.12, 0.6, 6), toon(PAL.plum), 0.04);
+      const leg = part(new THREE.CylinderGeometry(0.1, 0.12, 0.6, 6), PAL.plum);
       leg.position.y = -0.3;
       pivot.add(leg);
       return pivot;
@@ -54,7 +61,7 @@ export class Player {
   update(dt, t, input, camYaw) {
     const fx = -Math.sin(camYaw);
     const fz = -Math.cos(camYaw);
-    let wx = fx * input.forward + -fz * input.right;
+    let wx = fx * input.forward - fz * input.right;
     let wz = fz * input.forward + fx * input.right;
     const len = Math.hypot(wx, wz);
     if (len > 1) {
@@ -72,13 +79,19 @@ export class Player {
       this.onGround = false;
     }
     this.velocity.y -= GRAVITY * dt;
-    this.position.addScaledVector(this.velocity, dt);
 
-    const r = Math.hypot(this.position.x, this.position.z);
-    if (r > WORLD_RADIUS) {
-      this.position.x *= WORLD_RADIUS / r;
-      this.position.z *= WORLD_RADIUS / r;
+    // Cliffs block the way unless you jump up the ledge.
+    const nx = this.position.x + this.velocity.x * dt;
+    const nz = this.position.z + this.velocity.z * dt;
+    const ahead = Math.max(groundAt(nx, nz), WATER_LEVEL - SWIM_DEPTH);
+    if (ahead - this.position.y > MAX_STEP || Math.hypot(nx, nz) > WORLD_RADIUS) {
+      this.velocity.x = 0;
+      this.velocity.z = 0;
+    } else {
+      this.position.x = nx;
+      this.position.z = nz;
     }
+    this.position.y += this.velocity.y * dt;
 
     const floor = Math.max(groundAt(this.position.x, this.position.z), WATER_LEVEL - SWIM_DEPTH);
     // Stick to gentle downhill slopes instead of hopping off every shelf edge.
@@ -96,10 +109,10 @@ export class Player {
 
   animate(dt, t) {
     const hs = Math.hypot(this.velocity.x, this.velocity.z);
-    if (hs > 0.5) this.heading = lerpAngle(this.heading, Math.atan2(this.velocity.x, this.velocity.z), 1 - Math.exp(-dt * 10));
+    if (hs > 0.5) this.heading = lerpAngle(this.heading, Math.atan2(this.velocity.x, this.velocity.z), 1 - Math.exp(-dt * 12));
     this.root.rotation.y = this.heading;
 
-    this.stride += hs * dt * 0.9;
+    this.stride += hs * dt * 1.1;
     const swing = Math.min(hs / WALK_SPEED, 1.4) * (this.onGround ? 1 : 0.2);
     this.legs[0].rotation.x = Math.sin(this.stride) * 0.7 * swing;
     this.legs[1].rotation.x = -Math.sin(this.stride) * 0.7 * swing;
@@ -107,6 +120,6 @@ export class Player {
 
     const lift = Math.min(hs / RUN_SPEED, 1);
     this.scarf.rotation.x = -1.2 + lift * 1.3 + Math.sin(t * 9) * 0.12 * (0.3 + lift);
-    this.scarf.rotation.z = Math.sin(t * 5) * 0.12 * lift;
+    this.scarf.rotation.z = Math.sin(t * 5) * 0.12 * lift + Math.sin(t * 1.3) * 0.05;
   }
 }

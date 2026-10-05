@@ -1,78 +1,234 @@
-// Visual language: flat pastel tones + ink outlines, in the spirit of Mœbius.
+// Visual language: Mœbius palette rendered as 3D pixel art.
+// Every world material goes through `paint()`: two-tone cel lighting with hue-shifted shadows,
+// drifting cloud shadows, and a second render target output carrying view-space normals.
 import * as THREE from 'three';
-import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 
 export const PAL = {
   ink: 0x2a1f3d,
   sand: 0xf4dfb4,
+  sandDeep: 0xecd09a,
   peach: 0xf1b98f,
   rose: 0xdc9a9a,
   ochre: 0xe2b25c,
   lilac: 0xb7a0cf,
+  cream: 0xf7ecd4,
   wetSand: 0xc9b48e,
+  grass: 0x9fd09a,
+  grassDeep: 0x6fb08f,
   moss: 0x93c9a0,
-  teal: 0x5cb5ad,
+  teal: 0x4fb0a8,
   ivory: 0xf3ead6,
   coral: 0xe9765c,
   saffron: 0xf6c54f,
   red: 0xc9443c,
   skin: 0xf1c9a3,
-  water: 0x74d4cf,
+  water: 0x5fc8c8,
+  waterLight: 0x9fe3d6,
   plum: 0x7d5c9e,
+  sky: 0x8fd3e0,
+  pink: 0xf2a6c1,
+  blue: 0x6f8fd6,
+  wood: 0xb07a55,
 };
 
-// Three hard light steps instead of a smooth ramp: the "aplat" look.
-export const gradientMap = (() => {
-  const tex = new THREE.DataTexture(new Uint8Array([110, 190, 255]), 3, 1, THREE.RedFormat);
-  tex.minFilter = THREE.NearestFilter;
-  tex.magFilter = THREE.NearestFilter;
+export const WATER_LEVEL = -1.6;
+export const PATH_COUNT = 8;
+
+/** Uniforms shared by every painted material, updated once per frame. */
+export const GLOBALS = {
+  uTime: { value: 0 },
+  uSunTint: { value: new THREE.Color(1, 1, 1) },
+  uShadowTint: { value: new THREE.Color(0.6, 0.55, 0.85) },
+  uGlow: { value: 0 },
+  uCloud: { value: new THREE.Vector2() },
+  uPaths: { value: Array.from({ length: PATH_COUNT }, () => new THREE.Vector4()) },
+};
+
+// Hex (sRGB) → linear GLSL literal.
+const lin = (hex) => {
+  const c = new THREE.Color(hex);
+  return `vec3(${c.r.toFixed(4)}, ${c.g.toFixed(4)}, ${c.b.toFixed(4)})`;
+};
+
+// Binary light ramp: a face is either in the sun or in the shade.
+const gradientMap = (() => {
+  const tex = new THREE.DataTexture(new Uint8Array([0, 255]), 2, 1, THREE.RedFormat);
+  tex.minFilter = tex.magFilter = THREE.NearestFilter;
   tex.needsUpdate = true;
   return tex;
 })();
 
-const toonCache = new Map();
-export function toon(color, opts = {}) {
-  const key = `${color}|${JSON.stringify(opts)}`;
-  if (!toonCache.has(key)) toonCache.set(key, new THREE.MeshToonMaterial({ color, gradientMap, ...opts }));
-  return toonCache.get(key);
+const VERTEX_HEAD = /* glsl */ `
+uniform float uTime;
+varying vec3 vWorld;
+`;
+
+const VERTEX_SWAY = /* glsl */ `
+#include <begin_vertex>
+#if defined(SWAY) && defined(USE_INSTANCING)
+  vec3 pxRoot = (modelMatrix * instanceMatrix[3]).xyz;
+  float pxBend = max(position.y, 0.0);
+  transformed.x += sin(uTime * 2.1 + pxRoot.x * 0.35 + pxRoot.z * 0.2) * 0.18 * pxBend;
+  transformed.z += cos(uTime * 1.7 + pxRoot.x * 0.15 + pxRoot.z * 0.3) * 0.12 * pxBend;
+#endif
+`;
+
+const VERTEX_WORLD = /* glsl */ `
+#include <worldpos_vertex>
+vec4 pxW = vec4(transformed, 1.0);
+#ifdef USE_INSTANCING
+  pxW = instanceMatrix * pxW;
+#endif
+vWorld = (modelMatrix * pxW).xyz;
+`;
+
+const FRAGMENT_HEAD = /* glsl */ `
+#include <common>
+layout(location = 1) out highp vec4 gNormal;
+uniform float uTime;
+uniform vec3 uSunTint;
+uniform vec3 uShadowTint;
+uniform float uGlow;
+uniform vec2 uCloud;
+uniform vec4 uPaths[${PATH_COUNT}];
+varying vec3 vWorld;
+
+float pxHash(vec2 p) {
+  vec3 p3 = fract(vec3(p.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+float pxNoise(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(pxHash(i), pxHash(i + vec2(1, 0)), u.x), mix(pxHash(i + vec2(0, 1)), pxHash(i + vec2(1, 1)), u.x), u.y);
+}
+float pxFbm(vec2 p) {
+  return pxNoise(p) * 0.6 + pxNoise(p * 2.03 + 17.0) * 0.3 + pxNoise(p * 4.1 - 9.0) * 0.1;
 }
 
-// Inverted-hull outline: back faces pushed along the normal, drawn in flat ink.
-const outlineCache = new Map();
-export function outlineMat(thickness = 0.1, fog = true) {
-  const key = `${thickness}|${fog}`;
-  if (!outlineCache.has(key)) {
-    const mat = new THREE.MeshBasicMaterial({ color: PAL.ink, side: THREE.BackSide, fog });
-    mat.onBeforeCompile = (shader) => {
-      shader.vertexShader = shader.vertexShader.replace(
-        '#include <begin_vertex>',
-        `vec3 transformed = position + normal * ${thickness.toFixed(4)};`,
-      );
-    };
-    mat.customProgramCacheKey = () => `outline-${key}`;
-    outlineCache.set(key, mat);
-  }
-  return outlineCache.get(key);
+#ifdef TERRAIN
+const vec3 STRATA[6] = vec3[6](${[PAL.peach, PAL.rose, PAL.cream, PAL.ochre, PAL.lilac, PAL.coral].map(lin).join(', ')});
+
+float pxSegment(vec2 p, vec4 s) {
+  vec2 pa = p - s.xy;
+  vec2 ba = s.zw - s.xy;
+  float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-4), 0.0, 1.0);
+  return length(pa - ba * h);
 }
 
-// Hard edges split vertices; merging them gives continuous normals so the hull stays closed.
-const smoothCache = new WeakMap();
-export function smoothed(geometry) {
-  if (!smoothCache.has(geometry)) {
-    const geo = geometry.clone();
-    geo.deleteAttribute('normal');
-    geo.deleteAttribute('uv');
-    const merged = mergeVertices(geo);
-    merged.computeVertexNormals();
-    smoothCache.set(geometry, merged);
-  }
-  return smoothCache.get(geometry);
+vec3 terrainColor(vec3 w, vec3 n) {
+  // Cliffs: wavy sedimentary strata, the signature of Mœbius deserts.
+  float wobble = (pxNoise(w.xz * 0.22) - 0.5) * 1.1;
+  int band = int(mod(floor((w.y + wobble) / 1.1), 6.0));
+  vec3 cliff = STRATA[band];
+
+  // Flats: meadows and sand in organic patches, with a fine speckle.
+  float patchN = pxFbm(w.xz * 0.045);
+  float speck = pxHash(floor(w.xz * 3.0));
+  vec3 flat_ = patchN > 0.5
+    ? (pxNoise(w.xz * 0.35) > 0.55 ? ${lin(PAL.grassDeep)} : ${lin(PAL.grass)})
+    : (pxNoise(w.xz * 0.3) > 0.62 ? ${lin(PAL.sandDeep)} : ${lin(PAL.sand)});
+  if (speck > 0.93) flat_ *= patchN > 0.5 ? 0.88 : 1.06;
+
+  // Footpaths between the work areas.
+  float path = 1e3;
+  for (int i = 0; i < ${PATH_COUNT}; i++) path = min(path, pxSegment(w.xz, uPaths[i]));
+  float edge = 1.5 + (pxNoise(w.xz * 1.2) - 0.5) * 0.7;
+  if (path < edge) flat_ = path < edge - 0.45 ? ${lin(PAL.cream)} : ${lin(PAL.sandDeep)};
+
+  float slope = 1.0 - n.y;
+  vec3 col = slope > 0.42 + (pxNoise(w.xz * 0.8) - 0.5) * 0.12 ? cliff : flat_;
+  if (w.y < ${(WATER_LEVEL + 0.35).toFixed(2)}) col = ${lin(PAL.wetSand)};
+  return col;
+}
+#endif
+
+#ifdef WATER
+vec3 waterColor(vec3 w) {
+  float ripple = pxNoise(w.xz * vec2(0.22, 0.5) + vec2(uTime * 0.25, uTime * 0.1));
+  vec3 col = ripple > 0.64 ? ${lin(PAL.waterLight)} : ${lin(PAL.water)};
+  float sparkle = pxHash(floor(w.xz * 2.0) + floor(uTime * 3.0) * vec2(7.0, 3.0));
+  if (sparkle > 0.993) col = vec3(1.0);
+  return col;
+}
+#endif
+`;
+
+const FRAGMENT_SHADE = /* glsl */ `
+vec3 pxAlb = diffuseColor.rgb;
+#ifdef TERRAIN
+  pxAlb = terrainColor(vWorld, normalize(inverseTransformDirection(normal, viewMatrix)));
+#endif
+#ifdef WATER
+  pxAlb = waterColor(vWorld);
+#endif
+
+float pxLit = 0.0;
+float pxNdl = 0.0;
+#if NUM_DIR_LIGHTS > 0
+  pxNdl = dot(normal, directionalLights[0].direction);
+  pxLit = step(0.5, dot(reflectedLight.directDiffuse / max(diffuseColor.rgb, vec3(0.002)), vec3(0.3333)) * PI);
+#endif
+// Cloud shadows drifting over the land.
+pxLit *= step(pxFbm(vWorld.xz * 0.04 + uCloud), 0.72);
+
+vec3 pxCol;
+if (pxLit > 0.5) {
+  pxCol = pxAlb * uSunTint;
+  if (pxNdl > 0.88) pxCol = pxCol * 1.07 + vec3(0.025, 0.018, 0.0);
+} else {
+  pxCol = pxAlb * uShadowTint;
+  if (pxNdl < -0.3) pxCol *= 0.84;
+}
+#ifdef GLOW
+  pxCol = mix(pxCol, pxAlb * 1.5 + 0.06, uGlow);
+#endif
+outgoingLight = pxCol;
+gNormal = vec4(normal * 0.5 + 0.5, 1.0);
+#include <opaque_fragment>
+`;
+
+const cache = new Map();
+
+/**
+ * @param {number} color sRGB hex
+ * @param {{terrain?: boolean, water?: boolean, sway?: boolean, glow?: boolean, flat?: boolean, doubleSide?: boolean, map?: THREE.Texture}} [opts]
+ */
+export function paint(color, opts = {}) {
+  const { map, ...flags } = opts;
+  const key = `${color}|${JSON.stringify(flags)}|${map?.uuid ?? ''}`;
+  if (cache.has(key)) return cache.get(key);
+  const mat = new THREE.MeshToonMaterial({
+    color,
+    gradientMap,
+    map: map ?? null,
+    side: opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide,
+  });
+  if (opts.flat) mat.flatShading = true;
+  mat.defines = {};
+  if (opts.terrain) mat.defines.TERRAIN = '';
+  if (opts.water) mat.defines.WATER = '';
+  if (opts.sway) mat.defines.SWAY = '';
+  if (opts.glow) mat.defines.GLOW = '';
+  mat.onBeforeCompile = (shader) => {
+    Object.assign(shader.uniforms, GLOBALS);
+    shader.vertexShader = VERTEX_HEAD + shader.vertexShader
+      .replace('#include <begin_vertex>', VERTEX_SWAY)
+      .replace('#include <worldpos_vertex>', VERTEX_WORLD);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', FRAGMENT_HEAD)
+      .replace('#include <opaque_fragment>', FRAGMENT_SHADE);
+  };
+  cache.set(key, mat);
+  return mat;
 }
 
-export function inked(geometry, material, thickness = 0.1, { fog = true, shadows = true } = {}) {
+/** A mesh that casts and receives shadows. */
+export function solid(geometry, material) {
   const mesh = new THREE.Mesh(geometry, material);
-  mesh.castShadow = shadows;
-  mesh.receiveShadow = shadows;
-  mesh.add(new THREE.Mesh(smoothed(geometry), outlineMat(thickness, fog)));
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
   return mesh;
 }
