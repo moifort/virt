@@ -514,6 +514,49 @@ export function lighthouse(parent, x, y, z) {
   at(ball(0.22, PAL.saffron, { glow: true }, 6, 4), 0, top + 4.0, 0, g);
 }
 
+/** A small fishermen's shop with an arched front, awning, sign and its wares on the quay. */
+function bottega(parent, rng, x, w) {
+  const shop = at(new THREE.Group(), x, 0, -1, parent);
+  const wall = pick(rng, [PAL.ochre, PAL.rose, PAL.coral, PAL.saffron, PAL.peach, 0xf2c79a, PAL.pink]);
+  const floors = 1 + Math.floor(rng() * 2);
+  const H = 3.4 + floors * 1.8;
+  at(box(w, H, 4, wall), 0, H / 2, 0, shop);
+  at(box(w + 0.1, 0.9, 4.1, 0xd9cbb5), 0, 0.45, 0, shop);
+  at(box(w + 0.3, 0.2, 4.3, PAL.cream), 0, H + 0.1, 0, shop);
+  at(cone(Math.max(w, 4) * 0.78, 1.2, rng() < 0.6 ? 0x8a86a0 : 0xc8643c, 4, { flat: true }), 0, H + 0.75, 0, shop).rotation.y = Math.PI / 4;
+  // Arched shopfront opening onto the quay.
+  at(box(w * 0.62, 2.2, 0.1, 0x3b3346), 0, 1.1, 2.02, shop);
+  at(solid(new THREE.CylinderGeometry(w * 0.31, w * 0.31, 0.1, 12, 1, false, -Math.PI / 2, Math.PI).rotateX(-Math.PI / 2), paint(0x3b3346)), 0, 2.2, 2.02, shop);
+  at(box(w * 0.7, 0.18, 0.12, PAL.cream), 0, 3.0, 2.05, shop);
+  // Striped awning.
+  const awning = at(new THREE.Group(), 0, 3.1, 2.1, shop);
+  awning.rotation.x = 0.45;
+  const color = pick(rng, [PAL.red, PAL.teal, PAL.blue, PAL.coral]);
+  for (let k = 0; k < 5; k++) at(box(w * 0.8 / 5, 0.06, 1.3, k % 2 ? PAL.ivory : color), -w * 0.4 + (w * 0.8 / 5) * (k + 0.5), 0, 0.6, awning);
+  // Sign board and upper windows with shutters.
+  at(box(w * 0.55, 0.45, 0.08, INK), 0, 3.6, 2.04, shop);
+  at(box(w * 0.35, 0.08, 0.04, PAL.saffron), 0, 3.6, 2.09, shop);
+  for (let f = 0; f < floors; f++) {
+    for (const s of [-1, 1]) {
+      const wx = s * w * 0.25;
+      const wy = 4.6 + f * 1.8;
+      at(box(0.5, 0.8, 0.06, 0x3b3346), wx, wy, 2.03, shop);
+      for (const t of [-1, 1]) at(box(0.24, 0.82, 0.06, pick(rng, [0x3f8f5a, 0x3f7f8f])), wx + t * 0.38, wy, 2.04, shop);
+    }
+  }
+  // Wares: crates of fish, baskets, a hanging net.
+  for (let k = 0; k < 3; k++) {
+    const cx = -w * 0.3 + k * w * 0.3;
+    at(box(0.9, 0.35, 0.65, PAL.blue), cx, 0.18, 2.7 + (k % 2) * 0.3, shop);
+    for (let f = 0; f < 3; f++) at(ball(0.12, 0xc8d4e0, {}, 5, 3), cx - 0.25 + f * 0.25, 0.4, 2.7 + (k % 2) * 0.3, shop).scale.set(1.8, 0.6, 0.8);
+  }
+  at(cyl(0.3, 0.24, 0.5, PAL.wood, 8), w * 0.42, 0.25, 2.6, shop);
+  for (let k = 0; k < 5; k++) at(box(0.03, 1.4, 0.03, 0x6d8f8a), -w * 0.45 + k * 0.12, 2.4, 2.12, shop);
+  at(ball(0.2, PAL.saffron, {}, 5, 4), -w * 0.4, 1.6, 2.15, shop);
+}
+
+/** Traditional fishing harbour, Cinque Terre style: a cobbled piazza, a slipway with boats
+ * pulled up, fishermen's shops under the houses, boats on their moorings, and a breakwater. */
 export function buildPort(g, rng, animated) {
   // Local +z points to the open sea, found by looking for the deepest water around the port.
   let best = { depth: Infinity, angle: 0 };
@@ -525,23 +568,57 @@ export function buildPort(g, rng, animated) {
   g.rotation.y = best.angle;
   const surface = WATER_LEVEL;
   const Q = 17;
+  const SLIP = { x0: -9, x1: -1 };
 
-  // Quay wall with bollards and lamps.
-  at(box(46, 4.8, 2.6, STONE, { flat: true }), 0, -2.4, Q, g);
-  at(box(46, 0.25, 2.8, PAL.cream), 0, 0.1, Q, g);
-  for (let x = -21; x <= 21; x += 4.2) at(cyl(0.22, 0.28, 0.65, INK, 6), x, 0.42, Q + 0.9, g);
+  // The cobbled piazza.
+  at(box(44, 0.2, 18, 0xe8dcc4), 0, 0.1, Q - 9, g);
+  for (let x = -21; x <= 21; x += 1.5) at(box(0.05, 0.02, 17.6, 0xd2c4a8), x, 0.21, Q - 9, g);
+  for (let z = Q - 17.5; z < Q; z += 1.5) at(box(43.6, 0.02, 0.05, 0xd2c4a8), 0, 0.21, z, g);
+
+  // Quay wall, open where the slipway runs down into the water.
+  for (const [x0, x1] of [[-23, SLIP.x0], [SLIP.x1, 23]]) {
+    at(box(x1 - x0, 4.8, 2.6, STONE, { flat: true }), (x0 + x1) / 2, -2.4, Q, g);
+    at(box(x1 - x0, 0.25, 2.8, PAL.cream), (x0 + x1) / 2, 0.1, Q, g);
+    for (let x = x0 + 1.5; x < x1 - 1; x += 4.2) at(cyl(0.22, 0.28, 0.65, INK, 6), x, 0.42, Q + 0.9, g);
+  }
+  const slip = at(box(SLIP.x1 - SLIP.x0, 0.4, 14, 0xd2c4a8), (SLIP.x0 + SLIP.x1) / 2, -1.0, Q + 4, g);
+  slip.rotation.x = 0.17;
   for (const x of [-18, -6, 6, 18]) lantern(g, x, 0.2, Q - 0.6);
 
-  // A stone mole to the left, a long curved breakwater to the right ending at the lighthouse.
+  // Boats pulled up on the slipway and the piazza, a couple upturned on trestles.
+  [[-7, 13.5, 0], [-3, 12.5, 0.1], [-7, 9.5, -0.1], [-3, 8.5, 0.05], [-12, 11, 0.4], [-15.5, 12, 0.5]].forEach(([x, z, yaw]) => {
+    const boat = at(gozzo(rng), x, 0.25, z, g);
+    boat.rotation.set(0, yaw, 0.08);
+  });
+  for (const [x, z] of [[4, 11], [7.5, 12.5]]) {
+    for (const dz of [-1.2, 1.2]) at(box(1.6, 0.5, 0.3, PAL.wood), x, 0.45, z + dz, g);
+    const boat = at(gozzo(rng), x, 1.3, z, g);
+    boat.rotation.set(0, 0, Math.PI);
+  }
+
+  // Boats on their moorings in the harbour.
+  for (let i = 0; i < 7; i++) {
+    const x = -16 + i * 5 + (rng() - 0.5) * 2;
+    const z = Q + 6 + (i % 3) * 5 + rng() * 2;
+    const boat = at(live(gozzo(rng, i % 4 === 3)), x, surface, z, g);
+    boat.rotation.y = 0.3 + (rng() - 0.5) * 0.5;
+    at(ball(0.3, PAL.coral, {}, 8, 6), x + 1.5, surface + 0.1, z + 2.8, g);
+    animated.push((t) => {
+      boat.position.y = surface + Math.sin(t * 1.3 + i) * 0.08;
+      boat.rotation.z = Math.sin(t * 1.1 + i * 2) * 0.05;
+    });
+  }
+
+  // A stone mole to the left, a curved breakwater to the right ending at the lighthouse.
   const block = (x, z, size) => {
     const b = at(solid(new THREE.BoxGeometry(size, size, size), paint(pick(rng, [STONE, PAL.lilac, 0xd9cbb5]), { flat: true })), x, surface + 0.2, z, g);
     b.rotation.set(rng() * 0.5, rng() * 3, rng() * 0.5);
   };
-  for (let z = Q + 2; z < Q + 22; z += 2.2) {
+  for (let z = Q + 2; z < Q + 16; z += 2.2) {
     block(-21, z, 3.2);
     block(-23, z + 1, 2.4);
   }
-  at(box(3, 0.4, 20, STONE), -21, surface + 1.7, Q + 11, g);
+  at(box(3, 0.4, 14, STONE), -21, surface + 1.7, Q + 8, g);
   for (let t = 0; t <= 1; t += 0.035) {
     const x = 21 - Math.sin(t * 1.3) * 12;
     const z = Q + 2 + t * 34;
@@ -550,45 +627,14 @@ export function buildPort(g, rng, animated) {
   }
   lighthouse(g, 21 - Math.sin(1.3) * 12, surface + 0.6, Q + 39);
 
-  // Two wooden piers.
-  for (const px of [-9, 5]) {
-    for (let i = 0; i < 28; i++) at(box(2.6, 0.16, 0.56, PAL.wood), px, 0.05, Q + 1.6 + i * 0.62, g);
-    for (let z = Q + 2; z < Q + 19; z += 2.8) for (const dx of [-1.2, 1.2]) at(cyl(0.13, 0.13, 3.6, DARK_WOOD, 6), px + dx, -1.7, z, g);
-    lantern(g, px + 1.1, 0.13, Q + 18.6);
-  }
+  // The row of fishermen's shops at the back of the piazza.
+  for (let x = -19; x <= 19; x += 5.5) bottega(g, rng, x, 5.2);
 
-  // Moored boats along the piers, bobbing.
-  const moorings = [];
-  for (const px of [-9, 5]) for (const side of [-1, 1]) for (let k = 0; k < 3; k++) moorings.push([px + side * 2.6, Q + 4 + k * 5, (rng() - 0.5) * 0.2]);
-  moorings.forEach(([x, z, yaw], i) => {
-    const boat = at(live(gozzo(rng, i % 5 === 4)), x, surface, z, g);
-    boat.rotation.y = yaw;
-    animated.push((t) => {
-      boat.position.y = surface + Math.sin(t * 1.3 + i) * 0.08;
-      boat.rotation.z = Math.sin(t * 1.1 + i * 2) * 0.05;
-    });
-  });
-
-  // A harbour crane.
-  const crane = at(new THREE.Group(), 15, 0, Q - 2, g);
-  at(cyl(0.35, 0.5, 9, PAL.saffron, 8), 0, 4.5, 0, crane);
-  const boom = at(box(0.4, 0.4, 8, PAL.saffron), 0, 8.6, 3, crane);
-  boom.rotation.x = -0.25;
-  at(box(1.4, 1.2, 1.6, PAL.coral), 0, 9.2, -0.8, crane);
-  at(cyl(0.02, 0.02, 5, INK, 3), 0, 7.6, 6.6, crane);
-  at(box(0.5, 0.3, 0.3, INK), 0, 5.1, 6.6, crane);
-
-  // Boats pulled up on the quay, crates and a café terrace.
-  for (const [x, z, yaw] of [[-12, 9, 0.4], [-9.5, 7.5, 0.2], [-14.5, 10.5, 0.6]]) {
-    const boat = at(gozzo(rng), x, 0.15, z, g);
-    boat.rotation.set(0, yaw, 0.12);
-  }
-  for (let i = 0; i < 7; i++) at(box(0.9, 0.7, 0.9, pick(rng, [PAL.wood, PAL.ochre, PAL.teal])), 8 + (i % 3), 0.35 + Math.floor(i / 3) * 0.7, 12 + (i % 2) * 0.4, g).rotation.y = rng();
-  for (const [x, z, color] of [[2, 6, PAL.coral], [6, 4, PAL.teal], [-3, 4, PAL.saffron], [-7, 2, PAL.pink]]) {
+  // A café terrace by the water.
+  for (const [x, z, color] of [[14, 8, PAL.coral], [18, 11, PAL.teal]]) {
     at(cyl(0.7, 0.7, 0.08, PAL.ivory, 12), x, 1.05, z, g);
     at(cyl(0.07, 0.07, 3, INK, 6), x, 1.5, z, g);
-    const parasol = at(cone(2, 0.8, color, 8), x, 3.2, z, g);
-    parasol.rotation.y = rng();
+    at(cone(2, 0.8, color, 8), x, 3.2, z, g).rotation.y = rng();
     for (let k = 0; k < 2; k++) at(chair(PAL.ivory, 0.9), x + (k ? 1.2 : -1.2), 0, z, g).rotation.y = k ? -Math.PI / 2 : Math.PI / 2;
   }
   furnishPort(g, rng);
@@ -799,37 +845,26 @@ function furnishAtelier(g, rng, animated) {
 }
 
 function furnishPort(g, rng) {
-  // Fisherman's shed.
-  const shed = at(new THREE.Group(), -11, 0, 3, g);
-  at(box(3.2, 2.4, 2.6, PAL.sky), 0, 1.2, 0, shed);
-  at(box(3.6, 0.15, 3.0, PAL.ivory), 0, 2.45, 0, shed);
-  const roof = at(cone(2.4, 1.0, 0xc8643c, 4, { flat: true }), 0, 3.0, 0, shed);
-  roof.rotation.y = Math.PI / 4;
-  roof.scale.set(1, 1, 0.85);
-  at(box(0.8, 1.5, 0.05, PAL.wood), 0.6, 0.75, 1.32, shed);
-  at(box(0.6, 0.5, 0.05, 0x3b3346), -0.8, 1.4, 1.32, shed);
-  // Nets drying on poles.
-  for (const x of [0, 3.6]) at(cyl(0.06, 0.06, 2.4, PAL.wood, 4), x, 1.2, 10.8, g);
-  for (let k = 0; k < 6; k++) at(box(3.6, 0.03, 0.03, 0x6d8f8a), 1.8, 0.9 + k * 0.25, 10.8, g);
-  for (let k = 0; k < 9; k++) at(box(0.03, 1.4, 0.03, 0x6d8f8a), 0.2 + k * 0.4, 1.5, 10.8, g);
-  // Buoys, rope coils, lobster pots, an anchor.
-  for (let k = 0; k < 5; k++) {
-    at(ball(0.24, k % 2 ? PAL.red : PAL.ivory, {}, 8, 6), 4.5 + k * 0.45, 0.3, 11.7 - (k % 2) * 0.4, g);
+  const Q = 17;
+  // Nets drying on poles, coiled ropes, buoys, lobster pots and an old anchor on the piazza.
+  for (const x of [9, 12.6]) at(cyl(0.06, 0.06, 2.4, PAL.wood, 4), x, 1.2, Q - 3, g);
+  for (let k = 0; k < 6; k++) at(box(3.6, 0.03, 0.03, 0x6d8f8a), 10.8, 0.9 + k * 0.25, Q - 3, g);
+  for (let k = 0; k < 9; k++) at(box(0.03, 1.4, 0.03, 0x6d8f8a), 9.2 + k * 0.4, 1.5, Q - 3, g);
+  for (let k = 0; k < 5; k++) at(ball(0.24, k % 2 ? PAL.red : PAL.ivory, {}, 8, 6), 14 + k * 0.45, 0.45, Q - 1.5 - (k % 2) * 0.4, g);
+  for (const [x, z] of [[2, Q - 2], [2.8, Q - 1.6]]) at(ring(0.35, 0.09, PAL.cream, Math.PI * 2, 12), x, 0.3, z, g).rotation.x = Math.PI / 2;
+  for (const [x, z] of [[-14, Q - 3], [-13.2, Q - 2.7], [-13.6, Q - 3.6]]) {
+    at(cyl(0.4, 0.4, 0.55, 0x5a6a7a, 8), x, 0.48, z, g);
+    at(ring(0.4, 0.03, PAL.saffron, Math.PI * 2, 10), x, 0.75, z, g).rotation.x = Math.PI / 2;
   }
-  for (const [x, z] of [[-6, 11.4], [-5.2, 11.6]]) at(ring(0.35, 0.09, PAL.cream, Math.PI * 2, 12), x, 0.18, z, g).rotation.x = Math.PI / 2;
-  for (const [x, z] of [[-2, 11.2], [-1.2, 11.5], [-1.6, 10.6]]) {
-    at(cyl(0.4, 0.4, 0.55, 0x5a6a7a, 8), x, 0.28, z, g);
-    at(ring(0.4, 0.03, PAL.saffron, Math.PI * 2, 10), x, 0.55, z, g).rotation.x = Math.PI / 2;
-  }
-  const anchor = at(new THREE.Group(), 8, 0.2, 12, g);
+  const anchor = at(new THREE.Group(), 0, 0.35, Q - 4, g);
   anchor.rotation.set(-Math.PI / 2, 0, 0.4);
   at(cyl(0.08, 0.08, 1.6, INK, 6), 0, 0, 0, anchor);
   at(ring(0.55, 0.08, INK, Math.PI, 10), 0, -0.6, 0, anchor).rotation.z = Math.PI;
   at(ring(0.18, 0.05, INK, Math.PI * 2, 8), 0, 0.9, 0, anchor);
-  // Mooring buoys out in the harbour.
-  for (const [x, z] of [[-12, 20], [2, 27], [-6, 29]]) {
-    at(ball(0.35, PAL.coral, {}, 8, 6), x, WATER_LEVEL + 0.1, z, g);
-    at(cyl(0.04, 0.04, 0.5, INK, 4), x, WATER_LEVEL + 0.55, z, g);
+  // Benches facing the sea.
+  for (const x of [-18, 20]) {
+    at(box(2.4, 0.15, 0.7, PAL.wood), x, 0.75, Q - 2, g);
+    for (const dx of [-0.9, 0.9]) at(box(0.2, 0.55, 0.6, STONE), x + dx, 0.45, Q - 2, g);
   }
 }
 
