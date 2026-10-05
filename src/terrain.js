@@ -130,7 +130,7 @@ for (let iz = 0; iz <= SEGMENTS; iz++) {
     const x = ix * CELL - HALF;
     const z = iz * CELL - HALF;
     // Outside the diorama there is only open sea, deep enough to read as such.
-    GRID[iz * (SEGMENTS + 1) + ix] = inSquare(x, z, -1.5) ? heightAt(x, z) : -14;
+    GRID[iz * (SEGMENTS + 1) + ix] = inSquare(x, z, -1.5) ? Math.max(BASE_Y + 1, heightAt(x, z)) : -14;
   }
 }
 
@@ -213,8 +213,7 @@ export function buildTerrain() {
 }
 
 /**
- * The cut faces of the island: earth strata from the base up to the ground (the endless sea
- * hides them below the waterline). `holes` open windows in the back face
+ * The cut faces of the island: earth strata from the base up to the ground. `holes` open windows in the back face
  * ({ v0, v1, y0, y1 } in back-face coordinates) to look into the mountain.
  */
 export function buildSides(holes = []) {
@@ -268,13 +267,55 @@ export function buildSides(holes = []) {
 }
 
 
-/** The sea: it runs on past the island to the horizon. */
+/** The sea stops at the cut of the diorama, like the land: a slab of water with clear sides. */
 export function buildWater() {
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), paint(0xffffff, { water: true }));
-  water.rotation.x = -Math.PI / 2;
-  water.position.y = WATER_LEVEL;
-  water.receiveShadow = true;
-  return water;
+  const group = new THREE.Group();
+  const corners = [[SQUARE.u0, SQUARE.v0], [SQUARE.u0, SQUARE.v1], [SQUARE.u1, SQUARE.v1], [SQUARE.u1, SQUARE.v0]].map(([u, v]) => [toX(u, v), WATER_LEVEL, toZ(u, v)]);
+  const surface = new THREE.BufferGeometry();
+  surface.setAttribute('position', new THREE.Float32BufferAttribute([0, 1, 2, 0, 2, 3].flatMap((i) => corners[i]), 3));
+  surface.computeVertexNormals();
+  const top = new THREE.Mesh(surface, paint(0xffffff, { water: true, doubleSide: true }));
+  top.receiveShadow = true;
+  group.add(top);
+
+  // Cut faces: wherever the sea bed is below the waterline at the edge, the water shows in
+  // section, paler near the surface and deep blue below.
+  const shallow = [];
+  const deep = [];
+  const band = 1.4;
+  const quad = (out, p0, p1, lo0, lo1, hi0, hi1) => out.push(p0.x, lo0, p0.z, p1.x, lo1, p1.z, p1.x, hi1, p1.z, p0.x, lo0, p0.z, p1.x, hi1, p1.z, p0.x, hi0, p0.z);
+  const edges = [
+    ['u', SQUARE.u1, SQUARE.v0, SQUARE.v1],
+    ['u', SQUARE.u0, SQUARE.v0, SQUARE.v1],
+    ['v', SQUARE.v0, SQUARE.u0, SQUARE.u1],
+    ['v', SQUARE.v1, SQUARE.u0, SQUARE.u1],
+  ];
+  for (const [fixed, value, from, to] of edges) {
+    const point = (s) => {
+      const [u, v] = fixed === 'u' ? [value, s] : [s, value];
+      const p = new THREE.Vector3(toX(u, v), 0, toZ(u, v));
+      p.y = Math.max(BASE_Y, groundAt(p.x, p.z));
+      return p;
+    };
+    for (let s = from; s < to; s++) {
+      const p0 = point(s);
+      const p1 = point(s + 1);
+      if (p0.y >= WATER_LEVEL && p1.y >= WATER_LEVEL) continue;
+      const b0 = Math.min(p0.y, WATER_LEVEL);
+      const b1 = Math.min(p1.y, WATER_LEVEL);
+      const m0 = Math.max(b0, WATER_LEVEL - band);
+      const m1 = Math.max(b1, WATER_LEVEL - band);
+      quad(deep, p0, p1, b0, b1, m0, m1);
+      quad(shallow, p0, p1, m0, m1, WATER_LEVEL, WATER_LEVEL);
+    }
+  }
+  for (const [data, color] of [[shallow, 0x58b4cc], [deep, 0x2f72ac]]) {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(data, 3));
+    geo.computeVertexNormals();
+    group.add(new THREE.Mesh(geo, paint(color, { doubleSide: true })));
+  }
+  return group;
 }
 
 export function scatterInstanced(scene, rng, geo, mat, count, place) {

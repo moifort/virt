@@ -1,5 +1,5 @@
 // The avatar, Gather-style: a chibi John Difool (red quiff, ochre coat, teal shirt) who moves
-// tile by tile on a grid aligned with the shore, in four directions relative to the camera,
+// tile by tile on a grid aligned with the screen, so each arrow walks straight along its own axis,
 // with a little bounce on every step. Deepo the concrete seagull flutters around him.
 import * as THREE from 'three';
 import { PAL, paint, solid } from './style.js';
@@ -12,9 +12,10 @@ const MAX_STEP = 2.6; // one terrace: climbed with a hop
 const HOP = 0.55;
 const PUFFS = 14;
 
-// Grid axes in world space: u climbs toward the mountain, v runs along the shore.
-const AXIS_U = new THREE.Vector3(-1, 0, -1).normalize();
-const AXIS_V = new THREE.Vector3(1, 0, -1).normalize();
+// Grid axes in world space. The camera rests on quarter turns around the island, so these are
+// always the vertical and horizontal axes of the screen.
+const AXIS_U = new THREE.Vector3(0, 0, -1);
+const AXIS_V = new THREE.Vector3(1, 0, 0);
 const DIRECTIONS = [AXIS_U, AXIS_V, AXIS_U.clone().negate(), AXIS_V.clone().negate()];
 
 const lerpAngle = (a, b, k) => {

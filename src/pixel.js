@@ -175,10 +175,12 @@ export class PixelRenderer {
 export class PixelCamera {
   constructor() {
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 600);
-    // Isometric: looking down a corner of the grid, 35.26° below the horizon.
+    // Looking down a corner of the diorama from fairly low, so the mountains stand up against
+    // the sky; the frame is lifted so the avatar sits in its lower part.
     this.yaw = 0;
-    this.pitch = Math.atan(Math.SQRT1_2);
-    this.viewHeight = 60;
+    this.pitch = 0.44;
+    this.lift = 0.14;
+    this.viewHeight = 80;
     this.distance = 220;
     this.texelWorld = 0.1;
     this._right = new THREE.Vector3();
@@ -197,7 +199,7 @@ export class PixelCamera {
 
     const texel = this.viewHeight / lowRes.y;
     this.texelWorld = texel;
-    cam.position.copy(target).addScaledVector(this._fwd, -this.distance);
+    cam.position.copy(target).addScaledVector(this._fwd, -this.distance).addScaledVector(this._up, this.viewHeight * this.lift);
     const r = cam.position.dot(this._right);
     const u = cam.position.dot(this._up);
     const dr = Math.round(r / texel) * texel - r;
