@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { mulberry32, pick } from './noise.js';
 import { PAL, WATER_LEVEL, paint, solid } from './style.js';
-import { DARK_WOOD, INK, SCREEN, STONE, WARM_LIGHT, aerocar, at, ball, box, cone, cyl, lantern, live, plant, ring, screen } from './kit.js';
+import { DARK_WOOD, INK, SCREEN, STONE, WARM_LIGHT, at, ball, box, cone, cyl, lantern, live, plant, ring, screen } from './kit.js';
 import { SUN_DIR, ZONES, groundAt } from './terrain.js';
 
 /** Shelves of books along a wall. axis 'x' runs along x facing +z; axis 'z' runs along z facing +x. */
@@ -385,24 +385,28 @@ export function buildPods(g, rng, animated) {
   furnishPods(g, rng);
 }
 
+/** An old Genoese watchtower of rough stone, crenellated, as above Vernazza. */
 export function buildTower(g, rng, H) {
   const R = 2.2;
-  at(cyl(R * 0.75, R * 1.15, H, PAL.ivory, 18), 0, H / 2, 0, g);
-  for (let k = 1; k <= 3; k++) {
-    const band = at(solid(new THREE.TorusGeometry(R * (1.15 - (0.4 * k) / 4) + 0.12, 0.25, 6, 24), paint(k % 2 ? PAL.coral : PAL.teal)), 0, (H * k) / 4, 0, g);
-    band.rotation.x = Math.PI / 2;
+  const ROUGH = [0xcdbb9c, 0xb8a88e, 0xc2ad8a];
+  at(cyl(R * 0.82, R * 1.15, H, ROUGH[0], 14, { flat: true }), 0, H / 2, 0, g);
+  // Courses of darker stone and a few arrow slits.
+  for (let k = 1; k <= 4; k++) at(cyl(R * (1.15 - (0.33 * k) / 5) + 0.03, R * (1.15 - (0.33 * k) / 5) + 0.05, 0.3, ROUGH[1 + (k % 2)], 14, { flat: true }), 0, (H * k) / 5, 0, g);
+  for (let k = 0; k < 5; k++) {
+    const a = 0.4 + k * 1.3;
+    const y = H * (0.3 + (k % 3) * 0.22);
+    const r = R * (1.15 - (0.33 * y) / H);
+    at(box(0.22, 0.9, 0.3, INK), Math.sin(a) * r, y, Math.cos(a) * r, g).rotation.y = a;
   }
-  at(cyl(R * 2.1, R * 0.8, 1.6, PAL.ivory, 20), 0, H + 0.2, 0, g);
-  const dome = at(solid(new THREE.SphereGeometry(R * 1.2, 20, 10, 0, Math.PI * 2, 0, Math.PI / 2), paint(PAL.teal)), 0, H + 1, 0, g);
-  dome.scale.y = 0.9;
-  for (let k = 0; k < 6; k++) {
-    const a = (k / 6) * Math.PI * 2;
-    const h = 1.8 + rng() * 1.2;
-    at(cone(0.6, h, pick(rng, [PAL.grassDeep, PAL.teal]), 6), Math.cos(a) * R * 1.75, H + 1 + h / 2, Math.sin(a) * R * 1.75, g);
+  // Corbelled parapet with merlons.
+  at(cyl(R * 1.05, R * 0.82, 0.7, ROUGH[2], 14, { flat: true }), 0, H + 0.2, 0, g);
+  at(cyl(R * 1.05, R * 1.05, 0.5, ROUGH[0], 14, { flat: true }), 0, H + 0.8, 0, g);
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2;
+    at(box(0.7, 0.7, 0.4, ROUGH[k % 3]), Math.sin(a) * R * 0.98, H + 1.4, Math.cos(a) * R * 0.98, g).rotation.y = a;
   }
-  at(cyl(0.08, 0.12, 4, PAL.ivory, 6), 0, H + 1 + R * 1.1 + 2, 0, g);
-  const flag = at(cone(0.35, 1.8, PAL.red, 3), 0.9, H + R * 1.1 + 4.2, 0, g);
-  flag.rotation.z = -Math.PI / 2;
+  at(cyl(0.05, 0.07, 3.4, INK, 5), 0, H + 2.4, 0, g);
+  at(box(1.5, 0.9, 0.04, PAL.red), 0.78, H + 3.6, 0, g);
 }
 
 export function turbine(rng, animated) {
@@ -416,7 +420,7 @@ export function turbine(rng, animated) {
     const geo = new THREE.ConeGeometry(0.42, 4.4, 4);
     geo.translate(0, 2.2, 0);
     geo.scale(1, 1, 0.25);
-    const blade = solid(geo, paint(PAL.coral));
+    const blade = solid(geo, paint(PAL.ivory));
     blade.rotation.z = (k / 3) * Math.PI * 2;
     rotor.add(blade);
   }
@@ -426,16 +430,17 @@ export function turbine(rng, animated) {
   return g;
 }
 
-/** Photovoltaic flower turned toward the sun. */
+/** A sunflower, its head turned toward the sun. */
 export function sunFlower(rng) {
   const g = new THREE.Group();
-  const H = 1.6 + rng() * 1.6;
-  at(cyl(0.07, 0.11, H, PAL.grassDeep, 5), 0, H / 2, 0, g);
+  const H = 1.5 + rng() * 0.9;
+  at(cyl(0.05, 0.07, H, 0x5f8a45, 5), 0, H / 2, 0, g);
+  for (const s of [-1, 1]) at(ball(0.22, 0x5f8a45, { flat: true }, 5, 3), s * 0.22, H * (0.45 + s * 0.12), 0, g).scale.set(1, 0.35, 0.7);
   const head = at(new THREE.Group(), 0, H, 0, g);
-  const disc = new THREE.CylinderGeometry(0.85, 0.85, 0.1, 12);
+  const disc = new THREE.CylinderGeometry(0.42, 0.42, 0.06, 10);
   disc.rotateX(Math.PI / 2);
-  head.add(solid(disc, paint(PAL.saffron)));
-  at(ball(0.25, PAL.coral, {}, 8, 6), 0, 0, 0.08, head);
+  head.add(solid(disc, paint(0xf0c93a, { flat: true })));
+  at(ball(0.2, 0x6a4a30, {}, 8, 6), 0, 0, 0.04, head).scale.z = 0.4;
   head.lookAt(head.getWorldPosition(new THREE.Vector3()).add(SUN_DIR));
   return g;
 }
@@ -571,7 +576,7 @@ export function buildPort(g, rng, animated) {
 
   // A stone mole to the left, a long curved breakwater to the right ending at the lighthouse.
   const block = (x, z, size) => {
-    const b = at(solid(new THREE.BoxGeometry(size, size, size), paint(pick(rng, [STONE, PAL.lilac, 0xd9cbb5]), { flat: true })), x, surface + 0.2, z, g);
+    const b = at(solid(new THREE.BoxGeometry(size, size, size), paint(pick(rng, [STONE, 0xb9ad9c, 0xd9cbb5]), { flat: true })), x, surface + 0.2, z, g);
     b.rotation.set(rng() * 0.5, rng() * 3, rng() * 0.5);
   };
   for (let z = Q + 2; z < Q + 22; z += 2.2) {
@@ -626,17 +631,18 @@ export function buildPort(g, rng, animated) {
 }
 
 export function buildAgora(g, rng) {
-  // The Mother Tree, in full bloom.
-  at(cyl(0.9, 1.6, 8, PAL.ivory, 10), 0, 4, 0, g);
-  [PAL.grassDeep, PAL.teal, PAL.pink, PAL.moss, PAL.saffron, PAL.grass].forEach((color, k) => {
+  // The Mother Tree: a centuries-old holm oak shading the whole square.
+  const BARK = 0x7d5a48;
+  at(cyl(0.9, 1.6, 8, BARK, 10, { flat: true }), 0, 4, 0, g);
+  [0x3f6540, 0x4c7448, 0x5a8050, 0x466c44, 0x548050, 0x3f6540].forEach((color, k) => {
     const yaw = at(new THREE.Group(), 0, 7.5, 0, g);
     yaw.rotation.y = (k / 6) * Math.PI * 2;
     const tilt = at(new THREE.Group(), 0, 0, 0, yaw);
     tilt.rotation.z = -0.8 - (k % 2) * 0.2;
-    at(cyl(0.2, 0.42, 4.6, PAL.ivory, 6), 0, 2.3, 0, tilt);
+    at(cyl(0.2, 0.42, 4.6, BARK, 6), 0, 2.3, 0, tilt);
     at(ball(2.1 + (k % 3) * 0.3, color, { flat: true }, 9, 6), 0, 5, 0, tilt);
   });
-  at(ball(2.6, PAL.grass, { flat: true }, 9, 6), 0, 11.5, 0, g);
+  at(ball(2.6, 0x5a8050, { flat: true }, 9, 6), 0, 11.5, 0, g);
   for (let k = 0; k < 6; k++) {
     const a = (k / 6) * Math.PI * 2 + Math.PI / 6;
     const bench = at(new THREE.Group(), Math.cos(a) * 7, 0, Math.sin(a) * 7, g);
@@ -655,7 +661,7 @@ export function buildAgora(g, rng) {
   const rs = mulberry32(7);
   for (let k = 0; k < 9; k++) {
     const a = (k / 9) * Math.PI * 2;
-    const s = at(solid(new THREE.DodecahedronGeometry(0.9 + rs() * 0.5, 0), paint(pick(rs, [PAL.lilac, PAL.rose, PAL.peach]), { flat: true })), Math.cos(a) * 11.5, 0.6, Math.sin(a) * 11.5, g);
+    const s = at(solid(new THREE.DodecahedronGeometry(0.9 + rs() * 0.5, 0), paint(pick(rs, [0xcfc3b0, 0xb9ad9c, 0xd8cdb8]), { flat: true })), Math.cos(a) * 11.5, 0.6, Math.sin(a) * 11.5, g);
     s.scale.y = 1.6 + rs();
     s.rotation.y = rs() * 3;
   }
@@ -798,35 +804,19 @@ function furnishPods(g, rng) {
 }
 
 function furnishAtelier(g, rng, animated) {
-  // The tower gets a balcony, portholes, pipes and a dish.
-  const tower = new THREE.Vector3(-5, 0, -4);
-  const H = 15;
-  at(ring(2.6, 0.12, PAL.ivory, Math.PI * 2, 24), tower.x, H * 0.55, tower.z, g).rotation.x = Math.PI / 2;
-  at(cyl(2.6, 2.6, 0.14, PAL.cream, 20), tower.x, H * 0.55 - 0.65, tower.z, g);
-  for (let k = 0; k < 12; k++) {
-    const a = (k / 12) * Math.PI * 2;
-    at(cyl(0.04, 0.04, 0.6, PAL.ivory, 4), tower.x + Math.cos(a) * 2.6, H * 0.55 - 0.3, tower.z + Math.sin(a) * 2.6, g);
-  }
-  for (let k = 0; k < 6; k++) {
-    const a = Math.PI * 0.1 + (k % 3) * 0.5;
-    const y = 3 + Math.floor(k / 3) * 7;
-    const r = 2.2 * (1.15 - (0.4 * y) / H) + 0.02;
-    const port = at(cyl(0.32, 0.32, 0.1, 0x3b3346, 10), tower.x + Math.cos(a) * r, y, tower.z + Math.sin(a) * r, g);
-    port.rotation.set(Math.PI / 2, 0, -a + Math.PI / 2);
-    port.lookAt(tower.x + Math.cos(a) * 10, y, tower.z + Math.sin(a) * 10);
-    port.rotateX(Math.PI / 2);
-  }
-  at(cyl(0.18, 0.18, H, PAL.coral, 8), tower.x + 2.3, H / 2, tower.z + 0.6, g);
-  for (const y of [2, 6, 10, 14]) at(ring(0.24, 0.05, INK, Math.PI * 2, 8), tower.x + 2.3, y, tower.z + 0.6, g).rotation.x = Math.PI / 2;
-  const dish = at(solid(new THREE.SphereGeometry(1.1, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2.5), paint(PAL.ivory, { doubleSide: true })), tower.x + 2.4, H + 2.2, tower.z, g);
-  dish.rotation.set(-0.9, 0, 0.5);
-  // Landing pad with a parked aerotaxi.
-  at(cyl(3.2, 3.4, 0.25, PAL.ivory, 24), 2, 0.12, 11, g);
-  at(ring(2.5, 0.12, PAL.saffron, Math.PI * 2, 24), 2, 0.27, 11, g).rotation.x = Math.PI / 2;
-  for (let k = 0; k < 4; k++) at(ball(0.12, SCREEN, { glow: true }, 4, 3), 2 + Math.cos(k * Math.PI / 2) * 3, 0.3, 11 + Math.sin(k * Math.PI / 2) * 3, g);
-  const car = at(live(aerocar(PAL.teal)), 2, 1.1, 11, g);
-  car.rotation.y = 0.7;
-  animated.push((t) => (car.position.y = 1.1 + Math.sin(t * 2) * 0.06));
+  // A delivery three-wheeler parked on a cobbled yard, loaded with crates.
+  at(cyl(3.2, 3.4, 0.2, 0xcfc3b0, 20, { flat: true }), 2, 0.1, 11, g);
+  const ape = at(new THREE.Group(), 2, 0.2, 11, g);
+  ape.rotation.y = 0.7;
+  at(box(1.3, 1.1, 1.2, 0x6f9fb8), 0, 0.95, 1.0, ape);
+  at(box(1.34, 0.45, 0.9, 0x33303f), 0, 1.2, 1.2, ape);
+  at(box(1.3, 0.2, 0.5, 0x6f9fb8), 0, 0.5, 1.75, ape);
+  at(box(1.5, 0.12, 2.0, 0x6f9fb8), 0, 0.55, -0.6, ape);
+  for (const [x, z, w, d] of [[0.72, -0.6, 0.06, 2.0], [-0.72, -0.6, 0.06, 2.0], [0, -1.58, 1.5, 0.06]]) at(box(w, 0.4, d, 0x6f9fb8), x, 0.8, z, ape);
+  for (const [x, z] of [[0.3, -0.3], [-0.35, -0.9]]) at(box(0.6, 0.45, 0.6, PAL.wood), x, 0.85, z, ape);
+  at(cyl(0.26, 0.26, 0.16, INK, 10), 0, 0.26, 1.6, ape).rotation.z = Math.PI / 2;
+  for (const x of [-0.72, 0.72]) at(cyl(0.26, 0.26, 0.16, INK, 10), x, 0.26, -1.0, ape).rotation.z = Math.PI / 2;
+  at(ball(0.1, WARM_LIGHT, { glow: true }, 4, 3), 0, 0.8, 2.0, ape);
 }
 
 function furnishPort(g, rng) {
@@ -868,17 +858,16 @@ function furnishAgora(g, rng) {
   // Roots of the Mother Tree spreading over the ground.
   for (let k = 0; k < 6; k++) {
     const a = (k / 6) * Math.PI * 2 + 0.3;
-    const root = at(cyl(0.18, 0.5, 2.6, PAL.ivory, 6), Math.cos(a) * 1.6, 0.35, Math.sin(a) * 1.6, g);
+    const root = at(cyl(0.18, 0.5, 2.6, 0x7d5a48, 6), Math.cos(a) * 1.6, 0.35, Math.sin(a) * 1.6, g);
     root.rotation.set(Math.sin(a) * 1.2, 0, -Math.cos(a) * 1.2);
   }
-  for (const y of [1.5, 3.5, 5.5]) at(ring(1.25 - y * 0.06, 0.08, PAL.saffron, Math.PI * 2, 14), 0, y, 0, g).rotation.x = Math.PI / 2;
   // Lanterns hanging from the branches.
   for (let k = 0; k < 6; k++) {
     const a = (k / 6) * Math.PI * 2 + 0.5;
     const x = Math.cos(a) * 4.2;
     const z = -Math.sin(a) * 4.2;
     at(cyl(0.015, 0.015, 1.4, INK, 3), x, 9.2, z, g);
-    at(ball(0.22, k % 2 ? WARM_LIGHT : PAL.pink, { glow: true }, 6, 5), x, 8.4, z, g);
+    at(ball(0.22, WARM_LIGHT, { glow: true }, 6, 5), x, 8.4, z, g);
   }
   // A fountain.
   const f = at(new THREE.Group(), -5, 0, -5, g);

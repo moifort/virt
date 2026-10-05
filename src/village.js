@@ -1,5 +1,6 @@
-// Cinque Terre villages seen through Mœbius: pastel tower houses stacked on the terraces,
-// with framed windows, shutters, balconies, laundry, slate roofs, roof terraces and domes.
+// Cinque Terre villages: tall narrow houses in ochre, salmon and faded red, stacked on the
+// terraces, with framed windows, green shutters, balconies, laundry, tile and Ligurian slate
+// roofs, roof terraces and chimneys.
 // Every part is a unit shape instanced with its own matrix and colour: thousands of details,
 // a handful of draw calls.
 import * as THREE from 'three';
@@ -11,7 +12,6 @@ const SHAPES = {
   box: new THREE.BoxGeometry(1, 1, 1),
   pyramid: new THREE.ConeGeometry(Math.SQRT1_2, 1, 4).rotateY(Math.PI / 4),
   cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 10),
-  dome: new THREE.SphereGeometry(0.5, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2),
   ball: new THREE.SphereGeometry(0.5, 8, 6),
   cone: new THREE.ConeGeometry(0.5, 1, 8),
   // Half disc standing in the XY plane, flat side down (fanlights, arched openings).
@@ -19,11 +19,11 @@ const SHAPES = {
 };
 const FLAT = new Set(['pyramid', 'cone']);
 
-const WALLS = [PAL.ochre, PAL.rose, PAL.coral, PAL.saffron, PAL.peach, 0xf2c79a, 0xe58f6b, PAL.pink, 0xf5e1b8, 0xf0a97a];
+const WALLS = [0xe2b25c, 0xd99a86, 0xd9735a, 0xeec26a, 0xf1b98f, 0xf2c79a, 0xe58f6b, 0xc9604c, 0xf5e1b8, 0xf0a97a, 0xe8d2a0];
 const TRIM = [PAL.ivory, PAL.cream, 0xf7e9cf];
-const SHUTTER = [0x3f8f5a, 0x4a9a6a, 0x3f7f8f, 0x5f8f4a];
+const SHUTTER = [0x3f6f4a, 0x4a7a54, 0x35604a, 0x5a7a48];
 const GLASS = 0x3b3346;
-const SLATE = 0x8a86a0;
+const SLATE = 0x7d7f8a;
 const TILE = 0xc8643c;
 const WOOD = 0x8a5a41;
 const STONE = 0xd9cbb5;
@@ -89,7 +89,7 @@ function windowOn(parts, rng, face, w, d, across, y) {
   }
   if (rng() < 0.3) {
     parts.onFace(face, w, d, 'box', across, y - 0.6, 0.18, 0.56, 0.16, 0.2, TILE);
-    for (let k = -1; k <= 1; k++) parts.onFace(face, w, d, 'ball', across + k * 0.17, y - 0.46, 0.2, 0.17, 0.17, 0.17, pick(rng, [PAL.pink, PAL.red, PAL.grassDeep, PAL.coral]));
+    for (let k = -1; k <= 1; k++) parts.onFace(face, w, d, 'ball', across + k * 0.17, y - 0.46, 0.2, 0.17, 0.17, 0.17, pick(rng, [0xc9443c, 0xd9735a, PAL.grassDeep, 0xe58f6b]));
   }
 }
 
@@ -106,7 +106,7 @@ function house(parts, rng, w, d, floors) {
   // Door with its step and fanlight.
   const doorX = (rng() - 0.5) * (w - 1.2);
   parts.onFace(0, w, d, 'box', doorX, 0.95, 0.03, 0.95, 1.65, 0.05, parts.trim);
-  parts.onFace(0, w, d, 'box', doorX, 0.85, 0.05, 0.72, 1.45, 0.05, pick(rng, [WOOD, 0x3f7f8f, 0x6d4a6f]));
+  parts.onFace(0, w, d, 'box', doorX, 0.85, 0.05, 0.72, 1.45, 0.05, pick(rng, [WOOD, 0x3f6f4a, 0x5a4034]));
   parts.onFace(0, w, d, 'arch', doorX, 1.58, 0.04, 0.72, 0.72, 0.05, GLASS);
   parts.onFace(0, w, d, 'box', doorX, 0.08, 0.2, 1.1, 0.16, 0.42, STONE);
 
@@ -132,50 +132,44 @@ function house(parts, rng, w, d, floors) {
     parts.add('box', 0, y - 0.05, d / 2 + 0.38, bw, 0.12, 0.76, STONE);
     parts.add('box', 0, y + 0.55, d / 2 + 0.74, bw, 0.06, 0.06, parts.shutter);
     for (let k = 0; k <= 4; k++) parts.add('box', -bw / 2 + (bw * k) / 4, y + 0.27, d / 2 + 0.74, 0.05, 0.55, 0.05, parts.shutter);
-    for (const s of [-1, 1]) parts.add('ball', s * (bw / 2 - 0.25), y + 0.25, d / 2 + 0.45, 0.32, 0.32, 0.32, pick(rng, [PAL.grassDeep, PAL.pink, PAL.red]));
+    for (const s of [-1, 1]) parts.add('ball', s * (bw / 2 - 0.25), y + 0.25, d / 2 + 0.45, 0.32, 0.32, 0.32, pick(rng, [PAL.grassDeep, 0xc9443c, 0xd9735a]));
     if (rng() < 0.45) {
       parts.add('box', 0, y + 1.25, d / 2 + 0.7, bw, 0.02, 0.02, 0xd8d4e0);
-      for (let k = 0; k < 3; k++) parts.add('box', -bw / 3 + (k * bw) / 3, y + 1.0, d / 2 + 0.7, 0.36, 0.48, 0.03, pick(rng, [PAL.ivory, PAL.blue, PAL.coral, PAL.saffron, PAL.teal]));
+      for (let k = 0; k < 3; k++) parts.add('box', -bw / 3 + (k * bw) / 3, y + 1.0, d / 2 + 0.7, 0.36, 0.48, 0.03, pick(rng, [PAL.ivory, 0x8fa8c8, 0xd9735a, PAL.ivory, 0xe8d2a0]));
     }
   }
 
-  // Roof: slate pyramid, roof terrace, or a Mœbius dome.
+  // Roof: hipped tiles or slate with a chimney, or a roof terrace with a parasol or a pergola.
   const roof = rng();
-  if (roof < 0.5) {
-    const color = rng() < 0.6 ? SLATE : TILE;
-    parts.add('pyramid', 0, H + 0.18 + 0.55, 0, w + 0.45, 1.1, d + 0.45, color);
-    parts.add('box', w * 0.25, H + 0.9, -d * 0.2, 0.36, 1.2, 0.36, wall);
-    parts.add('box', w * 0.25, H + 1.55, -d * 0.2, 0.52, 0.1, 0.52, parts.trim);
-  } else if (roof < 0.78) {
+  if (roof < 0.68) {
+    const color = rng() < 0.45 ? SLATE : pick(rng, [TILE, 0xb8583a, 0xd0734a]);
+    parts.add('pyramid', 0, H + 0.18 + (roof < 0.4 ? 0.5 : 0.36), 0, w + 0.45, roof < 0.4 ? 1.0 : 0.72, d + 0.45, color);
+    parts.add('box', w * 0.25, H + 0.8, -d * 0.2, 0.36, 1.1, 0.36, wall);
+    parts.add('box', w * 0.25, H + 1.4, -d * 0.2, 0.52, 0.1, 0.52, parts.trim);
+    parts.add('pyramid', w * 0.25, H + 1.55, -d * 0.2, 0.5, 0.2, 0.5, TILE);
+  } else {
     for (const [x, z, sx, sz] of [[0, d / 2, w, 0.12], [0, -d / 2, w, 0.12], [w / 2, 0, 0.12, d], [-w / 2, 0, 0.12, d]]) parts.add('box', x, H + 0.4, z, sx + 0.1, 0.45, sz + 0.1, parts.trim);
     if (rng() < 0.5) {
       parts.add('cyl', -w * 0.2, H + 1.2, 0, 0.06, 1.9, 0.06, 0x3b3346);
-      parts.add('cone', -w * 0.2, H + 2.1, 0, 2.2, 0.55, 2.2, pick(rng, [PAL.coral, PAL.teal, PAL.saffron]));
+      parts.add('cone', -w * 0.2, H + 2.1, 0, 2.2, 0.55, 2.2, pick(rng, [0xe9e0c8, 0xc9443c, 0x4a7a54]));
     } else {
-      parts.add('cyl', w * 0.2, H + 0.7, -d * 0.15, 0.9, 1.0, 0.9, PAL.ivory);
-      parts.add('dome', w * 0.2, H + 1.2, -d * 0.15, 0.9, 0.5, 0.9, PAL.ivory);
+      // A vine pergola for the shade.
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) parts.add('box', sx * (w / 2 - 0.5), H + 1.1, sz * (d / 2 - 0.5), 0.08, 1.5, 0.08, WOOD);
+      parts.add('box', 0, H + 1.9, 0, w - 0.6, 0.14, d - 0.6, 0x5f8a45);
     }
-    for (let k = 0; k < 3; k++) parts.add('ball', (rng() - 0.5) * (w - 0.8), H + 0.45, (rng() - 0.5) * (d - 0.8), 0.5, 0.45, 0.5, pick(rng, [PAL.grassDeep, PAL.grass, PAL.pink]));
-  } else {
-    const r = Math.min(w, d) * 0.8;
-    parts.add('cyl', 0, H + 0.4, 0, r, 0.5, r, parts.trim);
-    parts.add('dome', 0, H + 0.62, 0, r, r * 1.2, r, pick(rng, [PAL.teal, PAL.ivory, PAL.coral, PAL.lilac]));
-    parts.add('cyl', 0, H + 0.62 + r * 0.6 + 0.2, 0, 0.12, 0.4, 0.12, parts.trim);
-    parts.add('cone', 0, H + 0.62 + r * 0.6 + 0.6, 0, 0.28, 0.6, 0.28, PAL.saffron);
-    parts.add('ball', 0, H + 0.62 + r * 0.6 + 0.95, 0, 0.16, 0.16, 0.16, PAL.saffron);
+    for (let k = 0; k < 3; k++) parts.add('ball', (rng() - 0.5) * (w - 0.8), H + 0.45, (rng() - 0.5) * (d - 0.8), 0.5, 0.45, 0.5, pick(rng, [PAL.grassDeep, PAL.grass, 0xc9443c]));
   }
 
-  // Antennas and dishes: the techno side of the valley.
-  if (rng() < 0.22) {
-    parts.add('cyl', -w * 0.3, H + 1.2, d * 0.25, 0.05, 2.2, 0.05, 0x3b3346);
-    parts.add('dome', -w * 0.3, H + 1.9, d * 0.25, 0.9, 0.25, 0.9, PAL.ivory, -0.7, 0, 0.3);
-    parts.add('ball', -w * 0.3, H + 2.35, d * 0.25, 0.12, 0.12, 0.12, PAL.red);
+  // A television aerial here and there.
+  if (rng() < 0.2) {
+    parts.add('cyl', -w * 0.3, H + 1.4, d * 0.25, 0.04, 2.0, 0.04, 0x3b3346);
+    for (const [y, l] of [[2.2, 0.9], [1.95, 0.7], [1.7, 0.5]]) parts.add('box', -w * 0.3, H + y, d * 0.25, l, 0.03, 0.03, 0x3b3346);
   }
   return H;
 }
 
 function campanile(parts, rng) {
-  const color = pick(rng, [PAL.cream, PAL.peach, PAL.ochre]);
+  const color = pick(rng, [PAL.cream, 0xe8d2a0, 0xd9c7a8]);
   const trim = PAL.ivory;
   parts.add('box', 0, 7, 0, 2.4, 14, 2.4, color);
   parts.add('box', 0, 0.6, 0, 2.6, 1.2, 2.6, STONE);
@@ -189,15 +183,10 @@ function campanile(parts, rng) {
   parts.add('box', 0, 8.75, 1.28, 0.06, 0.4, 0.03, 0x3b3346);
   parts.add('box', 0.12, 8.6, 1.28, 0.3, 0.06, 0.03, 0x3b3346);
   parts.add('box', 0, 14.15, 0, 2.7, 0.3, 2.7, trim);
-  if (rng() < 0.5) {
-    parts.add('pyramid', 0, 15.4, 0, 2.6, 2.4, 2.6, SLATE);
-  } else {
-    // An onion dome: the Mœbius touch on a Ligurian bell tower.
-    parts.add('cyl', 0, 14.6, 0, 1.9, 0.6, 1.9, trim);
-    parts.add('ball', 0, 15.7, 0, 2.1, 2.5, 2.1, PAL.teal);
-    parts.add('cone', 0, 17.4, 0, 0.7, 1.4, 0.7, PAL.teal);
-  }
-  parts.add('ball', 0, 18.3, 0, 0.3, 0.3, 0.3, PAL.saffron);
+  // A stone spire with a cross, as on the church of San Lorenzo in Manarola.
+  parts.add('pyramid', 0, 15.6, 0, 2.6, 2.8, 2.6, rng() < 0.5 ? SLATE : TILE);
+  parts.add('box', 0, 17.5, 0, 0.08, 1.0, 0.08, 0x3b3346);
+  parts.add('box', 0, 17.7, 0, 0.5, 0.08, 0.08, 0x3b3346);
 }
 
 export function buildVillages(scene, rng) {
