@@ -6,7 +6,7 @@ import { hash, pick } from './noise.js';
 import { PAL, WATER_LEVEL, paint, solid } from './style.js';
 import { INK, WARM_LIGHT, at, ball, cyl, lamplight, live } from './kit.js';
 import { gozzo } from './zones.js';
-import { UP, coastU, groundAt, isWild, randomSpot, toX, toZ } from './terrain.js';
+import { UP, VILLAGES, coastU, groundAt, isWild, randomSpot, toX, toZ } from './terrain.js';
 
 /** A herring gull on the wing: white, with grey wings tipped in black. */
 function gull() {
@@ -236,6 +236,32 @@ export function buildLife(scene, rng, animated) {
 
   buildWhales(scene, animated);
   buildDolphins(scene, animated);
+
+  // Swallows: a flock wheeling over the roofs of the main village, tightest toward evening.
+  const FLOCK = 16;
+  const wing = new THREE.BufferGeometry();
+  wing.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0.18, -0.42, 0, -0.16, 0, 0, -0.04, 0, 0, 0.18, 0, 0, -0.04, 0.42, 0, -0.16], 3));
+  wing.computeVertexNormals();
+  const swallows = new THREE.InstancedMesh(wing, paint(0x2b2f45, { doubleSide: true }), FLOCK);
+  swallows.frustumCulled = false;
+  scene.add(swallows);
+  const roost = { x: toX(VILLAGES[0].u, VILLAGES[0].v), z: toZ(VILLAGES[0].u, VILLAGES[0].v) };
+  const roostY = groundAt(roost.x, roost.z) + 14;
+  const dart = { m: new THREE.Matrix4(), p: new THREE.Vector3(), q: new THREE.Quaternion(), s: new THREE.Vector3(1, 1, 1), e: new THREE.Euler() };
+  animated.push((t, dt, climate) => {
+    swallows.visible = !climate || (climate.night < 0.7 && climate.now.rain < 0.3);
+    if (!swallows.visible) return;
+    for (let i = 0; i < FLOCK; i++) {
+      // One long figure of eight for the flock, each bird a little behind and beside the last.
+      const a = t * 0.5 - i * 0.11 + Math.sin(t * 0.13 + i) * 0.3;
+      const x = roost.x + Math.sin(a) * 16 + Math.sin(i * 2.4) * 1.8;
+      const z = roost.z + Math.sin(a * 2) * 9 + Math.cos(i * 1.7) * 1.8;
+      dart.p.set(x, roostY + Math.sin(a * 1.3 + i) * 3 + (i % 4) * 0.6, z);
+      dart.q.setFromEuler(dart.e.set(0, Math.atan2(Math.cos(a) * 16, Math.cos(a * 2) * 18), Math.sin(t * 14 + i) * 0.5, 'YXZ'));
+      swallows.setMatrixAt(i, dart.m.compose(dart.p, dart.q, dart.s));
+    }
+    swallows.instanceMatrix.needsUpdate = true;
+  });
 
   // Fireflies: on warm nights they drift and wink over the grass at the edge of the groves.
   const FLIES = 90;

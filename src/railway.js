@@ -5,7 +5,7 @@
 // on a shelf of the mountain just outside the first tunnel.
 import * as THREE from 'three';
 import { PAL, paint, solid } from './style.js';
-import { INK, at, bake, ball, box, cone, cyl, lantern, live, ring } from './kit.js';
+import { INK, at, bake, ball, box, cone, cyl, lantern, live, ring, seat } from './kit.js';
 import { RAIL, STATION, groundAt, railPoint, toX, toZ } from './terrain.js';
 
 // The line runs straight across the angle between the mountain (A) and the ridge (B), in (u, v).
@@ -224,6 +224,7 @@ function buildStation(line) {
   for (const x of [cx - 4.4, cx + 4.4]) {
     at(box(1.7, 0.1, 0.5, 0x8a5a41), x, TOP + 0.5, BACK + 0.45, line);
     at(box(1.7, 0.5, 0.08, 0x8a5a41), x, TOP + 0.85, BACK + 0.2, line);
+    for (const dx of [-0.4, 0.4]) seat(line, x + dx, TOP + 0.57, BACK + 0.45);
     for (const dx of [-0.7, 0.7]) at(box(0.08, 0.5, 0.45, IRON), x + dx, TOP + 0.25, BACK + 0.45, line);
   }
   for (const x of [P0 + 1.5, P1 - 8, P1 - 1.5]) lantern(line, x, TOP, BACK + 0.5);

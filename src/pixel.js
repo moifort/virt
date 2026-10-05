@@ -35,6 +35,7 @@ uniform float uWind;
 uniform vec2 uLitter;
 uniform float uHorizonY;
 uniform float uOffing;
+uniform float uLine;
 uniform float uLowSun;
 uniform vec3 uSun;
 uniform vec3 uMoon;
@@ -158,7 +159,7 @@ void main() {
     // gets none: it melts into the sky without a seam.
     if (d > uOffing) {
     } else if (depthEdge > uDepthThreshold) {
-      col = mix(col * 0.42, uInk, 0.22);
+      col = mix(col * uLine, uInk, 0.18);
     } else if (creases > 0.12) {
       col = col * 1.3 + vec3(0.035, 0.028, 0.012);
     }
@@ -218,6 +219,8 @@ void main() {
   // and the darks lifted toward the colour of the air so nothing ever goes to black.
   col = mix(vec3(dot(col, vec3(0.3, 0.59, 0.11))), col, 1.14);
   col = mix(col, mix(vec3(1.0, 0.96, 0.88), vec3(0.4, 0.48, 0.78), uNight), 0.04);
+  // The corners fall off a touch, so the eye rests on the middle of the picture.
+  col *= 1.0 - 0.1 * smoothstep(0.42, 0.82, length(vUv - 0.5));
 
   // Ordered dithering onto 24 levels per channel: gradients become pixel-art ramps.
   vec3 s = toSRGB(col);
@@ -281,6 +284,7 @@ export class PixelRenderer {
         uLitter: { value: new THREE.Vector2() },
         uHorizonY: { value: 0.5 },
         uOffing: { value: 1e6 },
+        uLine: { value: 0.42 },
         uLowSun: { value: 0 },
         uSun: { value: new THREE.Vector3() },
         uMoon: { value: new THREE.Vector3() },
@@ -330,6 +334,8 @@ export class PixelRenderer {
     const u = this.composite.uniforms;
     u.uDepthRange.value = camera.far - camera.near;
     u.uDepthThreshold.value = texelWorld * 4;
+    // Outlines soften as the view draws back, where a full-strength line would be all there is.
+    u.uLine.value = 0.42 + 0.3 * THREE.MathUtils.smoothstep(texelWorld, 0.16, 0.42);
     u.uSkyTop.value.copy(skyTop);
     u.uSkyHorizon.value.copy(skyHorizon);
     u.uTime.value = time;

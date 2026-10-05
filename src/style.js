@@ -536,6 +536,8 @@ if (pxGlass) {
 }
 // Lamplight pools on whatever stands near a lantern, in two soft steps.
 float pxLamp = texture2D(uLampMap, (vWorld.xz + uHeightMap.x) / uHeightMap.y).r * uLamps.x;
+// Each flame breathes a little, on its own.
+pxLamp *= 0.93 + 0.07 * sin(uTime * 5.0 + pxHash(floor(vWorld.xz / 7.0)) * 40.0);
 if (pxLamp > 0.12) pxCol += (pxAlb * 0.75 + 0.03) * vec3(1.0, 0.72, 0.36) * (pxLamp > 0.5 ? 0.85 : pxLamp > 0.27 ? 0.5 : 0.22);
 // The lighthouse sweeps its beam round over the sea and the shore: a bright core in a paler wedge.
 if (uBeam.w > 0.01 && vWorld.y < 6.0) {

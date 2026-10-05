@@ -93,29 +93,6 @@ export function cat(animated) {
   return live(g);
 }
 
-export function butler(animated) {
-  const g = new THREE.Group();
-  for (const s of [-1, 1]) at(cyl(0.13, 0.12, 1.25, INK, 6), s * 0.17, 0.62, 0, g);
-  at(cyl(0.4, 0.46, 1.45, INK, 10), 0, 1.92, 0, g);
-  at(box(0.5, 0.9, 0.12, INK), 0, 1.25, -0.36, g).rotation.x = -0.15; // coat tails
-  at(box(0.36, 0.95, 0.08, PAL.ivory), 0, 2.05, 0.37, g);
-  at(box(0.22, 0.09, 0.06, INK), 0, 2.45, 0.42, g);
-  at(ball(0.3, PAL.skin), 0, 2.95, 0, g);
-  const hair = at(ball(0.31, 0x8c8496, {}, 12, 6), 0, 3.02, -0.04, g);
-  hair.scale.y = 0.6;
-  const arm = new THREE.Group();
-  at(arm, 0.48, 2.3, 0.05, g);
-  const sleeve = at(box(0.2, 0.7, 0.2, INK), 0, -0.25, 0.2, arm);
-  sleeve.rotation.x = -1.1;
-  const tray = new THREE.Group();
-  at(tray, 0, -0.2, 0.62, arm);
-  at(cyl(0.45, 0.45, 0.05, 0xd8d4e0, 16), 0, 0, 0, tray);
-  at(cyl(0.12, 0.1, 0.2, PAL.ivory, 10), 0.12, 0.12, 0, tray);
-  at(cyl(0.1, 0.1, 0.16, PAL.coral, 10), -0.15, 0.1, 0.1, tray);
-  animated.push((t) => (g.position.y = Math.sin(t * 1.1) * 0.02));
-  return live(g);
-}
-
 // ---------------------------------------------------------------- Work areas
 // Every one is in the open air, under the sky, with room to walk between its tables; and every
 // chair, bench and step in them can be sat on.
@@ -305,6 +282,7 @@ function palapa(parent, rng, x, y, z) {
       at(box(0.2, 0.05, 1.0, k % 2 ? PAL.ivory : stripe), -0.3 + k * 0.2, 0.38, 0.45, chair).rotation.x = 0.12;
       at(box(0.2, 0.05, 1.1, k % 2 ? PAL.ivory : stripe), -0.3 + k * 0.2, 0.85, -0.42, chair).rotation.x = -1.0;
     }
+    seat(chair, 0, 0.5, 0.3);
     for (const dx of [-0.42, 0.42]) {
       at(box(0.06, 0.06, 1.9, 0x9a7a5a), dx, 0.42, 0, chair).rotation.x = 0.3;
       at(box(0.06, 0.06, 1.5, 0x9a7a5a), dx, 0.5, -0.2, chair).rotation.x = -0.75;
@@ -385,6 +363,7 @@ export function buildPub(g, rng, animated) {
   for (let i = 0; i < 5; i++) {
     const x = sx - 3 + i * 1.5;
     at(cyl(0.3, 0.3, 0.1, STRAW[1], 8), x, F + 0.95, front + 1.2, g);
+    seat(g, x, F + 1.02, front + 1.2, Math.PI);
     for (const [dx, dz] of [[-0.18, -0.18], [0.18, -0.18], [-0.18, 0.18], [0.18, 0.18]]) at(cyl(0.035, 0.045, 0.9, DRIFTWOOD, 4), x + dx, F + 0.45, front + 1.2 + dz, g);
   }
 
@@ -679,7 +658,7 @@ export function buildLighthouseWalk(scene, rng) {
 
   // From the shore straight out over the shallows...
   let shore = Q + 1.6;
-  while (shore > -60 && ground(21, shore) < 0.1) shore -= 0.62;
+  while (shore > -60 && ground(21, shore) < WATER_LEVEL + 0.9) shore -= 0.62;
   for (let z = shore; z < Q + 1.6; z += 0.62) {
     plank(21, z + 0.31, 0, 2.8);
     if (Math.round((z - shore) / 0.62) % 5 === 2 && ground(21, z) < WATER_LEVEL - 0.2) for (const dx of [-1.3, 1.3]) pile(21 + dx, z);
@@ -823,6 +802,7 @@ export function buildAgora(g, rng) {
     const bench = at(new THREE.Group(), Math.cos(a) * 7, 0, Math.sin(a) * 7, g);
     bench.rotation.y = -a + Math.PI / 2;
     at(box(2.6, 0.18, 0.8, PAL.wood), 0, 0.7, 0, bench);
+    for (const dx of [-0.6, 0.6]) seat(bench, dx, 0.8, 0, Math.PI);
     for (const x of [-1, 1]) at(box(0.25, 0.65, 0.7, STONE), x, 0.32, 0, bench);
   }
   // Signpost pointing to every area.
@@ -851,14 +831,6 @@ function bookPile(parent, x, y, z, rng, n = 4) {
     const b = at(box(0.7 - i * 0.05, 0.16, 0.5, pick(rng, [PAL.red, PAL.teal, PAL.saffron, PAL.plum, PAL.blue])), x, y + 0.08 + i * 0.16, z, parent);
     b.rotation.y = (rng() - 0.5) * 0.6;
   }
-}
-
-function amphora(parent, x, y, z, color = 0xc8643c) {
-  const body = at(ball(0.42, color, {}, 10, 8), x, y + 0.55, z, parent);
-  body.scale.y = 1.35;
-  at(cyl(0.14, 0.2, 0.4, color, 8), x, y + 1.2, z, parent);
-  at(ring(0.17, 0.04, color, Math.PI * 2, 10), x, y + 1.4, z, parent).rotation.x = Math.PI / 2;
-  for (const s of [-1, 1]) at(ring(0.18, 0.04, color, Math.PI, 8), x + s * 0.22, y + 1.05, z, parent).rotation.z = s * Math.PI / 2;
 }
 
 function lemonPot(parent, x, y, z, rng) {

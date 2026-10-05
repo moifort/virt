@@ -80,22 +80,6 @@ export const DARK_WOOD = 0x8a5a41;
 export const WARM_LIGHT = 0xffe2a6;
 export const SCREEN = 0x7fe3dc;
 
-/** Floating holographic panel with a few UI bars, Bob-style. */
-export function screen(w, h, parent, x, y, z, rotY, animated, rng) {
-  const g = new THREE.Group();
-  at(box(w, h, 0.06, SCREEN, { glow: true }), 0, 0, 0, g);
-  const bars = Math.max(2, Math.round(h / 0.32));
-  for (let i = 0; i < bars; i++) {
-    const bw = w * (0.35 + rng() * 0.5);
-    at(box(bw, 0.08, 0.04, i === 0 ? PAL.ivory : 0x3f8f99), -w / 2 + 0.15 + bw / 2, h / 2 - 0.25 - i * 0.28, 0.04, g);
-  }
-  g.rotation.y = rotY;
-  at(live(g), x, y, z, parent);
-  const phase = rng() * 6;
-  animated.push((t) => (g.position.y = y + Math.sin(t * 1.4 + phase) * 0.06));
-  return g;
-}
-
 export function plant(parent, x, y, z, rng) {
   at(cyl(0.35, 0.28, 0.6, PAL.coral, 10), x, y + 0.3, z, parent);
   const leaves = ball(0.55 + rng() * 0.2, pick(rng, [PAL.grassDeep, PAL.teal, PAL.moss]), { flat: true }, 7, 5);
