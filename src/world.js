@@ -8,6 +8,7 @@ import { GRID, HALF, PATHS, SEGMENTS, WORLD_SIZE, ZONES, buildSides, buildTerrai
 import { buildBase, planBase } from './base.js';
 import { bake } from './kit.js';
 import { buildRailway } from './railway.js';
+import { buildSky } from './sky.js';
 import { buildVillages } from './village.js';
 import { buildAgora, buildAtelier, buildLibrary, buildMoot, buildPods, buildPort, buildPub } from './zones.js';
 
@@ -52,6 +53,7 @@ export function createWorld(scene) {
   buildLife(scene, rng, animated);
   buildBase(scene, rooms, animated);
   buildRailway(scene, animated);
+  buildSky(scene, rng, animated);
 
   return {
     update(t, dt) {
