@@ -82,7 +82,12 @@ export function heightAt(x, z) {
 
 export const GRID = new Float32Array((SEGMENTS + 1) ** 2);
 for (let iz = 0; iz <= SEGMENTS; iz++) {
-  for (let ix = 0; ix <= SEGMENTS; ix++) GRID[iz * (SEGMENTS + 1) + ix] = heightAt(ix * CELL - HALF, iz * CELL - HALF);
+  for (let ix = 0; ix <= SEGMENTS; ix++) {
+    const x = ix * CELL - HALF;
+    const z = iz * CELL - HALF;
+    // Outside the diorama there is only open sea, deep enough to read as such.
+    GRID[iz * (SEGMENTS + 1) + ix] = inSquare(x, z, -1.5) ? heightAt(x, z) : -14;
+  }
 }
 
 /** Ground height matching the rendered triangles exactly. */
@@ -163,13 +168,12 @@ export function buildTerrain() {
 }
 
 /**
- * The four cut faces of the diorama: earth strata from the base up to the ground, and a slice
- * of sea where the ground dips below the water. `holes` open windows in the back face
+ * The cut faces of the island: earth strata from the base up to the ground (the endless sea
+ * hides them below the waterline). `holes` open windows in the back face
  * ({ v0, v1, y0, y1 } in back-face coordinates) to look into the mountain.
  */
 export function buildSides(holes = []) {
   const earth = [];
-  const sea = [];
   const quad = (out, p0, p1, y0a, y0b, y1a, y1b) => {
     // p0, p1: column positions (x, z); bottom y0a/y0b, top y1a/y1b.
     out.push(p0.x, y0a, p0.z, p1.x, y0b, p1.z, p1.x, y1b, p1.z, p0.x, y0a, p0.z, p1.x, y1b, p1.z, p0.x, y1a, p0.z);
@@ -203,7 +207,6 @@ export function buildSides(holes = []) {
         const tb = Math.min(hi, p1.y);
         if (ta > lo || tb > lo) quad(earth, p0, p1, lo, lo, Math.max(lo, ta), Math.max(lo, tb));
       }
-      if (p0.y < WATER_LEVEL || p1.y < WATER_LEVEL) quad(sea, p0, p1, Math.min(p0.y, WATER_LEVEL), Math.min(p1.y, WATER_LEVEL), WATER_LEVEL, WATER_LEVEL);
     }
   }
   const group = new THREE.Group();
@@ -216,35 +219,15 @@ export function buildSides(holes = []) {
     group.add(mesh);
   };
   make(earth, paint(0xffffff, { terrain: true, doubleSide: true }));
-  make(sea, paint(0x2f78b3, { doubleSide: true }));
-
-  // A dark plinth under the diorama, like a model on its stand.
-  const cu = (SQUARE.u0 + SQUARE.u1) / 2;
-  const cv = (SQUARE.v0 + SQUARE.v1) / 2;
-  const plinth = new THREE.Mesh(
-    new THREE.BoxGeometry(SQUARE.v1 - SQUARE.v0 + 4, 3, SQUARE.u1 - SQUARE.u0 + 4),
-    paint(0x4a3a52),
-  );
-  plinth.position.set(toX(cu, cv), BASE_Y - 1.5, toZ(cu, cv));
-  plinth.rotation.y = Math.PI / 4;
-  plinth.receiveShadow = true;
-  group.add(plinth);
-  const trim = new THREE.Mesh(new THREE.BoxGeometry(SQUARE.v1 - SQUARE.v0 + 4.6, 0.5, SQUARE.u1 - SQUARE.u0 + 4.6), paint(PAL_TRIM));
-  trim.position.set(toX(cu, cv), BASE_Y - 0.2, toZ(cu, cv));
-  trim.rotation.y = Math.PI / 4;
-  group.add(trim);
   return group;
 }
 
-const PAL_TRIM = 0xe2b25c;
 
-/** Sea surface, clipped to the square. */
+/** The sea: it runs on past the island to the horizon. */
 export function buildWater() {
-  const cu = (SQUARE.u0 + SQUARE.u1) / 2;
-  const cv = (SQUARE.v0 + SQUARE.v1) / 2;
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(SQUARE.v1 - SQUARE.v0, SQUARE.u1 - SQUARE.u0), paint(0xffffff, { water: true }));
-  water.rotation.set(-Math.PI / 2, 0, Math.PI / 4);
-  water.position.set(toX(cu, cv), WATER_LEVEL, toZ(cu, cv));
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), paint(0xffffff, { water: true }));
+  water.rotation.x = -Math.PI / 2;
+  water.position.y = WATER_LEVEL;
   water.receiveShadow = true;
   return water;
 }

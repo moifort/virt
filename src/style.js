@@ -214,7 +214,7 @@ const cache = new Map();
 
 /**
  * @param {number} color sRGB hex
- * @param {{terrain?: boolean, water?: boolean, sway?: boolean, glow?: boolean, flat?: boolean, doubleSide?: boolean, map?: THREE.Texture}} [opts]
+ * @param {{terrain?: boolean, water?: boolean, sway?: boolean, glow?: boolean, flat?: boolean, doubleSide?: boolean, backSide?: boolean, map?: THREE.Texture}} [opts]
  */
 export function paint(color, opts = {}) {
   const { map, ...flags } = opts;
@@ -224,7 +224,7 @@ export function paint(color, opts = {}) {
     color,
     gradientMap,
     map: map ?? null,
-    side: opts.doubleSide ? THREE.DoubleSide : THREE.FrontSide,
+    side: opts.doubleSide ? THREE.DoubleSide : opts.backSide ? THREE.BackSide : THREE.FrontSide,
   });
   if (opts.flat) mat.flatShading = true;
   mat.defines = {};

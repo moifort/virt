@@ -5,6 +5,7 @@ import { GLOBALS, PATH_COUNT } from './style.js';
 import { buildLife } from './life.js';
 import { buildNature } from './nature.js';
 import { GRID, HALF, PATHS, SEGMENTS, WORLD_SIZE, ZONES, buildSides, buildTerrain, buildWater } from './terrain.js';
+import { buildBase, planBase } from './base.js';
 import { bake } from './kit.js';
 import { buildVillages } from './village.js';
 import { buildAgora, buildAtelier, buildLibrary, buildMoot, buildPods, buildPort, buildPub } from './zones.js';
@@ -27,7 +28,8 @@ export function createWorld(scene) {
   GLOBALS.uHeight.value = heightTex;
   GLOBALS.uHeightMap.value.set(HALF, WORLD_SIZE, SEGMENTS + 1);
 
-  scene.add(buildTerrain(), buildSides(), buildWater());
+  const rooms = planBase();
+  scene.add(buildTerrain(), buildSides(rooms), buildWater());
   const builders = {
     agora: buildAgora,
     library: buildLibrary,
@@ -47,6 +49,7 @@ export function createWorld(scene) {
   buildVillages(scene, rng);
   buildNature(scene, rng);
   buildLife(scene, rng, animated);
+  buildBase(scene, rooms, animated);
 
   return {
     update(t, dt) {
