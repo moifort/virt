@@ -331,14 +331,14 @@ export function buildVillages(scene, rng, animated) {
   const SUNK = 1.4; // houses are dug into the slope: their street door is this far up
 
   // Houses packed in rows along the slope, as in Manarola, inside an organic blob.
-  const villages = VILLAGES.map((village) => ({ cu: village.u, cv: village.v, radius: village.r, bell: village.bell, waterfront: village.waterfront }));
+  const villages = VILLAGES.map((village) => ({ cu: village.u, cv: village.v, radius: village.r, up: village.up ?? 1, bell: village.bell, waterfront: village.waterfront }));
   for (const village of villages) {
     for (let v = village.cv - village.radius - 4; v <= village.cv + village.radius + 4; v += 3.4) {
-      for (let u = village.cu - village.radius - 4; u <= village.cu + village.radius + 4; u += 3.2) {
+      for (let u = village.cu - village.radius * village.up - 4; u <= village.cu + village.radius * village.up + 4; u += 3.2) {
         // Ragged outline: the edge of the blob wanders with noise.
-        const a = Math.atan2(u - village.cu, v - village.cv);
+        const a = Math.atan2((u - village.cu) / village.up, v - village.cv);
         const edge = village.radius * (0.75 + fbm(Math.cos(a) * 1.5 + village.cv, Math.sin(a) * 1.5, 2) * 0.5);
-        const d = Math.hypot(u - village.cu, (v - village.cv) * 0.85);
+        const d = Math.hypot((u - village.cu) / village.up, (v - village.cv) * 0.85);
         if (d > edge) continue;
         const jv = v + (rng() - 0.5) * 0.4;
         const ju = u + (rng() - 0.5) * 0.3;

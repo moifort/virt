@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { mulberry32, pick } from './noise.js';
 import { PAL, WATER_LEVEL, paint, solid } from './style.js';
-import { DARK_WOOD, INK, SCREEN, STONE, WARM_LIGHT, at, bake, ball, box, cone, cyl, lamplight, lantern, live, plant, ring, screen } from './kit.js';
+import { DARK_WOOD, INK, SCREEN, STONE, WARM_LIGHT, at, bake, ball, box, cone, cyl, lamplight, lantern, live, plant, ring, seat } from './kit.js';
 import { SUN_DIR, ZONES, groundAt, toX, toZ } from './terrain.js';
 
 /** Shelves of books along a wall. axis 'x' runs along x facing +z; axis 'z' runs along z facing +x. */
@@ -62,6 +62,7 @@ export function armchair(color) {
   at(box(0.38, 0.95, 1.7, color), -0.95, 0.75, 0, g);
   at(box(0.38, 0.95, 1.7, color), 0.95, 0.75, 0, g);
   at(box(1.4, 0.32, 0.9, color), 0, 0.42, -1.25, g); // footrest out
+  seat(g, 0, 0.82, -0.05, Math.PI);
   return g;
 }
 
@@ -70,6 +71,7 @@ export function chair(color, back = 1.3) {
   at(box(0.85, 0.12, 0.85, color), 0, 0.78, 0, g);
   at(box(0.85, back, 0.12, color), 0, 0.78 + back / 2, 0.38, g);
   at(cyl(0.07, 0.12, 0.75, INK, 6), 0, 0.38, 0, g);
+  seat(g, 0, 0.86, 0, Math.PI);
   return g;
 }
 
@@ -115,157 +117,166 @@ export function butler(animated) {
 }
 
 // ---------------------------------------------------------------- Work areas
+// Every one is in the open air, under the sky, with room to walk between its tables; and every
+// chair, bench and step in them can be sat on.
 
-export function buildLibrary(g, rng, animated) {
-  const W = 16;
-  const D = 12;
-  const F = 0.4;
-  const H = 7;
-  at(box(W, F, D, PAL.wood), 0, F / 2, 0, g);
-  for (let i = 0; i < 8; i++) at(box(0.06, 0.02, D, DARK_WOOD), -W / 2 + 1 + i * 2, F + 0.01, 0, g); // floorboards
-  at(cyl(3.3, 3.3, 0.05, PAL.coral, 28), 0.4, F + 0.03, -2, g);
-  at(cyl(2.6, 2.6, 0.06, PAL.saffron, 28), 0.4, F + 0.04, -2, g);
-  at(cyl(1.6, 1.6, 0.07, PAL.plum, 24), 0.4, F + 0.05, -2, g);
+/** A work table with a laptop and a cup on it, and its chair: the sitter faces the table. */
+function desk(parent, rng, x, y, z, yaw = 0) {
+  const g = at(new THREE.Group(), x, y, z, parent);
+  g.rotation.y = yaw;
+  at(box(2.3, 0.12, 1.15, PAL.wood), 0, 1.1, 0, g);
+  for (const [dx, dz] of [[-1, -0.45], [1, -0.45], [-1, 0.45], [1, 0.45]]) at(box(0.1, 1.05, 0.1, DARK_WOOD), dx, 0.52, dz, g);
+  at(box(0.62, 0.04, 0.42, 0x8a8a96), 0, 1.18, 0.15, g);
+  at(box(0.62, 0.42, 0.03, INK), 0, 1.38, -0.12, g).rotation.x = -0.25;
+  at(box(0.54, 0.34, 0.02, SCREEN, { glow: true }), 0, 1.38, -0.1, g).rotation.x = -0.25;
+  at(cyl(0.09, 0.08, 0.18, pick(rng, [PAL.ivory, PAL.coral, PAL.teal]), 6), 0.75, 1.25, 0.2, g);
+  at(chair(pick(rng, [PAL.teal, PAL.coral, PAL.saffron, PAL.lilac]), 1.1), 0, 0, 1.25, g);
+  return g;
+}
 
-  // Two walls on the far sides, open toward the viewer like a dollhouse.
-  at(box(W, H, 0.6, PAL.cream), 0, F + H / 2, -D / 2 + 0.3, g);
-  at(box(0.6, H, D, PAL.cream), -W / 2 + 0.3, F + H / 2, 0, g);
-  at(box(W + 0.7, 0.5, 1.1, PAL.rose), 0.35, F + H + 0.25, -D / 2 + 0.45, g);
-  at(box(1.1, 0.5, D + 0.7, PAL.rose), -W / 2 + 0.45, F + H + 0.25, 0.35, g);
-  for (const [x, z] of [[W / 2 - 0.5, D / 2 - 0.5], [W / 2 - 0.5, -D / 2 + 0.5], [-W / 2 + 0.5, D / 2 - 0.5]]) {
-    at(cyl(0.38, 0.45, H, PAL.ivory, 12), x, F + H / 2, z, g);
-    at(box(1.1, 0.4, 1.1, PAL.rose), x, F + H + 0.2, z, g);
+/** A plank bench for two. */
+function bench(parent, x, y, z, yaw = 0) {
+  const g = at(new THREE.Group(), x, y, z, parent);
+  g.rotation.y = yaw;
+  at(box(2.6, 0.14, 0.7, PAL.wood), 0, 0.72, 0, g);
+  for (const dx of [-1.05, 1.05]) at(box(0.2, 0.66, 0.6, STONE), dx, 0.33, 0, g);
+  for (const dx of [-0.6, 0.6]) seat(g, dx, 0.79, 0);
+  return g;
+}
+
+/** A paved floor of irregular flagstones, `r` across, set in the grass. */
+function flagstones(parent, rng, r, colors = [0xe6dcc8, 0xd9cdb6, 0xcfc3ac]) {
+  for (let ring = 0, d = 0; d < r; ring++, d += 2.1) {
+    const n = Math.max(1, Math.round((d * Math.PI * 2) / 2.3));
+    for (let k = 0; k < n; k++) {
+      const a = (k / n) * Math.PI * 2 + ring * 0.5;
+      const stone = at(cyl(0.95 + rng() * 0.25, 1.0 + rng() * 0.25, 0.1, pick(rng, colors), 6, { flat: true }), Math.cos(a) * d, 0.05, Math.sin(a) * d, parent);
+      stone.rotation.y = rng() * 3;
+    }
   }
+}
 
-  // Floor-to-ceiling books.
+/**
+ * The library: a reading garden. Bookcases stand in the open around a fire pit, with armchairs
+ * by the fire, long reading tables, and Bob's own desk.
+ */
+export function buildLibrary(g, rng, animated) {
+  flagstones(g, rng, 13.5);
+  // Bookcases with their backs to the mountain, well apart, a slate coping to keep the rain off.
   const books = [];
-  bookshelf(g, books, rng, { axis: 'x', from: -W / 2 + 0.7, to: -2.5, at: -D / 2 + 0.6, y0: F });
-  bookshelf(g, books, rng, { axis: 'x', from: 2.5, to: W / 2 - 1.1, at: -D / 2 + 0.6, y0: F });
-  bookshelf(g, books, rng, { axis: 'z', from: -D / 2 + 1.5, to: -3.4, at: -W / 2 + 0.6, y0: F });
-  bookshelf(g, books, rng, { axis: 'z', from: -1.4, to: 1.4, at: -W / 2 + 0.6, y0: F });
-  bookshelf(g, books, rng, { axis: 'z', from: 3.4, to: D / 2 - 0.9, at: -W / 2 + 0.6, y0: F });
+  for (const [x0, x1, z] of [[-12, -6.5, -9.5], [-2.8, 2.8, -11.5], [6.5, 12, -9.5]]) {
+    bookshelf(g, books, rng, { axis: 'x', from: x0, to: x1, at: z, y0: 0.1, rows: 3 });
+    at(box(x1 - x0 + 0.5, 0.16, 1.0, 0x8a8c98), (x0 + x1) / 2, 0.1 + 3 * 1.18 + 0.18, z + 0.1, g);
+  }
   instanceBooks(g, books);
 
-  // Tall narrow windows, lit by the perpetual late-afternoon sun.
-  for (const z of [-2.4, 2.4]) {
-    at(box(0.12, 4.6, 1.3, WARM_LIGHT, { glow: true }), -W / 2 + 0.66, F + 3.2, z, g);
-    at(box(0.16, 4.8, 0.12, DARK_WOOD), -W / 2 + 0.7, F + 3.2, z, g);
-    at(box(0.16, 0.12, 1.5, DARK_WOOD), -W / 2 + 0.7, F + 3.6, z, g);
-  }
-
-  // Fireplace.
-  const fz = -D / 2 + 0.6;
-  at(box(4.6, 4.3, 1.3, PAL.rose, { flat: true }), 0, F + 2.15, fz + 0.65, g);
-  at(box(2.4, 1.9, 0.3, 0x3a2b4f), 0, F + 1.05, fz + 1.2, g);
-  at(box(5.2, 0.3, 1.7, PAL.wood), 0, F + 4.3, fz + 0.75, g);
-  at(box(3.4, H - 4.6, 1.0, PAL.rose), 0, F + 4.45 + (H - 4.6) / 2, fz + 0.5, g);
-  at(cyl(0.18, 0.18, 0.35, PAL.ivory, 8), -1.8, F + 4.62, fz + 0.9, g);
-  at(box(0.16, 0.25, 0.16, WARM_LIGHT, { glow: true }), -1.8, F + 4.92, fz + 0.9, g);
-  at(box(0.7, 0.6, 0.25, PAL.saffron), 1.5, F + 4.75, fz + 0.9, g); // mantel clock
-  for (const s of [-0.5, 0.5]) {
-    const log = at(cyl(0.16, 0.16, 1.6, DARK_WOOD, 6), 0, F + 0.25, fz + 1.55 + s * 0.15, g);
-    log.rotation.z = Math.PI / 2;
-    log.rotation.y = s * 0.4;
-  }
-  const flames = [
-    [0, 1.1, 0.5, 0xff8a3d],
-    [-0.4, 0.8, 0.4, PAL.saffron],
-    [0.42, 0.75, 0.38, PAL.saffron],
-    [0.05, 0.55, 0.28, 0xfff1b0],
-  ].map(([x, h, r, color]) => at(live(cone(r, h, color, 6, { glow: true })), x, F + 0.35 + h / 2, fz + 1.6, g));
+  // The fire pit in the middle: a ring of stones, logs, and flames that never go out.
+  for (let k = 0; k < 10; k++) at(ball(0.42, pick(rng, [0xcfc3b0, 0xb9ad9c, 0xa99d8e]), { flat: true }, 5, 4), Math.cos(k * 0.63) * 1.5, 0.25, Math.sin(k * 0.63) * 1.5, g);
+  for (const a of [0.3, 1.4, 2.5]) at(cyl(0.14, 0.14, 1.5, DARK_WOOD, 5), 0, 0.3, 0, g).rotation.set(Math.PI / 2, 0, a);
+  const flames = [[0, 1.2, 0.5, 0xff8a3d], [-0.35, 0.8, 0.38, PAL.saffron], [0.38, 0.75, 0.36, PAL.saffron], [0.05, 0.55, 0.26, 0xfff1b0]].map(([x, h, r, color]) => at(live(cone(r, h, color, 6, { glow: true })), x, 0.35 + h / 2, 0.05, g));
   animated.push((t) => {
     flames.forEach((f, i) => {
       f.scale.y = 1 + Math.sin(t * 11 + i * 2.1) * 0.2 + Math.sin(t * 17 + i) * 0.1;
       f.rotation.y = t * (1 + i * 0.3);
     });
   });
+  lamplight(g, 0, 1.5, 0, 9);
+  // Armchairs drawn up to the fire, each with its little table; the cat has the warmest place.
+  [PAL.red, PAL.teal, PAL.saffron, PAL.plum].forEach((color, k) => {
+    const a = -0.5 + k * 1.25;
+    at(armchair(color), Math.sin(a) * 4.6, 0.1, Math.cos(a) * 4.6, g).rotation.y = a;
+    at(cyl(0.5, 0.5, 0.08, PAL.wood, 10), Math.sin(a + 0.5) * 4.9, 0.9, Math.cos(a + 0.5) * 4.9, g);
+    at(cyl(0.07, 0.1, 0.85, DARK_WOOD, 5), Math.sin(a + 0.5) * 4.9, 0.45, Math.cos(a + 0.5) * 4.9, g);
+    bookPile(g, Math.sin(a + 0.5) * 4.9, 0.94, Math.cos(a + 0.5) * 4.9, rng, 2 + (k % 2));
+  });
+  at(cat(animated), -1.9, 0.12, 1.6, g).rotation.y = 2.2;
 
-  // Bob's corner: La-Z-Boy facing the fire, coffee, Spike and Jeeves.
-  at(armchair(PAL.red), 0.4, F, 0.4, g);
-  at(cyl(0.08, 0.1, 1.0, DARK_WOOD, 6), 2.2, F + 0.5, 0.2, g);
-  at(cyl(0.55, 0.55, 0.08, PAL.wood, 16), 2.2, F + 1.04, 0.2, g);
-  at(cyl(0.13, 0.11, 0.24, PAL.ivory, 10), 2.1, F + 1.2, 0.1, g);
-  at(box(0.5, 0.1, 0.36, PAL.teal), 2.35, F + 1.13, 0.35, g);
-  const spike = at(cat(animated), -1.2, F + 0.06, -2.4, g);
-  spike.rotation.y = 0.5;
-  const jeeves = at(butler(animated), 3.6, F, -1.4, g);
-  jeeves.rotation.y = -Math.PI / 2 - 0.4;
-
-  // Work desk with floating displays.
-  at(box(3.8, 0.14, 1.6, PAL.wood), -4.6, F + 1.1, 3, g);
-  for (const [dx, dz] of [[-1.7, -0.6], [1.7, -0.6], [-1.7, 0.6], [1.7, 0.6]]) at(box(0.12, 1.05, 0.12, DARK_WOOD), -4.6 + dx, F + 0.55, 3 + dz, g);
-  at(box(0.6, 0.04, 0.4, INK), -4.6, F + 1.19, 3.2, g);
-  at(chair(PAL.teal, 1.1), -4.6, F, 4.4, g);
-  screen(1.6, 1.0, g, -5.9, F + 2.3, 2.5, 0.4, animated, rng);
-  screen(1.8, 1.1, g, -4.6, F + 2.5, 2.2, 0, animated, rng);
-  screen(1.6, 1.0, g, -3.3, F + 2.3, 2.5, -0.4, animated, rng);
-
-  // Floor lamp and plants.
-  at(cyl(0.06, 0.08, 2.6, INK, 6), -2.4, F + 1.3, -0.8, g);
-  at(cone(0.55, 0.6, WARM_LIGHT, 10, { glow: true }), -2.4, F + 2.75, -0.8, g);
-  plant(g, W / 2 - 1.4, F, -D / 2 + 1.5, rng);
-  plant(g, -W / 2 + 1.6, F, D / 2 - 1.2, rng);
-  plant(g, 6.2, F, 4.8, rng);
-  furnishLibrary(g, rng, animated);
+  // Two long reading tables under the open sky, four chairs to each, a lamp on each.
+  for (const x of [-8.5, 8.5]) {
+    at(box(2.0, 0.14, 6.2, PAL.wood), x, 1.1, 2.5, g);
+    for (const dz of [-2.6, 2.6]) at(box(1.5, 1.05, 0.14, DARK_WOOD), x, 0.55, 2.5 + dz, g);
+    for (const dz of [-1.7, 1.7]) for (const s of [-1, 1]) at(chair(pick(rng, [PAL.teal, PAL.coral, PAL.lilac]), 1.2), x + s * 1.7, 0.05, 2.5 + dz, g).rotation.y = (s * Math.PI) / 2;
+    at(cyl(0.06, 0.1, 0.6, INK, 5), x, 1.45, 2.5, g);
+    at(cone(0.3, 0.3, WARM_LIGHT, 8, { glow: true }), x, 1.85, 2.5, g);
+    bookPile(g, x, 1.18, 4.2, rng, 3);
+    lamplight(g, x, 2, 2.5, 6);
+  }
+  // Bob's desk, by the middle bookcase.
+  desk(g, rng, 0, 0.05, -7.6, Math.PI);
+  for (const [x, z] of [[-13, 1], [13, 1], [-5.2, -10.2], [5.2, -10.2]]) lemonPot(g, x, 0.05, z, rng);
+  for (const [x, z] of [[-11, 9], [11, 9]]) lantern(g, x, 0.05, z);
 }
 
+/**
+ * The moot: an open-air theatre. Three curved tiers of stone seats face a round floor where
+ * the meeting's table stands.
+ */
 export function buildMoot(g, rng, animated) {
-  const W = 22;
-  const D = 13;
-  at(box(W, 0.35, D, STONE), 0, 0.17, 0, g);
-  at(box(W - 2, 0.04, D - 2, PAL.rose), 0, 0.36, 0, g);
-  at(box(W - 2.6, 0.05, D - 2.6, STONE), 0, 0.37, 0, g);
-  const F = 0.4;
-
-  // The long banquet table of the Bob-moots.
-  at(box(15.5, 0.25, 3, PAL.wood), 0, F + 1.2, 0, g);
-  at(box(15.5, 0.03, 1, PAL.red), 0, F + 1.34, 0, g);
-  for (const x of [-6.5, 0, 6.5]) at(box(0.4, 1.1, 2.2, DARK_WOOD), x, F + 0.55, 0, g);
-  for (let i = 0; i < 7; i++) {
-    const x = -6 + i * 2;
-    for (const s of [-1, 1]) {
-      const c = at(chair(pick(rng, [PAL.teal, PAL.coral, PAL.saffron, PAL.lilac]), 1.5), x, F, s * 2.3, g);
-      c.rotation.y = s > 0 ? 0 : Math.PI;
-      at(cyl(0.32, 0.32, 0.03, PAL.ivory, 14), x, F + 1.35, s * 0.95, g);
-      at(cyl(0.09, 0.07, 0.3, pick(rng, [PAL.saffron, PAL.coral, PAL.teal]), 8), x + 0.45, F + 1.48, s * 0.9, g);
+  flagstones(g, rng, 6.5, [0xe9d9c4, 0xdcc9b0, 0xe6c8b4]);
+  // The tiers, in blocks, climbing away from the sea so that everyone looks out over it.
+  [7.6, 10, 12.4].forEach((r, tier) => {
+    const n = 7 + tier * 2;
+    for (let k = 0; k < n; k++) {
+      const a = Math.PI * (0.62 + (0.76 * k) / (n - 1));
+      const [x, z] = [Math.sin(a) * r, Math.cos(a) * r];
+      const block = at(box(2.25, 0.55 + tier * 0.55, 1.5, pick(rng, [0xe8d9c0, 0xdccdb4, 0xd2c3aa])), x, (0.55 + tier * 0.55) / 2, z, g);
+      block.rotation.y = a;
+      seat(g, x - Math.sin(a) * 0.2, 0.62 + tier * 0.55, z - Math.cos(a) * 0.2, a + Math.PI);
+      if ((k + tier) % 3 === 0) at(box(1.3, 0.1, 0.9, pick(rng, [PAL.coral, PAL.teal, PAL.saffron, PAL.lilac])), x, 0.6 + tier * 0.55, z, g).rotation.y = a;
     }
-  }
-  for (const s of [-1, 1]) {
-    const c = at(chair(PAL.plum, 2), s * 8.8, F, 0, g);
-    c.rotation.y = (s * Math.PI) / 2;
-  }
-  for (const x of [-4, 0, 4]) {
-    at(cyl(0.08, 0.1, 0.4, PAL.ivory, 8), x, F + 1.53, 0, g);
-    at(box(0.12, 0.2, 0.12, WARM_LIGHT, { glow: true }), x, F + 1.83, 0, g);
-  }
-  const bowl = at(ball(0.45, PAL.wood, {}, 12, 6), 2, F + 1.4, 0, g);
-  bowl.scale.y = 0.5;
-  for (let i = 0; i < 5; i++) at(ball(0.16, pick(rng, [PAL.red, PAL.saffron, PAL.grass]), {}, 8, 6), 2 + (rng() - 0.5) * 0.5, F + 1.6, (rng() - 0.5) * 0.5, g);
-
-  // Pergola: slatted shade, so the sun draws stripes on the table.
-  for (const x of [-10, -5, 0, 5, 10]) {
-    for (const z of [-6, 6]) {
-      at(cyl(0.32, 0.38, 6, PAL.ivory, 10), x, F + 3, z, g);
-      at(box(0.9, 0.35, 0.9, PAL.rose), x, F + 6, z, g);
-    }
-  }
-  for (const z of [-6, 6]) at(box(W, 0.4, 0.5, PAL.ivory), 0, F + 6.3, z, g);
-  for (let i = 0; i < 20; i++) at(box(0.28, 0.24, D + 1, PAL.wood), -10.45 + i * 1.1, F + 6.62, 0, g);
-  for (let i = 0; i < 12; i++) {
-    at(ball(0.5 + rng() * 0.4, pick(rng, [PAL.grassDeep, PAL.moss, PAL.teal]), { flat: true }, 6, 4), -10 + rng() * 20, F + 6.9, (rng() < 0.5 ? -1 : 1) * (5 + rng() * 1.5), g);
-  }
-  [PAL.teal, PAL.coral, PAL.saffron, PAL.lilac].forEach((color, i) => {
-    const x = -7.5 + i * 5;
-    at(box(1.4, 2.8, 0.08, color), x, F + 4.4, -6.3, g);
-    at(cyl(0.35, 0.35, 0.05, PAL.ivory, 12), x, F + 4.6, -6.25, g).rotation.x = Math.PI / 2;
-    at(cone(0.7, 0.6, color, 3), x, F + 2.75, -6.3, g).rotation.z = Math.PI;
   });
+  // The round table in the middle, with a few chairs for those who speak.
+  at(cyl(2.3, 2.3, 0.16, PAL.wood, 20), 0, 1.15, 0, g);
+  at(cyl(0.5, 0.8, 1.1, DARK_WOOD, 8), 0, 0.55, 0, g);
+  at(cyl(0.9, 0.9, 0.04, PAL.red, 16), 0, 1.25, 0, g);
+  const bowl = at(ball(0.42, PAL.wood, {}, 10, 6), 0, 1.32, 0, g);
+  bowl.scale.y = 0.5;
+  for (let k = 0; k < 5; k++) at(ball(0.16, pick(rng, [0xf2d24a, PAL.coral, PAL.red]), {}, 5, 4), Math.cos(k * 1.3) * 0.2, 1.5 + (k % 2) * 0.1, Math.sin(k * 1.3) * 0.2, g);
+  for (let k = 0; k < 5; k++) {
+    const a = -0.9 + k * 0.45;
+    at(chair(pick(rng, [PAL.teal, PAL.plum, PAL.coral]), 1.4), Math.sin(a) * 3.6, 0.05, Math.cos(a) * 3.6, g).rotation.y = a;
+  }
+  // Tall lamps at the ends of the tiers, and strings of little lamps across the floor.
+  const ends = [[-13.5, -3], [13.5, -3], [-8, 7], [8, 7]];
+  for (const [x, z] of ends) lantern(g, x, 0.05, z);
+  festoon(g, ends[0][0], 3.0, ends[0][1], ends[1][0], 3.0, ends[1][1], 1.6);
+  festoon(g, ends[2][0], 3.0, ends[2][1], ends[3][0], 3.0, ends[3][1], 1.2);
+}
 
-  // Presentation screen at the head of the table.
-  screen(4.2, 2.4, g, -10.6, F + 3.3, 0, Math.PI / 2, animated, rng);
-  lantern(g, W / 2 - 0.6, 0.35, D / 2 + 0.6);
-  lantern(g, -W / 2 + 0.6, 0.35, D / 2 + 0.6);
-  furnishMoot(g, rng);
+/**
+ * The focus nooks: five desks, each well away from the others in its own bay of clipped hedge
+ * under a parasol, around a little fountain.
+ */
+export function buildPods(g, rng, animated) {
+  const colors = [PAL.teal, PAL.lilac, PAL.coral, PAL.saffron, PAL.pink];
+  colors.forEach((color, i) => {
+    const a = (i / colors.length) * Math.PI * 2 + 0.3;
+    const nook = at(new THREE.Group(), Math.sin(a) * 10, 0, Math.cos(a) * 10, g);
+    nook.rotation.y = a;
+    at(cyl(3.1, 3.2, 0.12, pick(rng, [0xe6dcc8, 0xd9cdb6]), 10, { flat: true }), 0, 0.06, 0, nook);
+    // A hedge behind and to the sides, open toward the fountain.
+    for (let k = 0; k < 9; k++) {
+      const b = (k / 8 - 0.5) * 3.6;
+      at(ball(0.95, pick(rng, [0x4f8a52, 0x5c9658, 0x47804e]), { leaf: true }, 7, 5), Math.sin(b) * 3.6, 0.8, Math.cos(b) * 3.6, nook).scale.y = 1.15;
+    }
+    desk(nook, rng, 0, 0.1, 0.4, 0);
+    // The parasol, tilted to the afternoon sun.
+    at(cyl(0.06, 0.08, 3.4, INK, 5), 1.7, 1.7, 1.9, nook);
+    const shade = at(cone(2.2, 0.7, color, 8), 1.5, 3.5, 1.7, nook);
+    shade.rotation.z = 0.12;
+    plant(nook, -2.1, 0.1, 1.4, rng);
+    at(cyl(0.05, 0.07, 1.3, INK, 5), -1.4, 0.65, -0.6, nook);
+    at(ball(0.2, WARM_LIGHT, { glow: true }, 6, 4), -1.4, 1.4, -0.6, nook);
+    lamplight(nook, -1.4, 1.4, -0.6, 4.5);
+  });
+  // The fountain in the middle, a bench on either side of it.
+  at(cyl(2.0, 2.2, 0.6, STONE, 12, { flat: true }), 0, 0.3, 0, g);
+  at(cyl(1.7, 1.7, 0.06, 0x8fd0d8, 12, { glow: true }), 0, 0.6, 0, g);
+  at(cyl(0.16, 0.24, 1.3, STONE, 6), 0, 0.95, 0, g);
+  at(cyl(0.6, 0.2, 0.2, STONE, 8), 0, 1.65, 0, g);
+  const jet = at(live(cone(0.14, 0.7, 0xdff4f8, 5, { glow: true })), 0, 2.1, 0, g);
+  animated.push((t) => (jet.scale.y = 1 + Math.sin(t * 6) * 0.15));
+  for (const a of [0.94, 4.08]) bench(g, Math.sin(a) * 4, 0.02, Math.cos(a) * 4, a + Math.PI);
 }
 
 /** A square of thatch `w` by `d` narrowing to `taper` of itself at the top: stack a few for a roof. */
@@ -437,30 +448,6 @@ export function buildPub(g, rng, animated) {
   animated.push((t) => (sign.rotation.x = Math.sin(t * 0.8) * 0.05));
 }
 
-export function buildPods(g, rng, animated) {
-  const colors = [PAL.teal, PAL.lilac, PAL.coral, PAL.saffron];
-  [[-5, -5], [5, -5], [-5, 5], [5, 5]].forEach(([x, z], i) => {
-    const pod = at(new THREE.Group(), x, 0, z, g);
-    at(cyl(3.1, 3.3, 0.4, STONE, 24), 0, 0.2, 0, pod);
-    // Shell around the far quarter (-x / -z), open toward the viewer.
-    const shell = solid(
-      new THREE.SphereGeometry(3.1, 24, 12, (7 * Math.PI) / 4 - 0.6 * Math.PI, 1.2 * Math.PI, 0, Math.PI / 2),
-      paint(colors[i], { doubleSide: true }),
-    );
-    at(shell, 0, 0.4, 0, pod);
-    at(box(2.2, 0.12, 1.0, PAL.wood), -0.9, 1.45, -0.9, pod).rotation.y = Math.PI / 4;
-    at(cyl(0.1, 0.1, 1.05, INK, 6), -0.9, 0.92, -0.9, pod);
-    const c = at(chair(PAL.ivory, 1.0), 0.2, 0.4, 0.2, pod);
-    c.rotation.y = Math.PI / 4;
-    screen(1.3, 0.8, pod, -1.35, 2.25, -1.35, Math.PI / 4, animated, rng);
-    at(cyl(0.05, 0.05, 0.6, INK, 6), -1.6, 1.8, -0.2, pod);
-    at(ball(0.2, WARM_LIGHT, { glow: true }, 8, 6), -1.6, 2.15, -0.2, pod);
-    plant(pod, 1.6, 0.4, -1.6, rng);
-  });
-  lantern(g, 0, 0, 0, SCREEN);
-  furnishPods(g, rng);
-}
-
 /** A sunflower, its head turned toward the sun. */
 export function sunFlower(rng) {
   const g = new THREE.Group();
@@ -476,35 +463,55 @@ export function sunFlower(rng) {
   return g;
 }
 
+/**
+ * The atelier: an open yard for making things. Workbenches stand apart on the cobbles, with a
+ * potting table, a patch of sunflowers and the three-wheeler that fetches the timber.
+ */
 export function buildAtelier(g, rng, animated) {
-  at(box(16, 0.3, 11, STONE), 1, 0.15, 1, g);
-  // Greenhouse: an open frame with slanted glass panes.
-  const gh = at(new THREE.Group(), 4, 0.3, 0, g);
-  for (const x of [-3, 0, 3]) {
-    for (const z of [-2, 2]) at(box(0.18, 3, 0.18, PAL.ivory), x, 1.5, z, gh);
-  }
-  for (const s of [-1, 1]) {
-    for (const x of [-2.2, -0.75, 0.75, 2.2]) {
-      const pane = at(box(1.3, 0.06, 2.5, 0xb9ecd9), x, 3.6, s * 1.05, gh);
-      pane.rotation.x = s * 0.55;
+  flagstones(g, rng, 11.5, [0xd8cdb8, 0xcfc3b0, 0xc4b8a2]);
+  // Three workbenches, each with its vice, its work in hand and a stool.
+  [[-6.5, -3.5, 0.3], [5.5, -5, -0.4], [0.5, 4.5, 0.1]].forEach(([x, z, yaw], i) => {
+    const b = at(new THREE.Group(), x, 0.1, z, g);
+    b.rotation.y = yaw;
+    at(box(3.6, 0.18, 1.5, PAL.wood), 0, 1.15, 0, b);
+    for (const [dx, dz] of [[-1.6, -0.6], [1.6, -0.6], [-1.6, 0.6], [1.6, 0.6]]) at(box(0.16, 1.1, 0.16, DARK_WOOD), dx, 0.55, dz, b);
+    at(box(3.2, 0.1, 1.2, DARK_WOOD), 0, 0.3, 0, b);
+    at(box(0.3, 0.3, 0.4, 0x6a6a78), -1.5, 1.4, 0.4, b);
+    for (let k = 0; k < 3; k++) at(box(1.6, 0.1, 0.22, pick(rng, [0xe2c8a0, 0xd2b488, PAL.ochre])), 0.5, 1.3 + k * 0.1, -0.3 + k * 0.12, b).rotation.y = (rng() - 0.5) * 0.3;
+    at(box(0.5, 0.3, 0.3, pick(rng, [PAL.red, PAL.teal, PAL.blue])), 1.3, 0.5, 0, b);
+    at(cyl(0.34, 0.3, 0.1, PAL.wood, 8), 0, 0.82, 1.5, b);
+    for (const [dx, dz] of [[-0.2, -0.2], [0.2, -0.2], [0, 0.24]]) at(cyl(0.04, 0.05, 0.8, DARK_WOOD, 4), dx, 0.4, 1.5 + dz, b);
+    seat(b, 0, 0.88, 1.5, Math.PI);
+    if (i === 0) {
+      // The prototype of the moment turns slowly on the first bench.
+      const proto = at(live(new THREE.Group()), 0.8, 1.7, 0.1, b);
+      at(ball(0.3, PAL.ivory, { flat: true }, 6, 4), 0, 0, 0, proto);
+      at(new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.05, 6, 20), paint(PAL.saffron)), 0, 0, 0, proto);
+      animated.push((t) => proto.rotation.set(t * 0.7, t, 0));
     }
+  });
+  // The potting table: seedlings in rows of terracotta pots.
+  at(box(4.2, 0.14, 1.3, 0xd2b488), -3, 1.1, 9, g);
+  for (const dx of [-1.9, 1.9]) at(box(0.14, 1.05, 1.1, DARK_WOOD), -3 + dx, 0.55, 9, g);
+  for (let k = 0; k < 7; k++) {
+    at(cyl(0.2, 0.15, 0.26, 0xc8643c, 6), -4.8 + k * 0.6, 1.3, 9, g);
+    at(ball(0.2, pick(rng, [PAL.grass, PAL.grassDeep, PAL.pink, PAL.saffron]), { leaf: true }, 5, 4), -4.8 + k * 0.6, 1.55, 9, g);
   }
-  for (let i = 0; i < 9; i++) {
-    const x = -2.4 + (i % 3) * 2.4;
-    const z = -1 + Math.floor(i / 3);
-    at(box(1.6, 0.4, 0.6, DARK_WOOD), x, 0.2, z, gh);
-    for (let k = 0; k < 3; k++) at(ball(0.22, pick(rng, [PAL.grass, PAL.pink, PAL.saffron, PAL.teal]), { flat: true }, 6, 4), x - 0.5 + k * 0.5, 0.55, z, gh);
-  }
-  // Workbench with a prototype spinning on it.
-  at(box(3.6, 0.14, 1.4, PAL.wood), -1, 1.4, 4.5, g);
-  for (const dx of [-1.6, 1.6]) at(box(0.14, 1.1, 1.2, DARK_WOOD), -1 + dx, 0.85, 4.5, g);
-  const proto = at(live(new THREE.Group()), -1.2, 1.75, 4.5, g);
-  at(ball(0.35, PAL.ivory, { flat: true }, 6, 4), 0, 0, 0, proto);
-  at(new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.05, 6, 24), paint(SCREEN, { glow: true })), 0, 0, 0, proto);
-  animated.push((t) => proto.rotation.set(t * 0.7, t, 0));
-  for (let i = 0; i < 4; i++) at(box(0.9, 0.9, 0.9, pick(rng, [PAL.wood, PAL.ochre])), 6.5 - (i % 2), 0.75 + Math.floor(i / 2) * 0.9, 5 - (i % 2) * 0.3, g).rotation.y = rng();
-  for (let i = 0; i < 12; i++) at(sunFlower(rng), 9 + (i % 4) * 1.9, 0, -8 + Math.floor(i / 4) * 1.9, g);
-  furnishAtelier(g, rng, animated);
+  for (let i = 0; i < 4; i++) at(box(0.9, 0.8, 0.9, pick(rng, [PAL.wood, PAL.ochre])), 9 - (i % 2), 0.5 + Math.floor(i / 2) * 0.8, 3 - (i % 2) * 0.3, g).rotation.y = rng();
+  for (let i = 0; i < 12; i++) at(sunFlower(rng), 6 + (i % 4) * 1.9, 0, 7 + Math.floor(i / 4) * 1.9, g);
+  bench(g, -9.5, 0.05, 4, Math.PI / 2);
+  // The delivery three-wheeler, loaded with crates.
+  const ape = at(new THREE.Group(), -8, 0.12, -9.5, g);
+  ape.rotation.y = 0.7;
+  at(box(1.3, 1.1, 1.2, 0x6f9fb8), 0, 0.95, 1.0, ape);
+  at(box(1.34, 0.45, 0.9, 0x33303f), 0, 1.2, 1.2, ape);
+  at(box(1.3, 0.2, 0.5, 0x6f9fb8), 0, 0.5, 1.75, ape);
+  at(box(1.5, 0.12, 2.0, 0x6f9fb8), 0, 0.55, -0.6, ape);
+  for (const [x, z, w, d] of [[0.72, -0.6, 0.06, 2.0], [-0.72, -0.6, 0.06, 2.0], [0, -1.58, 1.5, 0.06]]) at(box(w, 0.4, d, 0x6f9fb8), x, 0.8, z, ape);
+  for (const [x, z] of [[0.3, -0.3], [-0.35, -0.9]]) at(box(0.6, 0.45, 0.6, PAL.wood), x, 0.85, z, ape);
+  at(cyl(0.26, 0.26, 0.16, INK, 10), 0, 0.26, 1.6, ape).rotation.z = Math.PI / 2;
+  for (const x of [-0.72, 0.72]) at(cyl(0.26, 0.26, 0.16, INK, 10), x, 0.26, -1.0, ape).rotation.z = Math.PI / 2;
+  for (const [x, z] of [[-10.5, 9], [10, -8]]) lantern(g, x, 0.05, z);
 }
 
 /** Small wooden fishing boat (gozzo). */
@@ -720,25 +727,21 @@ export function buildPort(g, rng, animated) {
   g.rotation.y = seaward(g.position.x, g.position.z);
   const surface = WATER_LEVEL;
   const Q = 17;
+  const TIMBER = [PAL.wood, 0xa8764f, 0x9a6a48];
 
-  // The quay is held by a palisade wherever it meets the water: timber piles driven side by
-  // side, a taller mooring post now and then.
-  const rim = ZONES.find((zn) => zn.id === 'port').r + 1.1;
-  const sin = Math.sin(g.rotation.y);
-  const cos = Math.cos(g.rotation.y);
-  for (let k = 0, n = Math.round((rim * Math.PI * 2) / 0.5); k < n; k++) {
-    const a = (k / n) * Math.PI * 2;
-    const [x, z] = [Math.sin(a) * rim, Math.cos(a) * rim];
-    const [ox, oz] = [Math.sin(a) * (rim + 1.6), Math.cos(a) * (rim + 1.6)];
-    if (groundAt(g.position.x + ox * cos + oz * sin, g.position.z - ox * sin + oz * cos) > WATER_LEVEL - 0.2) continue;
-    const tall = k % 9 === 0;
-    at(cyl(0.24, 0.26, tall ? 4.4 : 3.6, [PAL.wood, 0xa8764f, 0x9a6a48, DARK_WOOD][k % 4], 6), x, tall ? -1.3 : -1.6, z, g);
-    if (k % 4 === 0) mussels(g, rng, x + Math.sin(a) * 0.1, z + Math.cos(a) * 0.1, 0.26);
+  // The harbour starts at the foot of the village street: a boardwalk on piles runs straight
+  // out from the last houses over the shallows to the quay.
+  for (let z = 0; z < Q - 1.8; z += 0.62) at(box(3.2, 0.14, 0.56, pick(rng, TIMBER)), 0, 0.12, z + 0.31, g);
+  for (let z = 1.5; z < Q - 2; z += 3) {
+    for (const dx of [-1.5, 1.5]) {
+      at(cyl(0.16, 0.18, 4.6, DARK_WOOD, 6), dx, -2.0, z, g);
+      mussels(g, rng, dx, z);
+    }
   }
+  for (const z of [4, 11]) lantern(g, 1.3, 0.2, z);
 
   // A timber quay: a plank boardwalk carried on driven piles and faced with boards, with
   // mooring posts and lamps. Everything in the harbour is wood.
-  const TIMBER = [PAL.wood, 0xa8764f, 0x9a6a48];
   for (let x = -22.5; x <= 22.5; x += 1.5) at(cyl(0.2, 0.24, 5.2, DARK_WOOD, 6), x, -2.3, Q + 1.35, g);
   for (let k = 0; k < 4; k++) at(box(45.2, 0.5, 0.12, TIMBER[k % 3]), 0, -0.3 - k * 0.56, Q + 1.15, g);
   for (let x = -22.5; x < 22.5; x += 0.62) at(box(0.56, 0.14, 3.2, pick(rng, TIMBER)), x + 0.31, 0.12, Q - 0.2, g);
@@ -788,21 +791,8 @@ export function buildPort(g, rng, animated) {
     });
   });
 
-  // Boats pulled up on the quay, crates and a café terrace.
-  for (const [x, z, yaw] of [[-12, 9, 0.4], [-9.5, 7.5, 0.2], [-14.5, 10.5, 0.6]]) {
-    const boat = at(gozzo(rng), x, 0.15, z, g);
-    boat.rotation.set(0, yaw, 0.12);
-  }
-  for (let i = 0; i < 7; i++) at(box(0.9, 0.7, 0.9, pick(rng, [PAL.wood, PAL.ochre, PAL.teal])), 8 + (i % 3), 0.35 + Math.floor(i / 3) * 0.7, 12 + (i % 2) * 0.4, g).rotation.y = rng();
-  for (const [x, z, color] of [[2, 6, PAL.coral], [6, 4, PAL.teal], [-3, 4, PAL.saffron], [-7, 2, PAL.pink]]) {
-    at(cyl(0.7, 0.7, 0.08, PAL.ivory, 12), x, 1.05, z, g);
-    at(cyl(0.07, 0.07, 3, INK, 6), x, 1.5, z, g);
-    const parasol = at(cone(2, 0.8, color, 8), x, 3.2, z, g);
-    parasol.rotation.y = rng();
-    for (let k = 0; k < 2; k++) at(chair(PAL.ivory, 0.9), x + (k ? 1.2 : -1.2), 0, z, g).rotation.y = k ? -Math.PI / 2 : Math.PI / 2;
-  }
-  // A few fishmongers' stalls along the quay.
-  for (const [x, z, yaw] of [[-15, Q - 2.6, 0], [-3.5, Q - 2.6, 0], [12.5, Q - 2.6, 0], [17, 6, -0.4]]) fishStall(g, rng, x, z, yaw);
+  // Two fishmongers' stalls on the quay.
+  for (const x of [-15, 12.5]) fishStall(g, rng, x, Q - 0.5, 0);
   furnishPort(g, rng);
   harbourCats(g, rng, animated);
 }
@@ -880,102 +870,6 @@ function lemonPot(parent, x, y, z, rng) {
     const a = rng() * Math.PI * 2;
     at(ball(0.11, PAL.saffron, {}, 5, 4), x + Math.cos(a) * 0.72, y + 2.0 + (rng() - 0.5) * 0.6, z + Math.sin(a) * 0.72, parent);
   }
-}
-
-function furnishLibrary(g, rng, animated) {
-  const F = 0.4;
-  // Globe on a stand.
-  at(cyl(0.35, 0.45, 0.1, DARK_WOOD, 10), 5.4, F + 0.05, 2.6, g);
-  at(cyl(0.05, 0.05, 1.1, DARK_WOOD, 6), 5.4, F + 0.6, 2.6, g);
-  const meridian = at(ring(0.62, 0.04, PAL.saffron, Math.PI * 2, 18), 5.4, F + 1.5, 2.6, g);
-  meridian.rotation.y = 0.6;
-  at(ball(0.55, PAL.teal, {}, 14, 10), 5.4, F + 1.5, 2.6, g);
-  for (let k = 0; k < 4; k++) at(ball(0.2, PAL.ochre, { flat: true }, 5, 4), 5.4 + Math.cos(k * 1.7) * 0.42, F + 1.5 + Math.sin(k * 2.3) * 0.3, 2.6 + Math.sin(k * 1.7) * 0.42, g);
-  // Telescope aimed at the tall windows.
-  for (let k = 0; k < 3; k++) {
-    const leg = at(cyl(0.03, 0.04, 1.6, DARK_WOOD, 4), -5.4 + Math.cos(k * 2.1) * 0.3, F + 0.75, -3.2 + Math.sin(k * 2.1) * 0.3, g);
-    leg.rotation.set(Math.sin(k * 2.1) * 0.3, 0, -Math.cos(k * 2.1) * 0.3);
-  }
-  const tube = at(cyl(0.12, 0.18, 1.6, PAL.saffron, 10), -5.6, F + 1.75, -3.0, g);
-  tube.rotation.set(0.5, 0, 0.9);
-  // Library ladder against the shelves.
-  const ladder = at(new THREE.Group(), -4.6, F, -4.9, g);
-  ladder.rotation.x = -0.18;
-  for (const x of [-0.35, 0.35]) at(box(0.08, 5.4, 0.08, PAL.wood), x, 2.7, 0, ladder);
-  for (let k = 0; k < 9; k++) at(box(0.7, 0.06, 0.08, PAL.wood), 0, 0.4 + k * 0.6, 0, ladder);
-  // Piles of books, a reading lamp on the desk.
-  bookPile(g, 3.2, F, 3.8, rng, 5);
-  bookPile(g, -2.8, F, -4.3, rng, 3);
-  bookPile(g, -5.6, F + 1.17, 3.4, rng, 2);
-  at(cyl(0.15, 0.18, 0.06, PAL.saffron, 8), -3.4, F + 1.2, 3.4, g);
-  at(cyl(0.03, 0.03, 0.5, PAL.saffron, 4), -3.4, F + 1.45, 3.4, g);
-  at(cyl(0.12, 0.28, 0.2, 0x3f8f5a, 8, { glow: true }), -3.4, F + 1.72, 3.5, g);
-  // The Incal: a luminous pyramid hovering over its pedestal.
-  at(cyl(0.35, 0.45, 1.2, PAL.ivory, 8), -1.6, F + 0.6, 3.8, g);
-  at(ring(0.38, 0.05, PAL.saffron, Math.PI * 2, 10), -1.6, F + 1.2, 3.8, g).rotation.x = Math.PI / 2;
-  const incal = at(live(new THREE.Group()), -1.6, F + 1.9, 3.8, g);
-  at(cone(0.34, 0.5, 0xfff6d8, 4, { glow: true, flat: true }), 0, 0.25, 0, incal);
-  at(cone(0.34, 0.5, PAL.saffron, 4, { glow: true, flat: true }), 0, -0.25, 0, incal).rotation.x = Math.PI;
-  animated.push((t) => {
-    incal.rotation.y = t * 0.9;
-    incal.position.y = F + 1.9 + Math.sin(t * 1.6) * 0.12;
-  });
-}
-
-function furnishMoot(g, rng) {
-  const F = 0.4;
-  // Lanterns hanging from the pergola.
-  for (let x = -7.5; x <= 7.5; x += 3) {
-    at(cyl(0.015, 0.015, 1.3, INK, 3), x, F + 5.85, 0, g);
-    at(cone(0.22, 0.2, INK, 6), x, F + 5.2, 0, g);
-    at(ball(0.24, WARM_LIGHT, { glow: true }, 8, 6), x, F + 4.98, 0, g);
-  }
-  // Sideboard with amphorae and a feast.
-  at(box(6, 1.0, 0.8, DARK_WOOD), 3, F + 0.5, -5.2, g);
-  at(box(6.2, 0.1, 0.95, PAL.wood), 3, F + 1.05, -5.2, g);
-  for (const x of [0.6, 5.4]) amphora(g, x, F + 1.1, -5.2, pick(rng, [0xc8643c, PAL.teal, PAL.ochre]));
-  for (let k = 0; k < 4; k++) at(ball(0.18, pick(rng, [PAL.saffron, PAL.red, PAL.grass]), {}, 6, 5), 2 + k * 0.5, F + 1.25, -5.1, g);
-  at(cyl(0.45, 0.45, 0.06, PAL.ivory, 12), 3.4, F + 1.12, -5.2, g);
-  // Big jars and lemon trees at the corners.
-  for (const [x, z] of [[-10.3, 5.6], [10.3, 5.6], [-10.3, -5.6], [10.3, -5.6]]) amphora(g, x, 0.35, z, pick(rng, [0xc8643c, PAL.ochre]));
-  for (const [x, z] of [[-12, 7.5], [12, 7.5]]) lemonPot(g, x, 0, z, rng);
-  // Mosaic: a border of coloured tiles around the table.
-  for (let x = -9; x <= 9; x += 0.9) {
-    for (const z of [-4.2, 4.2]) at(box(0.7, 0.03, 0.7, pick(rng, [PAL.teal, PAL.coral, PAL.saffron, PAL.ivory])), x, 0.39, z, g);
-  }
-}
-
-function furnishPods(g, rng) {
-  [[-5, -5], [5, -5], [-5, 5], [5, 5]].forEach(([x, z], i) => {
-    const pod = at(new THREE.Group(), x, 0, z, g);
-    at(cyl(1.4, 1.4, 0.04, [PAL.coral, PAL.teal, PAL.saffron, PAL.lilac][(i + 1) % 4], 16), 0.2, 0.42, 0.2, pod);
-    // Low shelf with a few books, a hanging lamp, an antenna on the shell.
-    const shelf = at(new THREE.Group(), 1.4, 0.4, -1.2, pod);
-    shelf.rotation.y = -Math.PI / 4;
-    at(box(1.2, 0.8, 0.4, PAL.wood), 0, 0.4, 0, shelf);
-    for (let k = 0; k < 5; k++) at(box(0.14, 0.4, 0.3, pick(rng, [PAL.red, PAL.teal, PAL.saffron, PAL.blue])), -0.4 + k * 0.18, 0.95, 0, shelf);
-    at(cyl(0.01, 0.01, 0.9, INK, 3), -0.4, 3.0, -0.4, pod);
-    at(cone(0.25, 0.25, PAL.ivory, 8), -0.4, 2.5, -0.4, pod);
-    at(ball(0.13, WARM_LIGHT, { glow: true }, 6, 4), -0.4, 2.35, -0.4, pod);
-    at(cyl(0.04, 0.04, 1.4, INK, 4), -1.5, 3.4, -1.5, pod);
-    at(ball(0.12, PAL.red, { glow: true }, 4, 3), -1.5, 4.15, -1.5, pod);
-  });
-}
-
-function furnishAtelier(g, rng, animated) {
-  // A delivery three-wheeler parked on a cobbled yard, loaded with crates.
-  at(cyl(3.2, 3.4, 0.2, 0xcfc3b0, 20, { flat: true }), 2, 0.1, 11, g);
-  const ape = at(new THREE.Group(), 2, 0.2, 11, g);
-  ape.rotation.y = 0.7;
-  at(box(1.3, 1.1, 1.2, 0x6f9fb8), 0, 0.95, 1.0, ape);
-  at(box(1.34, 0.45, 0.9, 0x33303f), 0, 1.2, 1.2, ape);
-  at(box(1.3, 0.2, 0.5, 0x6f9fb8), 0, 0.5, 1.75, ape);
-  at(box(1.5, 0.12, 2.0, 0x6f9fb8), 0, 0.55, -0.6, ape);
-  for (const [x, z, w, d] of [[0.72, -0.6, 0.06, 2.0], [-0.72, -0.6, 0.06, 2.0], [0, -1.58, 1.5, 0.06]]) at(box(w, 0.4, d, 0x6f9fb8), x, 0.8, z, ape);
-  for (const [x, z] of [[0.3, -0.3], [-0.35, -0.9]]) at(box(0.6, 0.45, 0.6, PAL.wood), x, 0.85, z, ape);
-  at(cyl(0.26, 0.26, 0.16, INK, 10), 0, 0.26, 1.6, ape).rotation.z = Math.PI / 2;
-  for (const x of [-0.72, 0.72]) at(cyl(0.26, 0.26, 0.16, INK, 10), x, 0.26, -1.0, ape).rotation.z = Math.PI / 2;
-  at(ball(0.1, WARM_LIGHT, { glow: true }, 4, 3), 0, 0.8, 2.0, ape);
 }
 
 const CAT_COATS = [
@@ -1058,11 +952,11 @@ function harbourCats(g, rng, animated) {
   put('sit', -21.6, 0.12, Q + 19.6, -0.3);
   // Asleep in the last of the sun.
   put('sleep', 15.2, deck, Q - 0.2, 0.8);
-  put('sleep', -10.8, 0.05, 8.8, 2.2);
-  put('sleep', 8.4, 1.45, 12.2, 1.2);
+  put('sleep', -10.8, deck, Q - 0.4, 2.2);
+  put('sleep', 8.4, deck, Q + 0.3, 1.2);
   put('sleep', 5.6, 0.13, Q + 9, -0.6);
   // On patrol: back and forth along the quay and a pier, pausing at each end.
-  for (const [ax, az, bx, bz, y, speed] of [[-20, Q - 0.6, 19, Q - 0.6, deck, 1.1], [5.4, Q + 2, 5.4, Q + 17, 0.13, 0.9], [-7, 6, 9, 9, 0.02, 1.0]]) {
+  for (const [ax, az, bx, bz, y, speed] of [[-20, Q - 0.6, 19, Q - 0.6, deck, 1.1], [5.4, Q + 2, 5.4, Q + 17, 0.13, 0.9]]) {
     const cat = put('walk', ax, y, az, 0);
     const length = Math.hypot(bx - ax, bz - az);
     const travel = length / speed;
@@ -1082,29 +976,22 @@ function harbourCats(g, rng, animated) {
 }
 
 function furnishPort(g, rng) {
-  // Fisherman's shed.
-  const shed = at(new THREE.Group(), -11, 0, 3, g);
-  at(box(3.2, 2.4, 2.6, PAL.sky), 0, 1.2, 0, shed);
-  at(box(3.6, 0.15, 3.0, PAL.ivory), 0, 2.45, 0, shed);
-  const roof = at(cone(2.4, 1.0, 0xc8643c, 4, { flat: true }), 0, 3.0, 0, shed);
-  roof.rotation.y = Math.PI / 4;
-  roof.scale.set(1, 1, 0.85);
-  at(box(0.8, 1.5, 0.05, PAL.wood), 0.6, 0.75, 1.32, shed);
-  at(box(0.6, 0.5, 0.05, 0x3b3346), -0.8, 1.4, 1.32, shed);
+  // Fishing gear set down along the quay.
+  const quay = at(new THREE.Group(), 0, 0.17, 5.4, g);
   // Nets drying on poles.
-  for (const x of [0, 3.6]) at(cyl(0.06, 0.06, 2.4, PAL.wood, 4), x, 1.2, 10.8, g);
-  for (let k = 0; k < 6; k++) at(box(3.6, 0.03, 0.03, 0x6d8f8a), 1.8, 0.9 + k * 0.25, 10.8, g);
-  for (let k = 0; k < 9; k++) at(box(0.03, 1.4, 0.03, 0x6d8f8a), 0.2 + k * 0.4, 1.5, 10.8, g);
+  for (const x of [0, 3.6]) at(cyl(0.06, 0.06, 2.4, PAL.wood, 4), x, 1.2, 10.8, quay);
+  for (let k = 0; k < 6; k++) at(box(3.6, 0.03, 0.03, 0x6d8f8a), 1.8, 0.9 + k * 0.25, 10.8, quay);
+  for (let k = 0; k < 9; k++) at(box(0.03, 1.4, 0.03, 0x6d8f8a), 0.2 + k * 0.4, 1.5, 10.8, quay);
   // Buoys, rope coils, lobster pots, an anchor.
   for (let k = 0; k < 5; k++) {
-    at(ball(0.24, k % 2 ? PAL.red : PAL.ivory, {}, 8, 6), 4.5 + k * 0.45, 0.3, 11.7 - (k % 2) * 0.4, g);
+    at(ball(0.24, k % 2 ? PAL.red : PAL.ivory, {}, 8, 6), 4.5 + k * 0.45, 0.3, 11.7 - (k % 2) * 0.4, quay);
   }
-  for (const [x, z] of [[-6, 11.4], [-5.2, 11.6]]) at(ring(0.35, 0.09, PAL.cream, Math.PI * 2, 12), x, 0.18, z, g).rotation.x = Math.PI / 2;
+  for (const [x, z] of [[-6, 11.4], [-5.2, 11.6]]) at(ring(0.35, 0.09, PAL.cream, Math.PI * 2, 12), x, 0.18, z, quay).rotation.x = Math.PI / 2;
   for (const [x, z] of [[-2, 11.2], [-1.2, 11.5], [-1.6, 10.6]]) {
-    at(cyl(0.4, 0.4, 0.55, 0x5a6a7a, 8), x, 0.28, z, g);
-    at(ring(0.4, 0.03, PAL.saffron, Math.PI * 2, 10), x, 0.55, z, g).rotation.x = Math.PI / 2;
+    at(cyl(0.4, 0.4, 0.55, 0x5a6a7a, 8), x, 0.28, z, quay);
+    at(ring(0.4, 0.03, PAL.saffron, Math.PI * 2, 10), x, 0.55, z, quay).rotation.x = Math.PI / 2;
   }
-  const anchor = at(new THREE.Group(), 8, 0.2, 12, g);
+  const anchor = at(new THREE.Group(), 8, 0.2, 12, quay);
   anchor.rotation.set(-Math.PI / 2, 0, 0.4);
   at(cyl(0.08, 0.08, 1.6, INK, 6), 0, 0, 0, anchor);
   at(ring(0.55, 0.08, INK, Math.PI, 10), 0, -0.6, 0, anchor).rotation.z = Math.PI;

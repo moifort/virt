@@ -5,7 +5,7 @@ import { mulberry32 } from './noise.js';
 import { GLOBALS, PATH_COUNT } from './style.js';
 import { buildLife } from './life.js';
 import { buildNature } from './nature.js';
-import { GRID, HALF, PATHS, SEGMENTS, WORLD_SIZE, ZONES, buildTerrain, buildWater, zone } from './terrain.js';
+import { GRID, HALF, PATHS, SEGMENTS, WORLD_SIZE, ZONES, buildSides, buildTerrain, buildWater } from './terrain.js';
 import { buildEstate } from './estate.js';
 import { buildStream } from './stream.js';
 import { bake } from './kit.js';
@@ -31,10 +31,8 @@ export function createWorld(scene) {
   heightTex.needsUpdate = true;
   GLOBALS.uHeight.value = heightTex;
   GLOBALS.uHeightMap.value.set(HALF, WORLD_SIZE, SEGMENTS + 1);
-  const port = zone('port');
-  GLOBALS.uQuay.value.set(port.x, port.z, port.r + 1);
 
-  scene.add(buildTerrain(), buildWater());
+  scene.add(buildTerrain(), buildSides(), buildWater());
   const builders = {
     agora: buildAgora,
     library: buildLibrary,
@@ -69,7 +67,16 @@ export function createWorld(scene) {
   });
   animated.push((t) => GLOBALS.uBeam.value.setZ(t * 0.42).setW(GLOBALS.uLamps.value.x));
 
+  // Every chair, bench and step that can be sat on: where, and which way it faces.
+  const seats = [];
+  scene.traverse((obj) => {
+    if (!obj.userData.seat) return;
+    const facing = obj.getWorldDirection(new THREE.Vector3());
+    seats.push({ position: obj.getWorldPosition(new THREE.Vector3()), yaw: Math.atan2(facing.x, facing.z) });
+  });
+
   return {
+    seats,
     /** @param {import('./climate.js').Climate} climate the sky of the moment, for whatever lives by it */
     update(t, dt, climate) {
       for (const fn of animated) fn(t, dt, climate);

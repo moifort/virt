@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { PixelCamera, PixelRenderer } from './pixel.js';
 import { Player } from './player.js';
-import { GLOBALS } from './style.js';
+import { GLOBALS, PAL, paint } from './style.js';
 import { Climate } from './climate.js';
 import { LAND_ENDS, WATER_LEVEL, createWorld, groundAt } from './world.js';
 
@@ -34,6 +34,12 @@ const player = new Player();
 player.position.set(2, groundAt(2, 20), 20);
 scene.add(player.root, player.fx);
 
+// Sitting down: the seat within reach, and the marker that points it out.
+let seatAtHand = null;
+const seatMark = new THREE.Mesh(new THREE.ConeGeometry(0.22, 0.4, 4).rotateX(Math.PI), paint(PAL.saffron, { glow: true, flat: true }));
+seatMark.visible = false;
+scene.add(seatMark);
+
 // For looking around while building the map: `?at=x,z` drops the avatar there, `?zoom=` sets the
 // height of the view, `?yaw=` its corner in quarter turns; `virt` in the console holds the rest.
 const params = new URLSearchParams(location.search);
@@ -65,6 +71,11 @@ addEventListener('keydown', (e) => {
   // A / E on AZERTY (KeyQ / KeyE codes) turn the view to the next isometric corner.
   if (e.code === 'KeyQ') yawTarget = snapYaw(yawTarget) + Math.PI / 2;
   if (e.code === 'KeyE') yawTarget = snapYaw(yawTarget) - Math.PI / 2;
+  // F or Enter: sit down on the seat at hand, or get up.
+  if ((e.code === 'KeyF' || e.code === 'Enter') && !e.repeat) {
+    if (player.seat) player.stand();
+    else if (seatAtHand) player.sit(seatAtHand);
+  }
 });
 addEventListener('keyup', (e) => {
   keys.delete(e.code);
@@ -126,6 +137,18 @@ renderer.setAnimationLoop(() => {
   player.update(dt, t, readInput(!player.step), snapYaw(view.yaw));
   climate.update(dt);
   world.update(t, dt, climate);
+
+  // The nearest seat within reach, if he is standing still: a little marker bobs over it.
+  seatAtHand = null;
+  if (!player.seat && !player.step) {
+    let nearest = 2.6;
+    for (const seat of world.seats) {
+      const d = Math.hypot(seat.position.x - player.position.x, seat.position.z - player.position.z);
+      if (d < nearest && Math.abs(seat.position.y - player.position.y) < 3) [nearest, seatAtHand] = [d, seat];
+    }
+  }
+  seatMark.visible = seatAtHand !== null;
+  if (seatAtHand) seatMark.position.copy(seatAtHand.position).setY(seatAtHand.position.y + 1.9 + Math.sin(t * 4) * 0.12);
 
   GLOBALS.uTime.value = t;
   GLOBALS.uCloud.value.set(t * 0.035, t * 0.012);

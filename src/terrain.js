@@ -4,16 +4,18 @@ import { fbm, hash, smoothstep } from './noise.js';
 import { GLOBALS, PATH_COUNT, WATER_LEVEL, paint } from './style.js';
 
 export { WATER_LEVEL };
-// The map is an island of its own in an endless sea, laid out along its bay (u from the open
-// sea toward the mountain, v along the shore). The square is only the bounds of what can be
-// walked and planted: the land falls into the water well inside it on every side.
-export const SQUARE = { u0: -100, u1: 272, v0: -145, v1: 148 };
+// The map is a game tile laid out along its bay (u from the open sea toward the mountain, v
+// along the shore). In front and to the left the sea runs on to the horizon; behind the
+// mountains and on the right the tile is cut clean through, land and sea alike, and its
+// section shows down to a base.
+export const SQUARE = { u0: -100, u1: 205, v0: -145, v1: 112 };
 const SEA_FLOOR = -14;
+const BASE_Y = -16;
 // The sun is low over the sea, a little to the left: it lights the slopes that face the bay.
 export const SUN_DIR = new THREE.Vector3(-0.5, 0.36, 1).normalize();
 
-export const WORLD_SIZE = 600;
-export const SEGMENTS = 600;
+export const WORLD_SIZE = 500;
+export const SEGMENTS = 500;
 export const CELL = WORLD_SIZE / SEGMENTS;
 export const HALF = WORLD_SIZE / 2;
 export const UP = new THREE.Vector3(0, 1, 0);
@@ -33,26 +35,35 @@ const farLeft = (v) => smoothstep(-74, -94, v);
 const wander = (u) => (u === undefined ? 0 : (fbm(u * 0.035, 4.2, 3) - 0.5) * 30);
 export const coastU = (v, u) => -40 + (fbm(v * 0.02, 3.1, 3) - 0.5) * 20 - headland(v) * 58 + openSea(v) * 95 + farLeft(v + wander(u)) * 260;
 export const footU = (v, u) => 50 + (fbm(v * 0.025, 7.7, 3) - 0.5) * 18 + openSea(v) * 70 + farLeft(v + wander(u)) * 260;
+// The far shores of the island, where the mountain comes down to the sea: the water's edge on
+// the left (a v for each u), behind (a u for each v) and on the right (a v for each u).
+const leftShore = (u) => -85 - wander(u);
+const farShore = (v) => 238 + (fbm(v * 0.03 + 2, 6.1, 3) - 0.5) * 22;
+const rightShore = (u) => 128 + (fbm(u * 0.03 - 4, 1.7, 3) - 0.5) * 18;
+// Where along the left shore the main village comes down to the water.
+const HARBOUR_U = 68;
 // A white sand beach along the middle of the bay.
 const beachBand = (v) => smoothstep(-30, -18, v) * smoothstep(64, 50, v);
 
 export const placeZone = (id, name, hint, u, v, r) => ({ id, name, hint, u, v, r, x: toX(u, v), z: toZ(u, v) });
 export const ZONES = [
   placeZone('agora', 'Agora', "l'Arbre-Mère", 0, 0, 12),
-  placeZone('library', 'La Bibliothèque', 'bureau de Bob', 34, -34, 13),
-  placeZone('moot', 'Salle du Moot', 'réunions', 30, 36, 15),
+  placeZone('library', 'La Bibliothèque', 'bureau de Bob', 34, -34, 16),
+  placeZone('moot', 'Salle du Moot', 'réunions', 32, 38, 17),
   placeZone('pub', 'Le Pub', 'après le travail', -22, -40, 12),
-  placeZone('pods', 'Bulles focus', 'concentration', 2, 52, 13),
-  placeZone('atelier', "L'Atelier", 'prototypes', 8, -54, 12),
-  // The harbour lies at the foot of the main village, as in the Cinque Terre.
-  placeZone('port', 'Le Port', 'pause au bord de l\'eau', 57, -82, 16),
+  placeZone('pods', 'Bulles focus', 'concentration', -6, 60, 15),
+  placeZone('atelier', "L'Atelier", 'prototypes', 8, -54, 14),
+  // The harbour has no ground of its own: its boardwalks start from the foot of the main
+  // village, a dozen metres up from the water's edge, and run out over the sea.
+  placeZone('port', 'Le Port', 'pause au bord de l\'eau', HARBOUR_U, leftShore(HARBOUR_U) + 12, 1),
 ];
 export const zone = (id) => ZONES.find((z) => z.id === id);
 
-// The villages, in (u, v): the main one climbing from its harbour up the
-// left-hand slopes with its feet in the water, and a hamlet on the right headland.
+// The villages, in (u, v): the main one, with its feet in the water, climbing from its harbour
+// far up the left-hand slopes (`up` stretches it uphill), and a hamlet on the right headland.
+// `bell` gives a village its campanile.
 export const VILLAGES = [
-  { u: footU(-56) + 6, v: -61, r: 17, bell: true, waterfront: true },
+  { u: HARBOUR_U + 10, v: leftShore(HARBOUR_U) + 26, r: 21, up: 1.5, bell: true, waterfront: true },
   { u: -46, v: 84, r: 10 },
 ];
 const hub = { x: toX(VILLAGES[0].u, VILLAGES[0].v), z: toZ(VILLAGES[0].u, VILLAGES[0].v) };
@@ -116,18 +127,11 @@ export function cultivated(u, v) {
   const heart = smoothstep(-22, -12, v) * smoothstep(48, 38, v) * smoothstep(foot + 40, foot + 30, u);
   const patches = smoothstep(0.47, 0.55, fbm(v * 0.03 + 5, u * 0.03, 2)) * smoothstep(foot - 2, foot + 6, u) * smoothstep(foot + 78, foot + 52, u);
   let worked = Math.max(heart, patches, estateWeight(u, v));
-  for (const village of VILLAGES) worked = Math.max(worked, smoothstep(village.r + 12, village.r + 2, Math.hypot(u - village.u, v - village.v)));
+  for (const village of VILLAGES) worked = Math.max(worked, smoothstep(village.r + 12, village.r + 2, Math.hypot((u - village.u) / (village.up ?? 1), v - village.v)));
   return worked;
 }
 
 
-// A small island stands off the back of the mountain: sheer rock all round, pines on top.
-const ISLET = { u: 250, v: -122, r: 11 };
-// The far shores of the island, where the mountain comes down to the sea: the water's edge on
-// the left (a v for each u), behind (a u for each v) and on the right (a v for each u).
-const leftShore = (u) => -85 - wander(u);
-const farShore = (v) => 238 + (fbm(v * 0.03 + 2, 6.1, 3) - 0.5) * 22;
-const rightShore = (u) => 128 + (fbm(u * 0.03 - 4, 1.7, 3) - 0.5) * 18;
 
 /** The lie of the land before the stream has cut its bed into it. */
 function landAt(x, z) {
@@ -185,20 +189,14 @@ function landAt(x, z) {
   h += (WATER_LEVEL + 0.25 + Math.max(0, u - coast) * 0.08 - h) * beach;
   // Along those shores lie beaches of white sand, one cove after another, except under the
   // main village, whose houses stand with their feet in the water.
-  const strand = shore * smoothstep(0.4, 0.48, fbm(u * 0.022 + 31, v * 0.022 - 17, 2)) * smoothstep(34, 52, Math.hypot(u - VILLAGES[0].u, v - VILLAGES[0].v + 14));
+  const strand = shore * smoothstep(0.4, 0.48, fbm(u * 0.022 + 31, v * 0.022 - 17, 2)) * smoothstep(44, 62, Math.hypot(u - VILLAGES[0].u, v - VILLAGES[0].v + 14));
   h += (WATER_LEVEL + 0.3 + inland * 0.1 - h) * strand * smoothstep(-1, 1, inland) * smoothstep(16, 9, inland);
-  // Work areas sit on level pads; the harbour's is a quay, with a wall straight down to the water.
-  for (const zn of ZONES) {
-    const d = Math.hypot(x - zn.x, z - zn.z);
-    h += (0 - h) * (zn.id === 'port' ? smoothstep(zn.r + 1.6, zn.r + 0.4, d) : smoothstep(zn.r + 7, zn.r + 1, d));
-  }
+  // Work areas sit on level pads.
+  for (const zn of ZONES) if (zn.id !== 'port') h += (0 - h) * smoothstep(zn.r + 7, zn.r + 1, Math.hypot(x - zn.x, z - zn.z));
   h += (VILLA.y - h) * smoothstep(VILLA.r + 4, VILLA.r + 0.5, Math.hypot(x - VILLA.x, z - VILLA.z));
   h += (RAIL.level - 0.05 - h) * stationYard(x, z);
-  // The islet off the back of the mountain.
-  const off = Math.hypot(u - ISLET.u, v - ISLET.v) / ISLET.r + (fbm(x * 0.09 + 2, z * 0.09, 2) - 0.5) * 0.5;
-  if (off < 1.4) h = Math.max(h, -9.5 + smoothstep(1.4, 1, off) * 7 + smoothstep(1, 0.86, off) * (13 + fbm(x * 0.1, z * 0.1 + 3, 2) * 7) + smoothstep(0.86, 0, off) * 7);
-  // Whatever happens, the land has sunk under the sea before the bounds of the map.
-  const brink = Math.min(u - SQUARE.u0, SQUARE.u1 - u, v - SQUARE.v0, SQUARE.v1 - v) + (fbm(x * 0.05 + 8, z * 0.05, 2) - 0.5) * 8;
+  // On the open sides the land has sunk under the sea before the bounds of the map.
+  const brink = Math.min(u - SQUARE.u0, v - SQUARE.v0) + (fbm(x * 0.05 + 8, z * 0.05, 2) - 0.5) * 8;
   return h + (-12 - h) * smoothstep(11, 2, brink);
 }
 
@@ -354,16 +352,72 @@ export function buildTerrain() {
   mesh.receiveShadow = true;
   return mesh;
 }
-/**
- * The sea has no edge: it runs on past the diorama on every side, out to a horizon that the
- * view sets for itself (see `uHorizon`).
- */
-export function buildWater() {
-  const reach = 2400;
-  const surface = new THREE.PlaneGeometry(reach * 2, reach * 2).rotateX(-Math.PI / 2).translate(0, WATER_LEVEL, 0);
-  const mesh = new THREE.Mesh(surface, paint(0xffffff, { water: true }));
+const FAR = 2400;
+// The two cut edges of the tile, each as a run of points from the far-off open sea to the back
+// corner: the back edge (u = u1) and the right edge (v = v1).
+const CUTS = [
+  { from: SQUARE.v0, to: SQUARE.v1, at: (s) => ({ x: toX(SQUARE.u1, s), z: toZ(SQUARE.u1, s) }) },
+  { from: SQUARE.u0, to: SQUARE.u1, at: (s) => ({ x: toX(s, SQUARE.v1), z: toZ(s, SQUARE.v1) }) },
+];
+const wall = (out, p0, p1, lo0, lo1, hi0, hi1) => out.push(p0.x, lo0, p0.z, p1.x, lo1, p1.z, p1.x, hi1, p1.z, p0.x, lo0, p0.z, p1.x, hi1, p1.z, p0.x, hi0, p0.z);
+function walls(data, material) {
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(data, 3));
+  geo.computeVertexNormals();
+  const mesh = new THREE.Mesh(geo, material);
   mesh.receiveShadow = true;
   return mesh;
+}
+
+/** The cut faces of the tile: the earth in section, from the base up to the ground. */
+export function buildSides() {
+  const earth = [];
+  for (const cut of CUTS) {
+    wall(earth, cut.at(-FAR), cut.at(cut.from), BASE_Y, BASE_Y, SEA_FLOOR, SEA_FLOOR);
+    for (let s = cut.from; s < cut.to; s++) {
+      const p0 = cut.at(s);
+      const p1 = cut.at(s + 1);
+      wall(earth, p0, p1, BASE_Y, BASE_Y, groundAt(p0.x, p0.z), groundAt(p1.x, p1.z));
+    }
+  }
+  return walls(earth, paint(0xffffff, { terrain: true, doubleSide: true }));
+}
+
+/**
+ * The sea. In front and to the left it has no edge: it runs out to a horizon that the view sets
+ * for itself (see `uHorizon`). Behind and on the right it is cut with the tile, and shows in
+ * section there, paler near the surface and deep blue below.
+ */
+export function buildWater() {
+  const group = new THREE.Group();
+  const corners = [[-FAR, -FAR], [-FAR, SQUARE.v1], [SQUARE.u1, SQUARE.v1], [SQUARE.u1, -FAR]].map(([u, v]) => [toX(u, v), WATER_LEVEL, toZ(u, v)]);
+  const surface = new THREE.BufferGeometry();
+  surface.setAttribute('position', new THREE.Float32BufferAttribute([0, 1, 2, 0, 2, 3].flatMap((i) => corners[i]), 3));
+  surface.computeVertexNormals();
+  const top = new THREE.Mesh(surface, paint(0xffffff, { water: true, doubleSide: true }));
+  top.receiveShadow = true;
+  group.add(top);
+
+  const shallow = [];
+  const deep = [];
+  const band = 1.4;
+  const section = (p0, p1, bed0, bed1) => {
+    if (bed0 >= WATER_LEVEL && bed1 >= WATER_LEVEL) return;
+    const [b0, b1] = [Math.min(bed0, WATER_LEVEL), Math.min(bed1, WATER_LEVEL)];
+    const [m0, m1] = [Math.max(b0, WATER_LEVEL - band), Math.max(b1, WATER_LEVEL - band)];
+    wall(deep, p0, p1, b0, b1, m0, m1);
+    wall(shallow, p0, p1, m0, m1, WATER_LEVEL, WATER_LEVEL);
+  };
+  for (const cut of CUTS) {
+    section(cut.at(-FAR), cut.at(cut.from), SEA_FLOOR, SEA_FLOOR);
+    for (let s = cut.from; s < cut.to; s++) {
+      const p0 = cut.at(s);
+      const p1 = cut.at(s + 1);
+      section(p0, p1, groundAt(p0.x, p0.z), groundAt(p1.x, p1.z));
+    }
+  }
+  group.add(walls(shallow, paint(0x6cc0d6, { doubleSide: true })), walls(deep, paint(0x2f7cc0, { doubleSide: true })));
+  return group;
 }
 
 export function scatterInstanced(scene, rng, geo, mat, count, place) {

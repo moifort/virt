@@ -63,6 +63,17 @@ export function lamplight(parent, x, y, z, reach = 6.5) {
   return mark;
 }
 
+/**
+ * Marks a place to sit at a point of `parent`, at the height of the seat. Whoever sits there
+ * faces the mark's own +z, turned by `yaw`.
+ */
+export function seat(parent, x, y, z, yaw = 0) {
+  const mark = at(new THREE.Object3D(), x, y, z, parent);
+  mark.rotation.y = yaw;
+  mark.userData.seat = true;
+  return mark;
+}
+
 export const INK = 0x2b2533;
 export const STONE = 0xe8d9c0;
 export const DARK_WOOD = 0x8a5a41;

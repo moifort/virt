@@ -1,11 +1,12 @@
 // Things that move: butterflies over the meadows, gulls over the bay, sailboats crossing it,
+// whales and dolphins passing now and then far out,
 // fishing boats that light their lamps at dusk, and fireflies on summer nights.
 import * as THREE from 'three';
-import { pick } from './noise.js';
+import { hash, pick } from './noise.js';
 import { PAL, WATER_LEVEL, paint, solid } from './style.js';
 import { INK, WARM_LIGHT, at, ball, cyl, lamplight, live } from './kit.js';
 import { gozzo } from './zones.js';
-import { coastU, groundAt, isWild, randomSpot, toX, toZ } from './terrain.js';
+import { UP, coastU, groundAt, isWild, randomSpot, toX, toZ } from './terrain.js';
 
 /** A herring gull on the wing: white, with grey wings tipped in black. */
 function gull() {
@@ -23,6 +24,117 @@ function gull() {
     return { shoulder, hand, s };
   });
   return { group: g, wings };
+}
+
+// Stretches of deep open water where the big animals show themselves, in (u, v).
+const OFFING = [[-84, -30], [-88, 20], [-80, 62], [-70, -70], [10, -128], [60, -132], [-90, -5]];
+const offing = (k) => OFFING[Math.floor(hash(k, 77) * OFFING.length)];
+
+/**
+ * Whales: now and then one surfaces far out, shows its long back, blows three times, lifts its
+ * flukes and sounds. Then the sea is empty again for a good while.
+ */
+function buildWhales(scene, animated) {
+  const SKIN = 0x46536a;
+  const BLOW = 6;
+  for (let w = 0; w < 2; w++) {
+    const g = live(new THREE.Group());
+    const body = at(new THREE.Group(), 0, 0, 0, g);
+    at(ball(1, SKIN, {}, 12, 8), 0, -0.5, 0, body).scale.set(1.7, 1.15, 6.2);
+    at(ball(1, 0x596780, {}, 8, 6), 0, 0.05, 2.6, body).scale.set(1.2, 0.6, 2.6);
+    at(solid(new THREE.ConeGeometry(0.4, 0.7, 4), paint(SKIN, { flat: true })), 0, 0.75, -2.6, body).rotation.x = -0.5;
+    // The flukes, on a stalk that swings up out of the water as the whale goes down.
+    const tail = at(new THREE.Group(), 0, -0.4, -5.6, body);
+    at(ball(1, SKIN, {}, 6, 5), 0, 0, -0.9, tail).scale.set(0.45, 0.4, 1.3);
+    for (const s of [-1, 1]) {
+      const fluke = at(ball(1, SKIN, {}, 6, 4), s * 1.0, 0, -2.1, tail);
+      fluke.scale.set(1.2, 0.14, 0.62);
+      fluke.rotation.y = s * 0.5;
+    }
+    const spout = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.42, 0), paint(0xf4f9ff, { flat: true }), BLOW);
+    spout.frustumCulled = false;
+    spout.castShadow = false;
+    scene.add(g, spout);
+    const m = new THREE.Matrix4();
+    const p = new THREE.Vector3();
+    const q = new THREE.Quaternion();
+    const s = new THREE.Vector3();
+    const EVERY = 95;
+    const SHOW = 27;
+    animated.push((t) => {
+      const clock = t + w * 47 + 55;
+      const visit = Math.floor(clock / EVERY);
+      const age = clock % EVERY;
+      g.visible = spout.visible = age < SHOW;
+      if (!g.visible) return;
+      // Each visit somewhere else, on a new heading.
+      const [u, v] = offing(visit * 2 + w);
+      const heading = hash(visit, w + 5) * Math.PI * 2;
+      const swum = age * 1.1 - 12;
+      g.position.set(toX(u, v) + Math.sin(heading) * swum, WATER_LEVEL, toZ(u, v) + Math.cos(heading) * swum);
+      g.rotation.y = heading;
+      // It rises, rolls gently at the surface, then arches and slides under, flukes last.
+      const up = Math.min(1, age / 2.5) * (1 - Math.max(0, (age - 21) / 4.5));
+      const dive = Math.min(1, Math.max(0, (age - 19.5) / 3));
+      body.position.y = -2.4 + up * 2.3 + Math.sin(t * 1.1) * 0.12;
+      body.rotation.x = dive * 0.5;
+      tail.rotation.x = -dive * 1.25;
+      // Three blows: a column of mist thrown up, drifting and thinning.
+      for (let k = 0; k < BLOW; k++) {
+        let size = 0.001;
+        for (const blown of [3, 9.5, 16]) {
+          const life = (age - blown - k * 0.09) / 2.6;
+          if (life < 0 || life > 1) continue;
+          const rise = Math.sqrt(life) * (3.2 + (k % 3) * 0.7);
+          p.set(Math.sin(k * 2.4) * life * 0.9, 0.5 + rise, 3.2 + Math.cos(k * 2.4) * life * 0.9).applyAxisAngle(UP, heading).add(g.position);
+          size = (0.5 + life * 1.1) * Math.sin(Math.min(1, (1 - life) * 2.4) * Math.PI * 0.5);
+        }
+        spout.setMatrixAt(k, m.compose(p, q, s.setScalar(size)));
+      }
+      spout.instanceMatrix.needsUpdate = true;
+    });
+  }
+}
+
+/**
+ * Dolphins: from time to time a school crosses the bay, leaping one after another in long
+ * low arcs, and is gone.
+ */
+function buildDolphins(scene, animated) {
+  const POD = 6;
+  const pod = [];
+  for (let i = 0; i < POD; i++) {
+    const g = live(new THREE.Group());
+    at(ball(1, 0x6f7f94, {}, 8, 6), 0, 0, 0, g).scale.set(0.34, 0.36, 1.3);
+    at(ball(1, 0xdfe6ee, {}, 6, 4), 0, -0.14, 0.15, g).scale.set(0.26, 0.24, 0.95);
+    at(solid(new THREE.ConeGeometry(0.1, 0.5, 4), paint(0x6f7f94, { flat: true })), 0, 0.02, 1.4, g).rotation.x = Math.PI / 2;
+    at(solid(new THREE.ConeGeometry(0.16, 0.42, 4), paint(0x5d6c80, { flat: true })), 0, 0.42, -0.1, g).rotation.x = -0.5;
+    for (const s of [-1, 1]) at(ball(1, 0x5d6c80, {}, 5, 4), s * 0.24, 0, -1.35, g).scale.set(0.3, 0.06, 0.2);
+    scene.add(g);
+    pod.push({ g, side: (i % 3) - 1 + (i % 2) * 0.4, back: Math.floor(i / 3) * 2.6 + (i % 2) * 1.1, phase: i * 1.9 });
+  }
+  const EVERY = 64;
+  const SHOW = 30;
+  const SPEED = 5.5;
+  animated.push((t) => {
+    const clock = t + 20;
+    const pass = Math.floor(clock / EVERY);
+    const age = clock % EVERY;
+    const out = age < SHOW;
+    // Each pass starts from another stretch of water and runs along the shore one way or the other.
+    const [u, v] = offing(pass * 3 + 1);
+    const heading = (hash(pass, 31) < 0.5 ? 0.75 : 1.75) * Math.PI + (hash(pass, 9) - 0.5) * 0.7;
+    const [dx, dz] = [Math.sin(heading), Math.cos(heading)];
+    for (const { g, side, back, phase } of pod) {
+      g.visible = out;
+      if (!out) continue;
+      const along = (age - SHOW / 2) * SPEED - back;
+      const arc = t * 2.3 + phase;
+      g.position.set(toX(u, v) + dx * along + dz * side * 1.6, WATER_LEVEL - 0.35 + Math.sin(arc) * 1.25, toZ(u, v) + dz * along - dx * side * 1.6);
+      // Nose up on the way out of the water, down on the way back in.
+      g.rotation.set(-Math.cos(arc) * 0.7, heading, 0, 'YXZ');
+    }
+  });
 }
 
 export function buildLife(scene, rng, animated) {
@@ -121,6 +233,9 @@ export function buildLife(scene, rng, animated) {
       boat.rotation.z = Math.sin(t * 0.9 + i) * 0.05;
     });
   }
+
+  buildWhales(scene, animated);
+  buildDolphins(scene, animated);
 
   // Fireflies: on warm nights they drift and wink over the grass at the edge of the groves.
   const FLIES = 90;

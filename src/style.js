@@ -69,8 +69,6 @@ export const GLOBALS = {
   // Where the endless sea meets the sky: the direction the view looks in on the ground (x, z)
   // and how far along it the horizon lies; and the haze the far water pales into.
   uHorizon: { value: new THREE.Vector3(0, -1, 1e4) },
-  // The paved quay of the harbour: its middle (x, z) and its reach.
-  uQuay: { value: new THREE.Vector3(0, 0, -1) },
   uHaze: { value: new THREE.Color(0.8, 0.9, 0.95) },
   // The road of light on the sea: the level direction square to the light (x, z), where the
   // road lies along it, and how bright it is.
@@ -214,7 +212,6 @@ float pxGroundAt(vec2 xz) {
 
 #ifdef TERRAIN
 varying float vTerrace;
-uniform vec3 uQuay;
 // Dry-stone terrace walls and cliffs: weathered Ligurian sandstone, grey to warm ochre.
 const vec3 STRATA[6] = vec3[6](${[0xcdbb9c, 0xb8a88e, 0xd9c9a8, 0xc2ad8a, 0xa99c88, 0xcfb692].map(lin).join(', ')});
 // 1 inside a puddle.
@@ -261,7 +258,11 @@ vec3 terrainColor(vec3 w, vec3 n) {
   float below = w.y - pxGroundAt(w.xz - uphill * 0.9);
   float creep = pxNoise(w.xz * 0.45 + 3.0);
   float ivy = smoothstep(0.56, 0.8, pxNoise(w.xz * 0.13 + 50.0));
-  if (above < 0.45 + creep * 0.55 + ivy * 1.5) cliff = fine > 0.55 ? ${lin(0x7aa05c)} : kind > 0.8 ? ${lin(0x9cbc68)} : ${lin(0x55865a)};
+  // Where the tile is cut the ground shows in section instead: turf, a band of brown earth
+  // under it, then the bedrock.
+  float buried = pxGroundAt(w.xz) - w.y;
+  if (abs(n.y) < 0.02) cliff = buried < 0.4 ? ${lin(0x7aa05c)} : buried < 1.5 + creep ? (fine > 0.8 ? ${lin(0x7a5e46)} : ${lin(0x94745a)}) : cliff * 0.94;
+  else if (above < 0.45 + creep * 0.55 + ivy * 1.5) cliff = fine > 0.55 ? ${lin(0x7aa05c)} : kind > 0.8 ? ${lin(0x9cbc68)} : ${lin(0x55865a)};
   else if (below < 0.25 + creep * 0.3) cliff *= vec3(0.84, 0.9, 0.82);
   // Where the sea washes the rock it is dark and weedy.
   if (w.y < ${(WATER_LEVEL + 0.7).toFixed(2)} + creep * 0.5) cliff = fine > 0.7 ? ${lin(0x5c7a5c)} : ${lin(0x7a7468)};
@@ -311,13 +312,6 @@ vec3 terrainColor(vec3 w, vec3 n) {
     if (kind > 0.985) col = ${lin(0xd8a890)};
   }
   if (w.y < ${(WATER_LEVEL + 0.4).toFixed(2)}) col = ${lin(0xdccba6)};
-  // The harbour quay is paved with setts of grey and ochre stone, dark in the joints.
-  if (slope < 0.3 && distance(w.xz, uQuay.xy) < uQuay.z) {
-    vec2 paving = vec2(w.x + w.z, w.x - w.z) * 1.1;
-    float sett = pxHash(floor(paving));
-    col = sett > 0.7 ? ${lin(0xd8cdb8)} : sett > 0.35 ? ${lin(0xc6baa4)} : ${lin(0xb2a894)};
-    if (fract(paving.x) < 0.14 || fract(paving.y) < 0.14) col *= 0.82;
-  }
 
   // Rain gathers in the hollows of level ground, on the trodden paths first.
   if (uWet.y > 0.01 && slope < 0.05 && w.y > ${(WATER_LEVEL + 1.3).toFixed(2)}) {

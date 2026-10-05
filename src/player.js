@@ -69,6 +69,8 @@ export class Player {
     this.hop = 0;
     this.blink = 0;
     this.placed = false;
+    this.seat = null; // the seat he is sitting on, if any
+    this.perch = new THREE.Vector3();
 
     this.body = pivot(0, 0, 0, this.root);
 
@@ -187,6 +189,22 @@ export class Player {
     return best;
   }
 
+  /** Sits down on a seat of the world ({ position, yaw }): hips on it, facing the way it faces. */
+  sit(seat) {
+    this.seat = seat;
+    this.step = null;
+    this.perch = seat.position.clone();
+    this.perch.y -= 0.42;
+  }
+
+  /** Gets up, back onto the nearest tile. */
+  stand() {
+    this.seat = null;
+    this.position.copy(snapToTile(this.position));
+    this.position.y = groundAt(this.position.x, this.position.z);
+    this.hop = 1;
+  }
+
   walkable(target, from) {
     const ground = groundAt(target.x, target.z);
     if (ground < WATER_LEVEL - 0.2) return false;
@@ -199,6 +217,16 @@ export class Player {
       this.position.copy(snapToTile(this.position));
       this.position.y = groundAt(this.position.x, this.position.z);
       this.placed = true;
+    }
+
+    // Seated: he stays put until a direction or a hop gets him up again.
+    if (this.seat) {
+      if (this.wantedDirection(input, camYaw) < 0 && !input.jump) {
+        this.position.lerp(this.perch, 1 - Math.exp(-dt * 12));
+        this.animate(dt, t, 0);
+        return;
+      }
+      this.stand();
     }
 
     // Tile-by-tile movement: start a step whenever a key is held and no step is running.
@@ -246,7 +274,7 @@ export class Player {
 
   animate(dt, t, progress) {
     const dir = DIRECTIONS[this.facing];
-    this.heading = lerpAngle(this.heading, Math.atan2(dir.x, dir.z), 1 - Math.exp(-dt * 25));
+    this.heading = lerpAngle(this.heading, this.seat ? this.seat.yaw : Math.atan2(dir.x, dir.z), 1 - Math.exp(-dt * (this.seat ? 10 : 25)));
     this.root.rotation.y = this.heading;
 
     const moving = this.step ? 1 : 0;
@@ -254,10 +282,12 @@ export class Player {
     const swing = Math.sin(progress * Math.PI) * moving;
 
     // Gather-like step: one leg forward per tile, arms in opposition, a bounce on each tile.
-    this.legs[0].rotation.x = damp(this.legs[0].rotation.x, -swing * 0.7 * side, 30, dt);
-    this.legs[1].rotation.x = damp(this.legs[1].rotation.x, swing * 0.7 * side, 30, dt);
-    this.arms[0].rotation.x = damp(this.arms[0].rotation.x, swing * 0.6 * side, 30, dt);
-    this.arms[1].rotation.x = damp(this.arms[1].rotation.x, -swing * 0.6 * side, 30, dt);
+    // Seated, both legs come forward and the hands rest on the knees.
+    const sat = this.seat ? 1 : 0;
+    this.legs[0].rotation.x = damp(this.legs[0].rotation.x, sat ? -1.45 : -swing * 0.7 * side, sat ? 12 : 30, dt);
+    this.legs[1].rotation.x = damp(this.legs[1].rotation.x, sat ? -1.45 : swing * 0.7 * side, sat ? 12 : 30, dt);
+    this.arms[0].rotation.x = damp(this.arms[0].rotation.x, sat ? -0.5 : swing * 0.6 * side, sat ? 12 : 30, dt);
+    this.arms[1].rotation.x = damp(this.arms[1].rotation.x, sat ? -0.5 : -swing * 0.6 * side, sat ? 12 : 30, dt);
     this.torso.rotation.z = swing * 0.06 * side;
     this.torso.rotation.x = damp(this.torso.rotation.x, moving * (this.step?.run ? 0.14 : 0.05), 12, dt);
 
