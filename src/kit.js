@@ -82,18 +82,18 @@ export function plant(parent, x, y, z, rng) {
   at(leaves, x, y + 1.1, z, parent);
 }
 
-/** Mœbius street lamp: ringed post, curled crook, hanging glass orb. */
+/** Old Italian street lamp: fluted cast-iron post, scrolled bracket, four-sided glass lantern. */
 export function lantern(parent, x, y, z, color = WARM_LIGHT) {
   const g = at(new THREE.Group(), x, y, z, parent);
-  at(cyl(0.2, 0.26, 0.3, INK, 6), 0, 0.15, 0, g);
-  at(cyl(0.06, 0.09, 2.8, INK, 6), 0, 1.6, 0, g);
-  for (const h of [0.7, 1.9]) at(cyl(0.12, 0.12, 0.08, PAL.saffron, 6), 0, h, 0, g);
-  const crook = at(solid(new THREE.TorusGeometry(0.32, 0.05, 4, 10, Math.PI * 1.2), paint(INK)), 0.32, 3.0, 0, g);
-  crook.rotation.z = -0.1;
-  at(cyl(0.015, 0.015, 0.3, INK, 3), 0.64, 2.85, 0, g);
-  at(cone(0.22, 0.18, INK, 6), 0.64, 2.66, 0, g);
-  at(ball(0.2, color, { glow: true }, 8, 6), 0.64, 2.45, 0, g);
-  at(ball(0.05, INK, {}, 4, 3), 0.64, 2.22, 0, g);
+  at(cyl(0.16, 0.24, 0.5, INK, 6), 0, 0.25, 0, g);
+  at(cyl(0.06, 0.09, 2.7, INK, 6), 0, 1.6, 0, g);
+  at(cyl(0.11, 0.11, 0.1, INK, 6), 0, 0.9, 0, g);
+  at(box(0.6, 0.06, 0.06, INK), 0.3, 2.9, 0, g);
+  const scroll = at(solid(new THREE.TorusGeometry(0.2, 0.035, 4, 8, Math.PI), paint(INK)), 0.3, 2.68, 0, g);
+  scroll.rotation.z = Math.PI;
+  at(cyl(0.2, 0.13, 0.42, color, 4, { glow: true }), 0.6, 2.55, 0, g).rotation.y = Math.PI / 4;
+  at(cone(0.28, 0.2, INK, 4), 0.6, 2.86, 0, g).rotation.y = Math.PI / 4;
+  at(cyl(0.14, 0.14, 0.05, INK, 4), 0.6, 2.32, 0, g).rotation.y = Math.PI / 4;
 }
 
 

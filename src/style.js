@@ -1,4 +1,4 @@
-// Visual language: Mœbius palette rendered as 3D pixel art.
+// Visual language: the natural colours of the Ligurian coast, rendered as 3D pixel art.
 // Every world material goes through `paint()`: two-tone cel lighting with hue-shifted shadows,
 // drifting cloud shadows, and a second render target output carrying view-space normals.
 import * as THREE from 'three';
@@ -13,9 +13,9 @@ export const PAL = {
   lilac: 0xb7a0cf,
   cream: 0xf7ecd4,
   wetSand: 0xc9b48e,
-  grass: 0x9fd09a,
-  grassDeep: 0x6fb08f,
-  moss: 0x93c9a0,
+  grass: 0x93b56a,
+  grassDeep: 0x648f52,
+  moss: 0x7fa562,
   teal: 0x4fb0a8,
   ivory: 0xf3ead6,
   coral: 0xe9765c,
@@ -112,8 +112,8 @@ float pxFbm(vec2 p) {
 }
 
 #ifdef TERRAIN
-// Dry-stone terrace walls: warm, muted, a touch of Mœbius rose and lilac.
-const vec3 STRATA[6] = vec3[6](${[0xe8cfa6, 0xdcb9a6, 0xf0dfbd, 0xdcc394, 0xcbbccf, 0xe2ad92].map(lin).join(', ')});
+// Dry-stone terrace walls and cliffs: weathered Ligurian sandstone, grey to warm ochre.
+const vec3 STRATA[6] = vec3[6](${[0xcdbb9c, 0xb8a88e, 0xd9c9a8, 0xc2ad8a, 0xa99c88, 0xcfb692].map(lin).join(', ')});
 
 float pxSegment(vec2 p, vec4 s) {
   vec2 pa = p - s.xy;
@@ -123,9 +123,10 @@ float pxSegment(vec2 p, vec4 s) {
 }
 
 vec3 terrainColor(vec3 w, vec3 n) {
-  // Cliffs: wavy sedimentary strata, the signature of Mœbius deserts.
+  // Cliffs and walls: irregular courses of stone, broken up so they never read as stripes.
   float wobble = (pxNoise(w.xz * 0.22) - 0.5) * 1.1;
-  int band = int(mod(floor((w.y + wobble) / 1.1), 6.0));
+  float course = floor((w.y + wobble) / 0.55);
+  int band = int(mod(course + floor(pxHash(vec2(course, floor((w.x + w.z) * 0.45 + course * 0.5))) * 3.0), 6.0));
   vec3 cliff = STRATA[band];
 
   // Flats: meadows and sand in organic patches, with a fine speckle.
@@ -136,6 +137,8 @@ vec3 terrainColor(vec3 w, vec3 n) {
   vec3 flat_ = green > 0.5
     ? (pxNoise(w.xz * 0.35) > 0.55 ? ${lin(PAL.grassDeep)} : ${lin(PAL.grass)})
     : (pxNoise(w.xz * 0.3) > 0.62 ? ${lin(PAL.sandDeep)} : ${lin(PAL.sand)});
+  // Away from the shore the bare patches are sun-dried grass and earth, not sand.
+  if (green < 0.5 && w.y > 3.0) flat_ = pxNoise(w.xz * 0.3) > 0.62 ? ${lin(0xc2ac72)} : ${lin(0xd2be82)};
   if (speck > 0.93) flat_ *= green > 0.5 ? 0.88 : 1.06;
 
   // Footpaths between the work areas.

@@ -1,11 +1,10 @@
-// Things that move: butterflies, airships, floating islands, boats.
+// Things that move: butterflies and boats.
 import * as THREE from 'three';
 import { pick } from './noise.js';
-import { PAL, WATER_LEVEL, paint, solid } from './style.js';
-import { at, ball, cone, cyl } from './kit.js';
-import { tree } from './nature.js';
+import { PAL, WATER_LEVEL, paint } from './style.js';
+import { at } from './kit.js';
 import { gozzo } from './zones.js';
-import { footU, groundAt, isWild, randomSpot, toX, toZ } from './terrain.js';
+import { groundAt, isWild, randomSpot, toX, toZ } from './terrain.js';
 
 export function buildLife(scene, rng, animated) {
   // Butterflies fluttering over the meadows.
@@ -32,51 +31,6 @@ export function buildLife(scene, rng, animated) {
       wings[0].rotation.z = flap;
       wings[1].rotation.z = -flap;
     });
-  }
-
-  // Jellyfish airships drifting overhead, dragging their shadows across the valley.
-  for (let i = 0; i < 3; i++) {
-    const g = new THREE.Group();
-    const R = 2.4 + rng() * 1.2;
-    at(solid(new THREE.SphereGeometry(R, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), paint(pick(rng, [PAL.rose, PAL.lilac, PAL.teal]))), 0, 0, 0, g);
-    const belly = at(new THREE.Mesh(new THREE.CircleGeometry(Math.sin(Math.PI * 0.55) * R, 18), paint(PAL.plum)), 0, Math.cos(Math.PI * 0.55) * R, 0, g);
-    belly.rotation.x = Math.PI / 2;
-    at(ball(0.6, PAL.saffron, { glow: true }, 8, 6), 0, -R * 0.9, 0, g);
-    const strands = [];
-    for (let k = 0; k < 6; k++) {
-      const a = (k / 6) * Math.PI * 2;
-      const pivot = at(new THREE.Group(), Math.cos(a) * R * 0.55, belly.position.y, Math.sin(a) * R * 0.55, g);
-      at(cyl(0.08, 0.04, R * 1.6, PAL.ivory, 4), 0, -R * 0.8, 0, pivot);
-      strands.push(pivot);
-    }
-    scene.add(g);
-    const orbit = { r: 40 + rng() * 40, speed: 0.015 + rng() * 0.015, phase: rng() * 6, alt: 22 + rng() * 8 };
-    animated.push((t) => {
-      const a = t * orbit.speed + orbit.phase;
-      const x = Math.cos(a) * orbit.r;
-      const z = Math.sin(a) * orbit.r;
-      g.position.set(x, Math.max(groundAt(x, z), WATER_LEVEL) + orbit.alt + Math.sin(t * 0.6 + orbit.phase) * 1.2, z);
-      strands.forEach((p, k) => {
-        p.rotation.x = Math.sin(t * 1.3 + k) * 0.25;
-        p.rotation.z = Math.cos(t * 1.1 + k * 1.7) * 0.25;
-      });
-    });
-  }
-
-  // Floating islands above the mountain.
-  for (let i = 0; i < 3; i++) {
-    const v = -70 + i * 70;
-    const u = Math.min(95, footU(v) + 30 + rng() * 15);
-    const g = new THREE.Group();
-    const R = 2.5 + rng() * 2;
-    at(cyl(R, R * 0.9, 1, PAL.grass, 9, { flat: true }), 0, 0, 0, g);
-    at(cone(R * 0.9, R * 2, PAL.rose, 9, { flat: true }), 0, -0.5 - R, 0, g).rotation.x = Math.PI;
-    at(tree(rng), 0, 0.5, 0, g);
-    const x = toX(u, v);
-    const z = toZ(u, v);
-    const baseY = groundAt(x, z) + 16 + rng() * 6;
-    scene.add(at(g, x, baseY, z));
-    animated.push((t) => (g.position.y = baseY + Math.sin(t * 0.4 + i) * 0.8));
   }
 
   // Sailboats crossing the bay.
