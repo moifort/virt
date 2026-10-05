@@ -31,33 +31,6 @@
       canvas:active {
         cursor: grabbing;
       }
-      .panel {
-        position: fixed;
-        background: var(--paper);
-        border: 3px solid var(--ink);
-        box-shadow: 3px 3px 0 var(--ink);
-        padding: 6px 12px;
-      }
-      #title {
-        top: 15px;
-        left: 15px;
-        font-weight: 700;
-        font-size: 21px;
-        letter-spacing: 0.04em;
-      }
-      #title small {
-        display: block;
-        font-weight: 400;
-        font-size: 13px;
-        color: var(--red);
-      }
-      #help {
-        bottom: 15px;
-        left: 50%;
-        transform: translateX(-50%);
-        font-size: 14px;
-        white-space: nowrap;
-      }
     </style>
     <script type="importmap">
       {
@@ -69,8 +42,6 @@
     </script>
   </head>
   <body>
-    <div id="title" class="panel">VIRT · Les Jardins de Sable<small>espace de travail virtuel</small></div>
-    <div id="help" class="panel">ZQSD bouger · Maj courir · Espace sauter · A / E pivoter · glisser : caméra · molette : zoom</div>
     <script type="module" src="src/main.js"></script>
   </body>
 </html>
