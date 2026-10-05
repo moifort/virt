@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { mulberry32, pick } from './noise.js';
 import { PAL, WATER_LEVEL, paint, solid } from './style.js';
-import { DARK_WOOD, INK, SCREEN, STONE, WARM_LIGHT, at, ball, box, cone, cyl, lamplight, lantern, live, plant, ring, screen } from './kit.js';
+import { DARK_WOOD, INK, SCREEN, STONE, WARM_LIGHT, at, bake, ball, box, cone, cyl, lamplight, lantern, live, plant, ring, screen } from './kit.js';
 import { SUN_DIR, ZONES, groundAt } from './terrain.js';
 
 /** Shelves of books along a wall. axis 'x' runs along x facing +z; axis 'z' runs along z facing +x. */
@@ -525,6 +525,56 @@ export function gozzo(rng, sail = false) {
   return g;
 }
 
+/**
+ * A little red seaplane of the Adriatic kind: a boat hull, one high wing on struts with the
+ * engine in a pod above it, floats under the wing tips, the tricolour on its fin. Returns the
+ * plane and its propeller.
+ */
+export function seaplane() {
+  const g = new THREE.Group();
+  const RED = 0xc9382e;
+  const DEEP = 0x8f2a24;
+  const hull = at(ball(1, RED, {}, 12, 8), 0, 0.55, 0, g);
+  hull.scale.set(0.72, 0.62, 3.6);
+  at(box(0.9, 0.12, 5.0, DEEP), 0, 0.16, 0.2, g);
+  at(box(0.66, 0.28, 1.1, INK), 0, 1.04, 0.5, g);
+  at(box(0.7, 0.4, 0.08, 0x9fd8e8), 0, 1.24, 1.1, g).rotation.x = -0.45;
+  at(ball(0.2, PAL.skin, {}, 6, 4), 0, 1.28, 0.5, g);
+  // The wing, carried above the hull, with a cream band at each tip.
+  at(box(9.6, 0.16, 1.7, RED), 0, 2.35, 0.6, g);
+  for (const s of [-1, 1]) {
+    at(box(1.1, 0.17, 1.72, PAL.ivory), s * 3.9, 2.35, 0.6, g);
+    at(cyl(0.85, 0.85, 0.16, RED, 10), s * 4.8, 2.35, 0.6, g).scale.z = 1;
+    for (const z of [0.1, 1.1]) at(box(0.07, 1.5, 0.07, INK), s * 0.5, 1.6, z, g).rotation.z = s * 0.2;
+    // Stabilising floats on their struts.
+    const float = at(ball(1, RED, {}, 8, 6), s * 3.7, 0.3, 0.6, g);
+    float.scale.set(0.24, 0.24, 1.0);
+    for (const z of [0.2, 1.0]) at(box(0.06, 1.9, 0.06, INK), s * 3.7, 1.3, z, g);
+  }
+  // The engine pod above the wing, and its two-bladed propeller.
+  at(cyl(0.36, 0.3, 1.6, 0x8a8a96, 8), 0, 2.95, 0.6, g).rotation.x = Math.PI / 2;
+  for (const s of [-1, 1]) at(box(0.07, 0.6, 0.07, INK), s * 0.22, 2.62, 0.6, g);
+  const prop = at(live(new THREE.Group()), 0, 2.95, 1.45, g);
+  at(box(0.14, 2.0, 0.05, 0x5a4034), 0, 0, 0, prop);
+  at(ball(0.14, 0xd8d4e0, {}, 6, 4), 0, 0, 0.02, prop);
+  // Tailplane and fin, the fin striped green, white and red.
+  at(box(2.8, 0.1, 0.9, RED), 0, 1.25, -3.1, g);
+  at(box(0.1, 1.3, 1.0, RED), 0, 1.5, -3.2, g);
+  [0x3f8a55, PAL.ivory, RED].forEach((color, i) => at(box(0.12, 0.8, 0.26, color), 0, 1.7, -3.52 + i * 0.26, g));
+  return { plane: bake(g), prop };
+}
+
+/** A string of little coloured lamps sagging between two points, as hung for a village fête. */
+export function festoon(parent, ax, ay, az, bx, by, bz, sag = 0.7) {
+  const bulbs = [WARM_LIGHT, PAL.saffron, 0xffb8a8, 0x9fe8d8, WARM_LIGHT, PAL.pink];
+  const n = Math.max(3, Math.round(Math.hypot(bx - ax, by - ay, bz - az) / 0.85));
+  for (let i = 1; i < n; i++) {
+    const t = i / n;
+    at(ball(0.13, bulbs[i % bulbs.length], { glow: true }, 5, 4), ax + (bx - ax) * t, ay + (by - ay) * t - Math.sin(t * Math.PI) * sag, az + (bz - az) * t, parent);
+  }
+  lamplight(parent, (ax + bx) / 2, (ay + by) / 2, (az + bz) / 2, 5.5);
+}
+
 /** Tall striped lighthouse on an octagonal base, with a gallery and a glowing lantern room. */
 export function lighthouse(parent, x, y, z) {
   const g = at(new THREE.Group(), x, y, z, parent);
@@ -541,6 +591,8 @@ export function lighthouse(parent, x, y, z) {
   at(ring(1.65, 0.06, INK, Math.PI * 2, 18), 0, top + 0.95, 0, g).rotation.x = Math.PI / 2;
   for (let k = 0; k < 12; k++) at(cyl(0.04, 0.04, 0.8, INK, 4), Math.cos((k / 12) * Math.PI * 2) * 1.65, top + 0.6, Math.sin((k / 12) * Math.PI * 2) * 1.65, g);
   at(cyl(1.05, 1.05, 1.6, PAL.saffron, 10, { glow: true }), 0, top + 1.1, 0, g);
+  // Where the beam that sweeps the sea at night comes from.
+  at(new THREE.Object3D(), 0, top + 1.1, 0, g).userData.beacon = true;
   for (let k = 0; k < 6; k++) at(box(0.08, 1.6, 0.08, INK), Math.cos((k / 6) * Math.PI * 2) * 1.07, top + 1.1, Math.sin((k / 6) * Math.PI * 2) * 1.07, g);
   at(solid(new THREE.SphereGeometry(1.25, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), paint(PAL.red)), 0, top + 1.9, 0, g);
   at(cyl(0.06, 0.06, 1.2, INK, 4), 0, top + 3.4, 0, g);
@@ -599,6 +651,18 @@ export function buildPort(g, rng, animated) {
     at(cyl(0.2, 0.2, 0.06, INK, 6), x, 0.6, Q + 1.3, g);
   }
   for (const x of [-18, -6, 6, 18]) lantern(g, x, 0.2, Q - 0.9);
+  // Strings of little lamps from one quay lantern to the next.
+  for (const x of [-18, -6, 6]) festoon(g, x + 0.6, 3.0, Q - 0.9, x + 12.6, 3.0, Q - 0.9, 0.8);
+
+  // A red seaplane rides at its buoy off the ends of the piers, its propeller idling.
+  const { plane, prop } = seaplane();
+  at(live(plane), -1, surface + 0.1, Q + 28, g).rotation.y = 0.5;
+  at(cyl(0.3, 0.2, 0.5, PAL.red, 8), 2.5, surface + 0.1, Q + 31.5, g);
+  animated.push((t, dt) => {
+    plane.position.y = surface + 0.1 + Math.sin(t * 1.0) * 0.07;
+    plane.rotation.z = Math.sin(t * 0.8) * 0.03;
+    prop.rotation.z += dt * 3;
+  });
 
   // A straight jetty to the left, and a long curved boardwalk to the right, out to the lighthouse.
   const plank = (x, z, yaw, width) => {
@@ -691,6 +755,14 @@ export function buildAgora(g, rng) {
     at(ball(2.1 + (k % 3) * 0.3, color, { flat: true, leaf: true }, 9, 6), 0, 5, 0, tilt);
   });
   at(ball(2.6, 0x5a8050, { flat: true, leaf: true }, 9, 6), 0, 11.5, 0, g);
+  // Strings of little lamps fan out from the trunk to a ring of posts, for the evenings.
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2;
+    const b = ((k + 1) / 6) * Math.PI * 2;
+    at(cyl(0.07, 0.1, 3.6, DARK_WOOD, 5), Math.cos(a) * 9.4, 1.8, Math.sin(a) * 9.4, g);
+    festoon(g, Math.cos(a) * 1.1, 5.6, Math.sin(a) * 1.1, Math.cos(a) * 9.4, 3.6, Math.sin(a) * 9.4, 0.9);
+    festoon(g, Math.cos(a) * 9.4, 3.6, Math.sin(a) * 9.4, Math.cos(b) * 9.4, 3.6, Math.sin(b) * 9.4, 0.6);
+  }
   for (let k = 0; k < 6; k++) {
     const a = (k / 6) * Math.PI * 2 + Math.PI / 6;
     const bench = at(new THREE.Group(), Math.cos(a) * 7, 0, Math.sin(a) * 7, g);

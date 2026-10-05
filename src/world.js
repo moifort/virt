@@ -59,6 +59,14 @@ export function createWorld(scene) {
   buildRailway(scene, animated);
   buildSky(scene, rng, animated);
   GLOBALS.uLampMap.value = lampMap(scene);
+  // The lighthouse turns its beam once every quarter of a minute, as long as the lamps are lit.
+  scene.updateMatrixWorld(true);
+  scene.traverse((obj) => {
+    if (!obj.userData.beacon) return;
+    const lamp = obj.getWorldPosition(new THREE.Vector3());
+    GLOBALS.uBeam.value.set(lamp.x, lamp.z, 0, 0);
+  });
+  animated.push((t) => GLOBALS.uBeam.value.setZ(t * 0.42).setW(GLOBALS.uLamps.value.x));
 
   return {
     /** @param {import('./climate.js').Climate} climate the sky of the moment, for whatever lives by it */
@@ -88,7 +96,11 @@ function lampMap(scene) {
     for (let iz = Math.max(0, Math.floor(cz - r)); iz <= Math.min(SIZE - 1, Math.ceil(cz + r)); iz++) {
       for (let ix = Math.max(0, Math.floor(cx - r)); ix <= Math.min(SIZE - 1, Math.ceil(cx + r)); ix++) {
         const d = Math.hypot(ix + 0.5 - cx, iz + 0.5 - cz) / r;
-        if (d < 1) data[iz * SIZE + ix] = Math.min(255, data[iz * SIZE + ix] + 255 * (1 - d) ** 1.5);
+        if (d >= 1) continue;
+        // Where pools overlap the brighter one wins, with a little of the other added.
+        const light = 255 * (1 - d) ** 1.5;
+        const lit = data[iz * SIZE + ix];
+        data[iz * SIZE + ix] = Math.min(255, Math.max(lit, light) + Math.min(lit, light) * 0.3);
       }
     }
   });

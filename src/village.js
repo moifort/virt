@@ -7,7 +7,7 @@
 // a handful of draw calls.
 import * as THREE from 'three';
 import { fbm, pick } from './noise.js';
-import { PAL, paint } from './style.js';
+import { PAL, WATER_LEVEL, paint } from './style.js';
 import { lamplight } from './kit.js';
 import { SQUARE, VILLAGES, cultivated, estateWeight, footU, groundAt, isWild, slopeAt, toX, toZ, UP } from './terrain.js';
 
@@ -155,11 +155,11 @@ function house(parts, rng, w, d, floors, sunk) {
   parts.onFace(0, w, d, 'box', doorX, 0.85, 0.05, 0.72, 1.45, 0.05, pick(rng, [WOOD, 0x4a7a58, 0x5a4034, 0x4a6a8a, 0x8a3a3a]));
   parts.onFace(0, w, d, 'arch', doorX, 1.58, 0.04, 0.72, 0.72, 0.05, GLASS);
   parts.onFace(0, w, d, 'box', doorX, 0.08, 0.2, 1.1, 0.16, 0.42, STONE);
-  if (rng() < 0.6) {
+  if (rng() < 0.45) {
     const side = doorX > 0 ? -1 : 1;
     parts.onFace(0, w, d, 'box', doorX + side * 0.72, 2.1, 0.16, 0.05, 0.05, 0.3, IRON);
     parts.onFace(0, w, d, 'lamp', doorX + side * 0.72, 1.92, 0.3, 0.24, 0.3, 0.24, WARM_LIGHT);
-    parts.lights.push({ p: parts.world(doorX + side * 0.72, 1.9, d / 2 + 1), reach: 4.2 });
+    parts.lights.push({ p: parts.world(doorX + side * 0.72, 1.9, d / 2 + 1), reach: 3.8 });
   }
 
   // Windows on the three visible faces, floor by floor.
@@ -343,7 +343,7 @@ export function buildVillages(scene, rng, animated) {
         const x = toX(ju, jv);
         const z = toZ(ju, jv);
         if (rng() < 0.05 || (village.bell && Math.hypot(ju - village.cu, jv - village.cv) < 3.5)) continue;
-        if (!isWild(x, z, -2) || slopeAt(x, z) > 1.8 || groundAt(x, z) < 0.5) continue;
+        if (!isWild(x, z, -2) || slopeAt(x, z) > 1.8 || groundAt(x, z) < WATER_LEVEL + 1.3) continue;
         placed.push([x, z]);
         parts.at(new THREE.Vector3(x, groundAt(x, z) - SUNK, z), yaw);
         // Taller houses toward the heart of the village.
