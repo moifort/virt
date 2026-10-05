@@ -1,6 +1,7 @@
-// The avatar, Gather-style: a chibi John Difool (red quiff, ochre coat, teal shirt) who moves
-// tile by tile on a grid aligned with the screen, so each arrow walks straight along its own axis,
-// with a little bounce on every step. Deepo the concrete seagull flutters around him.
+// The avatar, Gather-style: a chibi seaplane pilot after Porco Rosso (a pig's snout and ears,
+// moustache, round dark glasses, trench coat and felt hat) who moves tile by tile on a grid
+// aligned with the screen, so each arrow walks straight along its own axis, with a little
+// bounce on every step. A seagull flutters around him.
 import * as THREE from 'three';
 import { PAL, paint, solid } from './style.js';
 import { WATER_LEVEL, groundAt, inSquare } from './world.js';
@@ -37,10 +38,15 @@ function pivot(x, y, z, parent) {
   return g;
 }
 
-const SHOE = 0x4a3346;
-const TROUSERS = 0x3b3346;
-const COAT = 0xd9b25a;
-const HAIR = 0xd8642e;
+const SHOE = 0x5a4034;
+const TROUSERS = 0x4a4658;
+const COAT = 0xcfb387;
+const COAT_SHADE = 0xb89a6c;
+const BELT = 0x7a5a44;
+const SKIN = 0xeab99a;
+const SNOUT = 0xdfa286;
+const MOUSTACHE = 0x4a3a34;
+const HAT = 0xbfa678;
 
 /** Snaps a world position to the centre of its grid tile. */
 function snapToTile(p) {
@@ -53,7 +59,7 @@ export class Player {
   constructor() {
     this.root = new THREE.Group();
     this.position = this.root.position;
-    this.fx = new THREE.Group(); // world-space effects: dust, Deepo
+    this.fx = new THREE.Group(); // world-space effects: dust, the gull
     this.facing = 0;
     this.heading = Math.atan2(DIRECTIONS[0].x, DIRECTIONS[0].z);
     this.from = new THREE.Vector3();
@@ -74,12 +80,14 @@ export class Player {
       return hip;
     });
 
-    // Compact body: ochre coat over a teal shirt.
+    // Compact body: a belted trench coat with its collar up, over a white shirt and a red tie.
     this.torso = pivot(0, 0.4, 0, this.body);
-    part(new THREE.CylinderGeometry(0.38, 0.46, 0.78, 12), COAT, 0, 0.38, 0, this.torso);
-    part(new THREE.BoxGeometry(0.3, 0.62, 0.1), PAL.teal, 0, 0.44, 0.38, this.torso);
-    part(new THREE.CylinderGeometry(0.44, 0.46, 0.09, 12), 0x8a6a3a, 0, 0.1, 0, this.torso);
-    part(new THREE.BoxGeometry(0.14, 0.12, 0.06), PAL.saffron, 0, 0.1, 0.45, this.torso);
+    part(new THREE.CylinderGeometry(0.38, 0.5, 0.95, 12), COAT, 0, 0.3, 0, this.torso);
+    part(new THREE.BoxGeometry(0.26, 0.34, 0.1), PAL.ivory, 0, 0.6, 0.36, this.torso);
+    part(new THREE.BoxGeometry(0.08, 0.3, 0.05), PAL.red, 0, 0.58, 0.42, this.torso);
+    for (const s of [-1, 1]) part(new THREE.BoxGeometry(0.14, 0.36, 0.06), COAT_SHADE, s * 0.17, 0.6, 0.4, this.torso).rotation.z = s * 0.3;
+    part(new THREE.CylinderGeometry(0.455, 0.47, 0.09, 12), BELT, 0, 0.26, 0, this.torso);
+    part(new THREE.BoxGeometry(0.14, 0.12, 0.06), PAL.saffron, 0, 0.26, 0.46, this.torso);
     for (const x of [-0.2, 0.2]) part(new THREE.BoxGeometry(0.16, 0.28, 0.3), COAT, x, 0.8, -0.04, this.torso).rotation.z = x > 0 ? -0.3 : 0.3;
 
     // Little arms.
@@ -87,25 +95,35 @@ export class Player {
       const shoulder = pivot(s * 0.42, 0.68, 0, this.torso);
       shoulder.rotation.z = s * 0.18;
       part(new THREE.CylinderGeometry(0.1, 0.11, 0.42, 6), COAT, 0, -0.2, 0, shoulder);
-      part(new THREE.SphereGeometry(0.1, 8, 6), PAL.skin, 0, -0.44, 0, shoulder);
+      part(new THREE.CylinderGeometry(0.115, 0.115, 0.07, 6), COAT_SHADE, 0, -0.36, 0, shoulder);
+      part(new THREE.SphereGeometry(0.1, 8, 6), SKIN, 0, -0.44, 0, shoulder);
       return shoulder;
     });
 
-    // Big round head with large dot eyes: the Gather silhouette.
+    // Big round head, Gather-sized: a pig's snout and ears, a pilot's moustache, round dark
+    // glasses that catch the light.
     this.head = pivot(0, 1.0, 0, this.torso);
-    part(new THREE.SphereGeometry(0.56, 18, 14), PAL.skin, 0, 0.5, 0, this.head);
-    const hair = part(new THREE.SphereGeometry(0.58, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.52), HAIR, 0, 0.53, -0.04, this.head);
-    hair.rotation.x = -0.35;
-    part(new THREE.BoxGeometry(0.86, 0.5, 0.3), HAIR, 0, 0.36, -0.36, this.head);
-    for (const x of [-0.52, 0.52]) part(new THREE.BoxGeometry(0.1, 0.36, 0.22), HAIR, x, 0.38, 0.06, this.head);
-    this.quiff = pivot(0, 1.0, 0.2, this.head);
-    part(new THREE.ConeGeometry(0.26, 0.7, 6), HAIR, 0, 0.12, 0.14, this.quiff, { flat: true }).rotation.x = 0.95;
-    this.eyes = [-0.19, 0.19].map((x) => part(new THREE.BoxGeometry(0.11, 0.17, 0.05), PAL.ink, x, 0.5, 0.53, this.head));
-    for (const x of [-0.33, 0.33]) part(new THREE.SphereGeometry(0.07, 6, 4), 0xf2a6a6, x, 0.36, 0.47, this.head).scale.z = 0.4;
-    part(new THREE.BoxGeometry(0.14, 0.04, 0.04), 0x9a4a4a, 0, 0.28, 0.54, this.head);
+    part(new THREE.SphereGeometry(0.56, 18, 14), SKIN, 0, 0.5, 0, this.head);
+    part(new THREE.CylinderGeometry(0.2, 0.23, 0.2, 10), SNOUT, 0, 0.4, 0.55, this.head).rotation.x = Math.PI / 2;
+    for (const x of [-0.08, 0.08]) part(new THREE.BoxGeometry(0.06, 0.09, 0.03), 0x9a5a52, x, 0.41, 0.655, this.head);
+    for (const s of [-1, 1]) {
+      part(new THREE.BoxGeometry(0.22, 0.08, 0.06), MOUSTACHE, s * 0.16, 0.25, 0.56, this.head).rotation.z = -s * 0.45;
+      const ear = part(new THREE.ConeGeometry(0.15, 0.32, 4), SKIN, s * 0.52, 0.72, -0.04, this.head, { flat: true });
+      ear.rotation.z = -s * 1.0;
+      part(new THREE.CylinderGeometry(0.14, 0.14, 0.05, 10), PAL.ink, s * 0.21, 0.61, 0.5, this.head).rotation.x = Math.PI / 2;
+      part(new THREE.SphereGeometry(0.07, 6, 4), 0xf2a6a6, s * 0.38, 0.4, 0.42, this.head).scale.z = 0.4;
+    }
+    part(new THREE.BoxGeometry(0.16, 0.04, 0.04), PAL.ink, 0, 0.63, 0.52, this.head);
+    this.eyes = [-0.17, 0.25].map((x) => part(new THREE.BoxGeometry(0.05, 0.07, 0.03), PAL.ivory, x, 0.66, 0.535, this.head));
+    // A soft felt hat with a dark band, worn a little forward.
+    this.hat = pivot(0, 0.94, 0.02, this.head);
+    this.hat.rotation.x = 0.08;
+    part(new THREE.CylinderGeometry(0.66, 0.68, 0.06, 14), HAT, 0, 0, 0, this.hat);
+    part(new THREE.CylinderGeometry(0.4, 0.46, 0.36, 12), HAT, 0, 0.2, 0, this.hat);
+    part(new THREE.CylinderGeometry(0.47, 0.47, 0.1, 12), BELT, 0, 0.08, 0, this.hat);
 
     this.buildPuffs();
-    this.buildDeepo();
+    this.buildGull();
   }
 
   buildPuffs() {
@@ -131,26 +149,26 @@ export class Player {
     }
   }
 
-  /** Deepo, the concrete seagull: a grey stone gull with heavy wingbeats. */
-  buildDeepo() {
-    const concrete = 0xa9a6b4;
-    this.deepo = new THREE.Group();
-    const body = part(new THREE.SphereGeometry(0.32, 8, 6), concrete, 0, 0, 0, this.deepo, { flat: true });
+  /** The gull that keeps him company: white, grey-winged, never far from his shoulder. */
+  buildGull() {
+    const plumage = 0xf1efea;
+    this.gull = new THREE.Group();
+    const body = part(new THREE.SphereGeometry(0.32, 8, 6), plumage, 0, 0, 0, this.gull, { flat: true });
     body.scale.set(0.8, 0.75, 1.5);
-    part(new THREE.SphereGeometry(0.2, 8, 6), PAL.ivory, 0, 0.22, 0.42, this.deepo, { flat: true });
-    part(new THREE.ConeGeometry(0.07, 0.32, 4), PAL.saffron, 0, 0.2, 0.7, this.deepo).rotation.x = Math.PI / 2;
-    for (const x of [-0.11, 0.11]) part(new THREE.BoxGeometry(0.05, 0.05, 0.05), PAL.ink, x, 0.28, 0.55, this.deepo);
-    part(new THREE.ConeGeometry(0.16, 0.4, 4), 0x7f7c8c, 0, 0.02, -0.6, this.deepo, { flat: true }).rotation.x = -Math.PI / 2;
+    part(new THREE.SphereGeometry(0.2, 8, 6), PAL.ivory, 0, 0.22, 0.42, this.gull, { flat: true });
+    part(new THREE.ConeGeometry(0.07, 0.32, 4), PAL.saffron, 0, 0.2, 0.7, this.gull).rotation.x = Math.PI / 2;
+    for (const x of [-0.11, 0.11]) part(new THREE.BoxGeometry(0.05, 0.05, 0.05), PAL.ink, x, 0.28, 0.55, this.gull);
+    part(new THREE.ConeGeometry(0.16, 0.4, 4), 0xd8dae0, 0, 0.02, -0.6, this.gull, { flat: true }).rotation.x = -Math.PI / 2;
     this.wings = [-1, 1].map((s) => {
-      const shoulder = pivot(s * 0.2, 0.12, 0.05, this.deepo);
-      part(new THREE.BoxGeometry(0.7, 0.05, 0.42).translate(s * 0.35, 0, 0), concrete, 0, 0, 0, shoulder, { flat: true });
+      const shoulder = pivot(s * 0.2, 0.12, 0.05, this.gull);
+      part(new THREE.BoxGeometry(0.7, 0.05, 0.42).translate(s * 0.35, 0, 0), plumage, 0, 0, 0, shoulder, { flat: true });
       const elbow = pivot(s * 0.7, 0, 0, shoulder);
-      part(new THREE.BoxGeometry(0.6, 0.05, 0.32).translate(s * 0.3, 0, -0.04), 0x5f5c6c, 0, 0, 0, elbow, { flat: true });
+      part(new THREE.BoxGeometry(0.6, 0.05, 0.32).translate(s * 0.3, 0, -0.04), 0x8f97a6, 0, 0, 0, elbow, { flat: true });
       return { shoulder, elbow };
     });
-    this.fx.add(this.deepo);
-    this.deepoTarget = new THREE.Vector3();
-    this.deepoAhead = new THREE.Vector3();
+    this.fx.add(this.gull);
+    this.gullTarget = new THREE.Vector3();
+    this.gullAhead = new THREE.Vector3();
   }
 
   /** Picks the grid direction closest to the camera-relative input, or -1 if no key is held. */
@@ -261,7 +279,7 @@ export class Player {
     // Idle: the head bobs and looks around; eyes blink every few seconds.
     this.head.rotation.y = damp(this.head.rotation.y, idle * Math.sin(t * 0.5) * 0.35, 4, dt);
     this.head.rotation.z = Math.sin(t * 1.2) * 0.03 * idle;
-    this.quiff.rotation.x = Math.sin(progress * Math.PI * 2) * 0.12 * moving + Math.sin(t * 2) * 0.03;
+    this.hat.rotation.x = 0.08 + Math.sin(progress * Math.PI * 2) * 0.06 * moving + Math.sin(t * 2) * 0.015;
     this.blink -= dt;
     if (this.blink < -0.12) this.blink = 2.5 + Math.random() * 2.5;
     for (const eye of this.eyes) eye.scale.y = this.blink < 0 ? 0.15 : 1;
@@ -275,7 +293,7 @@ export class Player {
       if (p.life <= 0) p.mesh.visible = false;
     }
 
-    // Deepo flutters around his shoulder, flapping hard like a bird made of concrete.
+    // The gull flutters around his shoulder.
     const orbit = (k, out) => {
       const a = (t + k) * 0.9;
       return out.set(
@@ -284,9 +302,9 @@ export class Player {
         this.position.z + Math.sin(a) * 2.4,
       );
     };
-    this.deepo.position.lerp(orbit(0, this.deepoTarget), 1 - Math.exp(-dt * 4));
-    this.deepo.lookAt(orbit(0.3, this.deepoAhead));
-    this.deepo.rotateZ(-0.3);
+    this.gull.position.lerp(orbit(0, this.gullTarget), 1 - Math.exp(-dt * 4));
+    this.gull.lookAt(orbit(0.3, this.gullAhead));
+    this.gull.rotateZ(-0.3);
     const beat = Math.sin(t * 13);
     this.wings.forEach(({ shoulder, elbow }, i) => {
       const s = i === 0 ? -1 : 1;
