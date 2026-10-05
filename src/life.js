@@ -66,7 +66,7 @@ export function buildLife(scene, rng, animated) {
   // Floating islands above the mountain.
   for (let i = 0; i < 3; i++) {
     const v = -70 + i * 70;
-    const u = footU(v) + 50 + rng() * 20;
+    const u = Math.min(95, footU(v) + 30 + rng() * 15);
     const g = new THREE.Group();
     const R = 2.5 + rng() * 2;
     at(cyl(R, R * 0.9, 1, PAL.grass, 9, { flat: true }), 0, 0, 0, g);

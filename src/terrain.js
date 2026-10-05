@@ -4,7 +4,10 @@ import { fbm, smoothstep } from './noise.js';
 import { GLOBALS, PATH_COUNT, WATER_LEVEL, paint } from './style.js';
 
 export { WATER_LEVEL };
-export const WORLD_RADIUS = 110;
+// The map is a square diorama aligned with the bay (u toward the mountain, v along the shore),
+// cut out of the land with its sides showing the cross-section down to a base.
+export const SQUARE = { u0: -100, u1: 110, v0: -105, v1: 105 };
+export const BASE_Y = -16;
 export const SUN_DIR = new THREE.Vector3(-0.25, 0.58, 1).normalize();
 
 export const WORLD_SIZE = 380;
@@ -57,9 +60,9 @@ export function heightAt(x, z) {
   let h = 0.7 + (fbm(x * 0.03, z * 0.03, 3) - 0.5) * 2.2;
   // The mountain: steep terraced slopes, like the Ligurian coast.
   const foot = footU(v, u);
-  const back = smoothstep(foot, foot + 95, u) * (62 + (fbm(x * 0.015, z * 0.015, 3) - 0.5) * 30) + Math.max(0, u - foot) * 0.08;
+  const back = smoothstep(foot, foot + 80, u) * (40 + (fbm(x * 0.015, z * 0.015, 3) - 0.5) * 20) + Math.max(0, u - foot) * 0.05;
   // Side ridges run down from the mountain and plunge into the sea, closing the bay.
-  const ridge = headland(v) * (16 + smoothstep(-110, 70, u) * 46 + (fbm(x * 0.03, z * 0.03, 3) - 0.5) * 14);
+  const ridge = headland(v) * (13 + smoothstep(-110, 70, u) * 30 + (fbm(x * 0.03, z * 0.03, 3) - 0.5) * 10);
   h += Math.max(back, ridge);
   // The sea: sheer cliffs under the headlands, softer coves in the bay.
   const coast = coastU(v, u);
@@ -109,7 +112,15 @@ export function segmentDistance(x, z, [ax, az, bx, bz]) {
 }
 
 /** True where nature may grow: off the work pads, off the paths, above water. */
+/** True inside the diorama square, at least `margin` from its edges. */
+export function inSquare(x, z, margin = 0) {
+  const u = toU(x, z);
+  const v = toV(x, z);
+  return u > SQUARE.u0 + margin && u < SQUARE.u1 - margin && v > SQUARE.v0 + margin && v < SQUARE.v1 - margin;
+}
+
 export function isWild(x, z, margin = 0) {
+  if (!inSquare(x, z, 2)) return false;
   if (groundAt(x, z) < WATER_LEVEL + 0.4) return false;
   for (const zn of ZONES) if (Math.hypot(x - zn.x, z - zn.z) < zn.r + 3 + margin) return false;
   for (const p of PATHS) if (segmentDistance(x, z, p) < 2.6 + margin) return false;
@@ -120,25 +131,123 @@ export function slopeAt(x, z) {
   return (Math.abs(groundAt(x + 1, z) - groundAt(x - 1, z)) + Math.abs(groundAt(x, z + 1) - groundAt(x, z - 1))) / 4;
 }
 
+/** Terrain surface: a grid laid out in (u, v) so its edges are the sides of the square. */
 export function buildTerrain() {
-  const geo = new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE, SEGMENTS, SEGMENTS);
-  geo.rotateX(-Math.PI / 2);
+  const nu = SQUARE.u1 - SQUARE.u0;
+  const nv = SQUARE.v1 - SQUARE.v0;
+  const geo = new THREE.PlaneGeometry(1, 1, nv, nu);
   const pos = geo.attributes.position;
-  for (let i = 0; i < pos.count; i++) pos.setY(i, groundAt(pos.getX(i), pos.getZ(i)));
+  for (let iu = 0; iu <= nu; iu++) {
+    for (let iv = 0; iv <= nv; iv++) {
+      const i = iu * (nv + 1) + iv;
+      const x = toX(SQUARE.u0 + iu, SQUARE.v0 + iv);
+      const z = toZ(SQUARE.u0 + iu, SQUARE.v0 + iv);
+      pos.setXYZ(i, x, groundAt(x, z), z);
+    }
+  }
+  // Make sure the triangles face up.
+  const index = geo.index.array;
+  const a = new THREE.Vector3();
+  const b = new THREE.Vector3();
+  const c = new THREE.Vector3();
+  a.fromBufferAttribute(pos, index[0]);
+  b.fromBufferAttribute(pos, index[1]);
+  c.fromBufferAttribute(pos, index[2]);
+  if (b.sub(a).cross(c.sub(a)).y < 0) {
+    for (let i = 0; i < index.length; i += 3) [index[i + 1], index[i + 2]] = [index[i + 2], index[i + 1]];
+  }
   geo.computeVertexNormals();
   const mesh = new THREE.Mesh(geo, paint(0xffffff, { terrain: true }));
   mesh.receiveShadow = true;
   return mesh;
 }
 
+/**
+ * The four cut faces of the diorama: earth strata from the base up to the ground, and a slice
+ * of sea where the ground dips below the water. `holes` open windows in the back face
+ * ({ v0, v1, y0, y1 } in back-face coordinates) to look into the mountain.
+ */
+export function buildSides(holes = []) {
+  const earth = [];
+  const sea = [];
+  const quad = (out, p0, p1, y0a, y0b, y1a, y1b) => {
+    // p0, p1: column positions (x, z); bottom y0a/y0b, top y1a/y1b.
+    out.push(p0.x, y0a, p0.z, p1.x, y0b, p1.z, p1.x, y1b, p1.z, p0.x, y0a, p0.z, p1.x, y1b, p1.z, p0.x, y1a, p0.z);
+  };
+  const edges = [
+    { fixed: 'u', at: SQUARE.u1, from: SQUARE.v0, to: SQUARE.v1, back: true },
+    { fixed: 'u', at: SQUARE.u0, from: SQUARE.v0, to: SQUARE.v1 },
+    { fixed: 'v', at: SQUARE.v0, from: SQUARE.u0, to: SQUARE.u1 },
+    { fixed: 'v', at: SQUARE.v1, from: SQUARE.u0, to: SQUARE.u1 },
+  ];
+  for (const edge of edges) {
+    const point = (s) => {
+      const [u, v] = edge.fixed === 'u' ? [edge.at, s] : [s, edge.at];
+      const p = new THREE.Vector3(toX(u, v), 0, toZ(u, v));
+      p.y = groundAt(p.x, p.z);
+      return p;
+    };
+    for (let s = edge.from; s < edge.to; s++) {
+      const p0 = point(s);
+      const p1 = point(s + 1);
+      // Vertical intervals of earth, minus any window opened in the back face.
+      let spans = [[BASE_Y, Infinity]];
+      if (edge.back) {
+        for (const h of holes) {
+          if (s + 0.5 < h.v0 || s + 0.5 > h.v1) continue;
+          spans = spans.flatMap(([lo, hi]) => (h.y1 <= lo || h.y0 >= hi ? [[lo, hi]] : [[lo, h.y0], [h.y1, hi]].filter(([a, b]) => b > a)));
+        }
+      }
+      for (const [lo, hi] of spans) {
+        const ta = Math.min(hi, p0.y);
+        const tb = Math.min(hi, p1.y);
+        if (ta > lo || tb > lo) quad(earth, p0, p1, lo, lo, Math.max(lo, ta), Math.max(lo, tb));
+      }
+      if (p0.y < WATER_LEVEL || p1.y < WATER_LEVEL) quad(sea, p0, p1, Math.min(p0.y, WATER_LEVEL), Math.min(p1.y, WATER_LEVEL), WATER_LEVEL, WATER_LEVEL);
+    }
+  }
+  const group = new THREE.Group();
+  const make = (data, material) => {
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(data, 3));
+    geo.computeVertexNormals();
+    const mesh = new THREE.Mesh(geo, material);
+    mesh.receiveShadow = true;
+    group.add(mesh);
+  };
+  make(earth, paint(0xffffff, { terrain: true, doubleSide: true }));
+  make(sea, paint(0x2f78b3, { doubleSide: true }));
+
+  // A dark plinth under the diorama, like a model on its stand.
+  const cu = (SQUARE.u0 + SQUARE.u1) / 2;
+  const cv = (SQUARE.v0 + SQUARE.v1) / 2;
+  const plinth = new THREE.Mesh(
+    new THREE.BoxGeometry(SQUARE.v1 - SQUARE.v0 + 4, 3, SQUARE.u1 - SQUARE.u0 + 4),
+    paint(0x4a3a52),
+  );
+  plinth.position.set(toX(cu, cv), BASE_Y - 1.5, toZ(cu, cv));
+  plinth.rotation.y = Math.PI / 4;
+  plinth.receiveShadow = true;
+  group.add(plinth);
+  const trim = new THREE.Mesh(new THREE.BoxGeometry(SQUARE.v1 - SQUARE.v0 + 4.6, 0.5, SQUARE.u1 - SQUARE.u0 + 4.6), paint(PAL_TRIM));
+  trim.position.set(toX(cu, cv), BASE_Y - 0.2, toZ(cu, cv));
+  trim.rotation.y = Math.PI / 4;
+  group.add(trim);
+  return group;
+}
+
+const PAL_TRIM = 0xe2b25c;
+
+/** Sea surface, clipped to the square. */
 export function buildWater() {
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(WORLD_SIZE * 3, WORLD_SIZE * 3), paint(0xffffff, { water: true }));
-  water.rotation.x = -Math.PI / 2;
-  water.position.y = WATER_LEVEL;
+  const cu = (SQUARE.u0 + SQUARE.u1) / 2;
+  const cv = (SQUARE.v0 + SQUARE.v1) / 2;
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(SQUARE.v1 - SQUARE.v0, SQUARE.u1 - SQUARE.u0), paint(0xffffff, { water: true }));
+  water.rotation.set(-Math.PI / 2, 0, Math.PI / 4);
+  water.position.set(toX(cu, cv), WATER_LEVEL, toZ(cu, cv));
   water.receiveShadow = true;
   return water;
 }
-
 
 export function scatterInstanced(scene, rng, geo, mat, count, place) {
   const mesh = new THREE.InstancedMesh(geo, mat, count);

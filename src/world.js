@@ -4,12 +4,12 @@ import { mulberry32 } from './noise.js';
 import { GLOBALS, PATH_COUNT } from './style.js';
 import { buildLife } from './life.js';
 import { buildNature } from './nature.js';
-import { GRID, HALF, PATHS, SEGMENTS, WORLD_SIZE, ZONES, buildTerrain, buildWater } from './terrain.js';
+import { GRID, HALF, PATHS, SEGMENTS, WORLD_SIZE, ZONES, buildSides, buildTerrain, buildWater } from './terrain.js';
 import { bake } from './kit.js';
 import { buildVillages } from './village.js';
 import { buildAgora, buildAtelier, buildLibrary, buildMoot, buildPods, buildPort, buildPub } from './zones.js';
 
-export { SUN_DIR, WATER_LEVEL, WORLD_RADIUS, ZONES, groundAt } from './terrain.js';
+export { SUN_DIR, WATER_LEVEL, ZONES, groundAt, inSquare } from './terrain.js';
 
 // ---------------------------------------------------------------- World
 
@@ -27,7 +27,7 @@ export function createWorld(scene) {
   GLOBALS.uHeight.value = heightTex;
   GLOBALS.uHeightMap.value.set(HALF, WORLD_SIZE, SEGMENTS + 1);
 
-  scene.add(buildTerrain(), buildWater());
+  scene.add(buildTerrain(), buildSides(), buildWater());
   const builders = {
     agora: buildAgora,
     library: buildLibrary,

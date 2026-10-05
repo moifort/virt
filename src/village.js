@@ -205,25 +205,32 @@ export function buildVillages(scene, rng) {
   const placed = [];
   const yaw = Math.PI / 4;
 
-  // Houses packed in rows along the terraces, as in Manarola: the main village on the
-  // left-hand slopes above the sea, and a hamlet clinging to the right-hand headland.
-  const bell = { v: -48, u: footU(-48) + 12 };
+  // Houses packed in rows along the terraces, as in Manarola, inside an organic blob:
+  // the main village on the left-hand slopes above the sea, a hamlet on the right headland.
+  const bell = { v: -48, u: footU(-48) + 11 };
   const villages = [
-    { v0: -68, v1: -28, u0: (v) => footU(v) + 2, u1: (v) => footU(v) + 30 },
-    { v0: 72, v1: 96, u0: () => -62, u1: () => -28 },
+    { cu: bell.u, cv: bell.v, radius: 17 },
+    { cu: -46, cv: 84, radius: 10 },
   ];
   for (const village of villages) {
-    for (let v = village.v0; v <= village.v1; v += 3.5) {
-      for (let u = village.u0(v); u <= village.u1(v); u += 3.3) {
+    for (let v = village.cv - village.radius - 4; v <= village.cv + village.radius + 4; v += 3.4) {
+      for (let u = village.cu - village.radius - 4; u <= village.cu + village.radius + 4; u += 3.2) {
+        // Ragged outline: the edge of the blob wanders with noise.
+        const a = Math.atan2(u - village.cu, v - village.cv);
+        const edge = village.radius * (0.75 + fbm(Math.cos(a) * 1.5 + village.cv, Math.sin(a) * 1.5, 2) * 0.5);
+        const d = Math.hypot(u - village.cu, (v - village.cv) * 0.85);
+        if (d > edge) continue;
         const jv = v + (rng() - 0.5) * 0.4;
         const ju = u + (rng() - 0.5) * 0.3;
         const x = toX(ju, jv);
         const z = toZ(ju, jv);
-        if (rng() < 0.08 || Math.hypot(ju - bell.u, jv - bell.v) < 3.5) continue;
-        if (!isWild(x, z, -2) || slopeAt(x, z) > 1.7 || groundAt(x, z) < 1) continue;
+        if (rng() < 0.05 || Math.hypot(ju - bell.u, jv - bell.v) < 3.5) continue;
+        if (!isWild(x, z, -2) || slopeAt(x, z) > 1.8 || groundAt(x, z) < 0.5) continue;
         placed.push([x, z]);
         parts.at(new THREE.Vector3(x, groundAt(x, z) - 1.4, z), yaw);
-        house(parts, rng, 2.8 + rng() * 0.6, 2.6 + rng() * 0.5, 2 + Math.floor(rng() * 3));
+        // Taller houses toward the heart of the village.
+        const floors = 2 + Math.floor(rng() * 2) + (d < edge * 0.5 ? 1 : 0);
+        house(parts, rng, 2.8 + rng() * 0.6, 2.6 + rng() * 0.5, floors);
       }
     }
   }

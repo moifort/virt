@@ -3,7 +3,7 @@
 // with a little bounce on every step. Deepo the concrete seagull flutters around him.
 import * as THREE from 'three';
 import { PAL, paint, solid } from './style.js';
-import { WATER_LEVEL, WORLD_RADIUS, groundAt } from './world.js';
+import { WATER_LEVEL, groundAt, inSquare } from './world.js';
 
 const TILE = 1.25;
 const WALK_SPEED = 5.5;
@@ -171,7 +171,7 @@ export class Player {
   walkable(target, from) {
     const ground = groundAt(target.x, target.z);
     if (ground < WATER_LEVEL - 0.2) return false;
-    if (Math.hypot(target.x, target.z) > WORLD_RADIUS) return false;
+    if (!inSquare(target.x, target.z, 1)) return false;
     return Math.abs(ground - groundAt(from.x, from.z)) <= MAX_STEP;
   }
 
