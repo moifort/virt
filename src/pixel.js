@@ -171,12 +171,13 @@ export class PixelRenderer {
   }
 }
 
-/** Orthographic camera locked to the texel grid; the snap error is handed to the upscaler. */
+/** Isometric orthographic camera locked to the texel grid; the snap error is handed to the upscaler. */
 export class PixelCamera {
   constructor() {
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 600);
-    this.yaw = Math.PI / 4;
-    this.pitch = 0.62;
+    // Isometric: looking down a corner of the grid, 35.26° below the horizon.
+    this.yaw = 0;
+    this.pitch = Math.atan(Math.SQRT1_2);
     this.viewHeight = 60;
     this.distance = 220;
     this.texelWorld = 0.1;

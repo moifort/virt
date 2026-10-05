@@ -17,12 +17,12 @@ const view = new PixelCamera();
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xffffff, 1, 2);
 
-// Perpetual late afternoon, as in Bob's VR: warm sun, lavender shade.
-const SKY_TOP = new THREE.Color(0x8fd3e0);
-const SKY_HORIZON = new THREE.Color(0xf8d3a8);
-GLOBALS.uSunTint.value.set(0xfff0d6);
-GLOBALS.uShadowTint.value.set(0xb4a6dc);
-GLOBALS.uGlow.value = 0.7;
+// A summer sunset over the Ligurian sea: low golden sun, long blue-violet shadows, lamps lit.
+const SKY_TOP = new THREE.Color(0x6f7fc4);
+const SKY_HORIZON = new THREE.Color(0xffb680);
+GLOBALS.uSunTint.value.set(0xffd9a6);
+GLOBALS.uShadowTint.value.set(0x8f88c8);
+GLOBALS.uGlow.value = 0.9;
 scene.fog.color.copy(SKY_HORIZON);
 
 const sun = new THREE.DirectionalLight(0xffffff, 1);
@@ -54,21 +54,25 @@ addEventListener('keydown', (e) => {
   keys.add(e.code);
   tapped.add(e.code);
   if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
-  // A / E on AZERTY (KeyQ / KeyE codes) turn the view by an eighth of a turn.
-  if (e.code === 'KeyQ') yawTarget += Math.PI / 4;
-  if (e.code === 'KeyE') yawTarget -= Math.PI / 4;
+  // A / E on AZERTY (KeyQ / KeyE codes) turn the view to the next isometric corner.
+  if (e.code === 'KeyQ') yawTarget = snapYaw(yawTarget) + Math.PI / 2;
+  if (e.code === 'KeyE') yawTarget = snapYaw(yawTarget) - Math.PI / 2;
 });
 addEventListener('keyup', (e) => keys.delete(e.code));
 addEventListener('blur', () => keys.clear());
 
+// True isometric view: the pitch is fixed and the yaw rests on one of the four corners of the
+// diorama. Dragging turns the island; on release it settles on the nearest corner.
+const snapYaw = (yaw) => Math.round(yaw / (Math.PI / 2)) * (Math.PI / 2);
 let yawTarget = view.yaw;
 let dragging = false;
 renderer.domElement.addEventListener('pointerdown', () => (dragging = true));
-addEventListener('pointerup', () => (dragging = false));
+addEventListener('pointerup', () => {
+  if (dragging) yawTarget = snapYaw(yawTarget);
+  dragging = false;
+});
 addEventListener('pointermove', (e) => {
-  if (!dragging) return;
-  yawTarget -= e.movementX * 0.006;
-  view.pitch = clamp(view.pitch + e.movementY * 0.004, 0.35, 1.2);
+  if (dragging) yawTarget -= e.movementX * 0.006;
 });
 addEventListener('wheel', (e) => (view.viewHeight = clamp(view.viewHeight * (1 + Math.sign(e.deltaY) * 0.1), 24, 140)), {
   passive: true,
@@ -98,7 +102,8 @@ renderer.setAnimationLoop(() => {
   t += dt;
 
   view.yaw += (yawTarget - view.yaw) * (1 - Math.exp(-dt * 8));
-  player.update(dt, t, readInput(!player.step), view.yaw);
+  // Arrow up walks toward the upper right of the screen, along the grid.
+  player.update(dt, t, readInput(!player.step), snapYaw(view.yaw) - Math.PI / 4);
   world.update(t, dt);
 
   GLOBALS.uTime.value = t;

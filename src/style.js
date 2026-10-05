@@ -165,12 +165,13 @@ vec3 waterColor(vec3 w) {
     : depth < 5.0 ? ${lin(0x3fa3c4)}
     : ${lin(0x2f78b3)};
   float ripple = pxNoise(w.xz * vec2(0.22, 0.5) + vec2(uTime * 0.25, uTime * 0.1));
-  if (ripple > 0.68) col = mix(col, vec3(1.0), 0.22);
+  // The low sun lays a golden glitter on the swell.
+  if (ripple > 0.68) col = mix(col, vec3(1.0, 0.78, 0.55), 0.3);
   // Foam lapping on the shore.
   float lap = 0.35 + 0.25 * sin(uTime * 1.3 + pxNoise(w.xz * 0.25) * 6.0);
   if (depth < lap) col = ${lin(0xf7fbf2)};
   float sparkle = pxHash(floor(w.xz * 2.0) + floor(uTime * 3.0) * vec2(7.0, 3.0));
-  if (sparkle > 0.993) col = vec3(1.0);
+  if (sparkle > 0.99) col = vec3(1.0, 0.93, 0.78);
   return col;
 }
 #endif

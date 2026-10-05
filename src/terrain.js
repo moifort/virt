@@ -8,7 +8,8 @@ export { WATER_LEVEL };
 // cut out of the land with its sides showing the cross-section down to a base.
 export const SQUARE = { u0: -100, u1: 110, v0: -105, v1: 105 };
 export const BASE_Y = -16;
-export const SUN_DIR = new THREE.Vector3(-0.25, 0.58, 1).normalize();
+// The sun is low over the sea, a little to the left: it lights the slopes that face the bay.
+export const SUN_DIR = new THREE.Vector3(-0.5, 0.36, 1).normalize();
 
 export const WORLD_SIZE = 380;
 export const SEGMENTS = 380;
