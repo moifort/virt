@@ -10,8 +10,8 @@ export { WATER_LEVEL };
 export const WORLD_RADIUS = 110;
 export const SUN_DIR = new THREE.Vector3(-0.25, 0.58, 1).normalize();
 
-const WORLD_SIZE = 300;
-const SEGMENTS = 300;
+const WORLD_SIZE = 380;
+const SEGMENTS = 380;
 const CELL = WORLD_SIZE / SEGMENTS;
 const HALF = WORLD_SIZE / 2;
 const UP = new THREE.Vector3(0, 1, 0);
@@ -22,7 +22,9 @@ const toX = (u, v) => (-u + v) / Math.SQRT2;
 const toZ = (u, v) => (-u - v) / Math.SQRT2;
 const toU = (x, z) => (-x - z) / Math.SQRT2;
 const toV = (x, z) => (x - z) / Math.SQRT2;
-const coastU = (v) => -40 + (fbm(v * 0.02, 3.1, 3) - 0.5) * 26;
+// Headlands: toward both ends of the bay the land reaches far out to sea.
+const headland = (v) => smoothstep(52, 96, Math.abs(v) + (fbm(v * 0.05, 9.4, 2) - 0.5) * 16);
+const coastU = (v) => -40 + (fbm(v * 0.02, 3.1, 3) - 0.5) * 20 - headland(v) * 58;
 const footU = (v) => 50 + (fbm(v * 0.025, 7.7, 3) - 0.5) * 18;
 
 const placeZone = (id, name, hint, u, v, r) => ({ id, name, hint, u, v, r, x: toX(u, v), z: toZ(u, v) });
@@ -31,8 +33,8 @@ export const ZONES = [
   placeZone('library', 'La Bibliothèque', 'bureau de Bob', 34, -34, 13),
   placeZone('moot', 'Salle du Moot', 'réunions', 30, 36, 15),
   placeZone('pub', 'Le Pub', 'après le travail', -22, -40, 12),
-  placeZone('pods', 'Bulles focus', 'concentration', 0, 60, 13),
-  placeZone('atelier', "L'Atelier", 'prototypes', 6, -70, 12),
+  placeZone('pods', 'Bulles focus', 'concentration', 2, 52, 13),
+  placeZone('atelier', "L'Atelier", 'prototypes', 8, -54, 12),
   placeZone('port', 'Le Port', 'pause au bord de l\'eau', -42, 10, 12),
 ];
 const zone = (id) => ZONES.find((z) => z.id === id);
@@ -51,12 +53,14 @@ function heightAt(x, z) {
   let h = 0.7 + (fbm(x * 0.03, z * 0.03, 3) - 0.5) * 2.2;
   // The mountain: steep terraced slopes, like the Ligurian coast.
   const foot = footU(v);
-  h += smoothstep(foot, foot + 95, u) * (62 + (fbm(x * 0.015, z * 0.015, 3) - 0.5) * 30);
-  h += Math.max(0, u - foot) * 0.08;
-  // The sea: rocky cliffs in places, coves in others.
+  const back = smoothstep(foot, foot + 95, u) * (62 + (fbm(x * 0.015, z * 0.015, 3) - 0.5) * 30) + Math.max(0, u - foot) * 0.08;
+  // Side ridges run down from the mountain and plunge into the sea, closing the bay.
+  const ridge = headland(v) * (16 + smoothstep(-110, 70, u) * 46 + (fbm(x * 0.03, z * 0.03, 3) - 0.5) * 14);
+  h += Math.max(back, ridge);
+  // The sea: sheer cliffs under the headlands, softer coves in the bay.
   const coast = coastU(v);
-  const sheer = 4 + fbm(v * 0.04 + 11, 2.3, 2) * 14;
-  h -= smoothstep(coast + 2, coast - sheer, u) * 9;
+  const sheer = (4 + fbm(v * 0.04 + 11, 2.3, 2) * 14) * (1 - headland(v) * 0.75);
+  h -= smoothstep(coast + 2, coast - sheer, u) * (9 + headland(v) * 20);
   // Terraces: shelves and short dry-stone walls.
   const step = 2.4;
   const shelf = Math.floor(h / step) * step;
@@ -977,11 +981,11 @@ function buildLife(scene, rng, animated) {
   for (let i = 0; i < 3; i++) {
     const boat = gozzo(rng, true);
     scene.add(boat);
-    const u = -70 - i * 14;
+    const u = -64 - i * 11;
     const speed = (0.012 + rng() * 0.01) * (i % 2 ? 1 : -1);
     const phase = rng() * 6;
     animated.push((t) => {
-      const v = Math.sin(t * speed + phase) * 110;
+      const v = Math.sin(t * speed + phase) * 45;
       boat.position.set(toX(u, v), WATER_LEVEL + Math.sin(t * 1.2 + i) * 0.1, toZ(u, v));
       const heading = Math.cos(t * speed + phase) * speed > 0 ? (3 * Math.PI) / 4 : -Math.PI / 4;
       boat.rotation.set(0, heading, Math.sin(t * 0.9 + i) * 0.06);
@@ -1028,10 +1032,17 @@ function buildVillages(scene, rng) {
     }
   };
 
-  for (const center of [-72, -8, 62]) {
-    for (let tries = 0, n = 0; tries < 400 && n < 26; tries++) {
-      const v = center + (rng() - 0.5) * 34;
-      const u = footU(v) + 2 + rng() * 34;
+  const villages = [
+    { v: -56, spread: 30, u: (v) => footU(v) + 2 + rng() * 32, n: 22 },
+    { v: -4, spread: 30, u: (v) => footU(v) + 2 + rng() * 32, n: 22 },
+    { v: 50, spread: 28, u: (v) => footU(v) + 2 + rng() * 32, n: 20 },
+    { v: -84, spread: 22, u: () => -75 + rng() * 55, n: 18 },
+    { v: 84, spread: 22, u: () => -75 + rng() * 55, n: 18 },
+  ];
+  for (const village of villages) {
+    for (let tries = 0, n = 0; tries < 500 && n < village.n; tries++) {
+      const v = village.v + (rng() - 0.5) * village.spread;
+      const u = village.u(v);
       const x = toX(u, v);
       const z = toZ(u, v);
       if (!isWild(x, z, -1) || slopeAt(x, z) > 1.1) continue;
@@ -1067,7 +1078,7 @@ function buildVillages(scene, rng) {
   instanced(new THREE.BoxGeometry(1, 1, 1), shutters, () => pick(rng, [0x3f8f5a, 0x4a9a6a, 0x3f7f8f]));
 
   // A campanile in each village.
-  for (const v of [-72, -8, 62]) {
+  for (const v of [-56, -4, 50]) {
     const u = footU(v) + 6;
     const x = toX(u, v);
     const z = toZ(u, v);

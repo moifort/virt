@@ -1,5 +1,5 @@
-// The wanderer, after Mœbius' Arzak: a lone traveller with a tall pointed hat,
-// a billowing cape and a white pterodactyl gliding overhead.
+// The hero, after John Difool from Mœbius and Jodorowsky's L'Incal: red quiff,
+// long trench coat, and Deepo the concrete seagull fluttering around him.
 import * as THREE from 'three';
 import { PAL, paint, solid } from './style.js';
 import { WATER_LEVEL, WORLD_RADIUS, groundAt } from './world.js';
@@ -31,14 +31,16 @@ function pivot(x, y, z, parent) {
   return g;
 }
 
-const BOOT = 0x5b3f4e;
-const CLOTH = 0x6d5a8f;
+const BOOT = 0x4a3346;
+const CLOTH = 0x3b3346;
+const COAT = 0xd9b25a;
+const HAIR = 0xd8642e;
 
 export class Player {
   constructor() {
     this.root = new THREE.Group();
     this.position = this.root.position;
-    this.fx = new THREE.Group(); // world-space effects: dust, pterodactyl
+    this.fx = new THREE.Group(); // world-space effects: dust, Deepo
     this.velocity = new THREE.Vector3();
     this.onGround = false;
     this.heading = 0;
@@ -58,29 +60,31 @@ export class Player {
 
     // Torso pivots at the waist so it can lean into a run.
     this.torso = pivot(0, 0.8, 0, this.body);
-    part(new THREE.ConeGeometry(0.68, 1.35, 12), PAL.cream, 0, 0.42, 0, this.torso);
-    part(new THREE.CylinderGeometry(0.54, 0.59, 0.12, 12), PAL.ochre, 0, 0.12, 0, this.torso);
-    part(new THREE.CylinderGeometry(0.33, 0.38, 0.1, 12), PAL.teal, 0, 0.66, 0, this.torso);
-    part(new THREE.CylinderGeometry(0.4, 0.42, 0.1, 12), BOOT, 0, -0.1, 0, this.torso);
-    part(new THREE.BoxGeometry(0.22, 0.2, 0.12), PAL.wood, 0.28, -0.12, 0.33, this.torso);
-
-    // Billowing cape: a chain of panels hanging from the shoulders.
-    part(new THREE.CylinderGeometry(0.36, 0.5, 0.18, 12), PAL.red, 0, 1.0, 0, this.torso);
-    this.cape = [];
-    let anchor = pivot(0, 1.0, -0.3, this.torso);
-    for (let i = 0; i < 4; i++) {
-      const w = 0.95 + i * 0.12;
-      const panel = new THREE.BoxGeometry(w, 0.42, 0.05).translate(0, -0.21, 0);
-      part(panel, i === 3 ? 0xa8343a : PAL.red, 0, 0, 0, anchor);
-      this.cape.push(anchor);
-      anchor = pivot(0, -0.42, 0, anchor);
+    part(new THREE.CylinderGeometry(0.4, 0.5, 1.1, 12), COAT, 0, 0.48, 0, this.torso);
+    part(new THREE.BoxGeometry(0.34, 0.95, 0.1), PAL.teal, 0, 0.55, 0.42, this.torso);
+    part(new THREE.BoxGeometry(0.1, 0.12, 0.06), PAL.ink, 0, 0.88, 0.48, this.torso);
+    part(new THREE.CylinderGeometry(0.48, 0.5, 0.1, 12), 0x8a6a3a, 0, 0.12, 0, this.torso);
+    part(new THREE.BoxGeometry(0.16, 0.14, 0.06), PAL.saffron, 0, 0.12, 0.5, this.torso);
+    for (const x of [-0.24, 0.24]) {
+      const lapel = part(new THREE.BoxGeometry(0.2, 0.55, 0.06), COAT, x, 0.72, 0.43, this.torso);
+      lapel.rotation.z = x > 0 ? -0.25 : 0.25;
     }
+    // High collar, turned up.
+    for (const x of [-0.22, 0.22]) {
+      const collar = part(new THREE.BoxGeometry(0.16, 0.36, 0.4), COAT, x, 1.13, -0.02, this.torso);
+      collar.rotation.z = x > 0 ? -0.3 : 0.3;
+    }
+    // Coat skirt: front panels and a back flap that swings with the stride.
+    for (const x of [-0.22, 0.22]) part(new THREE.BoxGeometry(0.4, 0.75, 0.08), COAT, x, -0.3, 0.38, this.torso);
+    this.coatTail = pivot(0, 0.05, -0.36, this.torso);
+    part(new THREE.BoxGeometry(0.92, 0.85, 0.08).translate(0, -0.42, 0), COAT, 0, 0, 0, this.coatTail);
+    part(new THREE.BoxGeometry(0.04, 0.6, 0.09).translate(0, -0.5, 0), 0x8a6a3a, 0, 0, 0, this.coatTail);
 
     // Arms swing from the shoulders.
     this.arms = [-1, 1].map((s) => {
       const shoulder = pivot(s * 0.42, 0.95, 0, this.torso);
       shoulder.rotation.z = s * 0.25;
-      part(new THREE.CylinderGeometry(0.11, 0.13, 0.62, 6), PAL.cream, 0, -0.3, 0, shoulder);
+      part(new THREE.CylinderGeometry(0.12, 0.14, 0.62, 6), COAT, 0, -0.3, 0, shoulder);
       part(new THREE.SphereGeometry(0.1, 6, 4), PAL.skin, 0, -0.66, 0, shoulder);
       return shoulder;
     });
@@ -88,19 +92,18 @@ export class Player {
     // Head, face and hat.
     this.head = pivot(0, 1.28, 0, this.torso);
     part(new THREE.SphereGeometry(0.34, 14, 10), PAL.skin, 0, 0.2, 0, this.head);
-    const hair = part(new THREE.SphereGeometry(0.35, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), 0x4a3a52, 0, 0.22, -0.05, this.head);
-    hair.rotation.x = -0.5;
+    const hair = part(new THREE.SphereGeometry(0.36, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), HAIR, 0, 0.24, -0.05, this.head);
+    hair.rotation.x = -0.45;
+    part(new THREE.BoxGeometry(0.5, 0.42, 0.18), HAIR, 0, 0.12, -0.26, this.head); // hair down the nape
+    for (const x of [-0.31, 0.31]) part(new THREE.BoxGeometry(0.07, 0.24, 0.12), HAIR, x, 0.12, 0.08, this.head);
+    this.quiff = pivot(0, 0.5, 0.12, this.head);
+    const quiff = part(new THREE.ConeGeometry(0.2, 0.55, 6), HAIR, 0, 0.12, 0.08, this.quiff, { flat: true });
+    quiff.rotation.x = 0.9;
     for (const x of [-0.12, 0.12]) part(new THREE.BoxGeometry(0.07, 0.1, 0.04), PAL.ink, x, 0.22, 0.31, this.head);
     part(new THREE.BoxGeometry(0.08, 0.06, 0.08), 0xe8a98a, 0, 0.14, 0.34, this.head);
-    this.hat = pivot(0, 0.42, -0.02, this.head);
-    this.hat.rotation.x = -0.12;
-    part(new THREE.CylinderGeometry(0.56, 0.6, 0.06, 18), PAL.ivory, 0, 0, 0, this.hat);
-    part(new THREE.ConeGeometry(0.36, 1.6, 14), PAL.ivory, 0, 0.82, 0, this.hat);
-    part(new THREE.CylinderGeometry(0.33, 0.35, 0.12, 14), PAL.teal, 0, 0.12, 0, this.hat);
-    part(new THREE.SphereGeometry(0.08, 6, 4), PAL.coral, 0, 1.64, 0, this.hat);
 
     this.buildPuffs();
-    this.buildPterodactyl();
+    this.buildDeepo();
   }
 
   buildPuffs() {
@@ -126,30 +129,26 @@ export class Player {
     }
   }
 
-  buildPterodactyl() {
-    const bone = PAL.ivory;
-    this.ptero = new THREE.Group();
-    const body = part(new THREE.SphereGeometry(0.5, 10, 8), bone, 0, 0, 0, this.ptero);
-    body.scale.set(0.6, 0.5, 1.6);
-    const head = pivot(0, 0.15, 0.85, this.ptero);
-    part(new THREE.SphereGeometry(0.22, 8, 6), bone, 0, 0, 0, head);
-    part(new THREE.ConeGeometry(0.13, 1.1, 6), bone, 0, -0.02, 0.6, head).rotation.x = Math.PI / 2;
-    part(new THREE.ConeGeometry(0.1, 0.9, 4), PAL.coral, 0, 0.12, -0.45, head).rotation.x = -Math.PI / 2 - 0.3;
-    for (const x of [-0.13, 0.13]) part(new THREE.BoxGeometry(0.05, 0.06, 0.06), PAL.ink, x, 0.06, 0.12, head);
-    part(new THREE.ConeGeometry(0.1, 1.1, 4), bone, 0, 0, -1.2, this.ptero).rotation.x = -Math.PI / 2;
+  /** Deepo, the concrete seagull: a grey stone gull with heavy wingbeats. */
+  buildDeepo() {
+    const concrete = 0xa9a6b4;
+    this.deepo = new THREE.Group();
+    const body = part(new THREE.SphereGeometry(0.32, 8, 6), concrete, 0, 0, 0, this.deepo, { flat: true });
+    body.scale.set(0.8, 0.75, 1.5);
+    part(new THREE.SphereGeometry(0.2, 8, 6), PAL.ivory, 0, 0.22, 0.42, this.deepo, { flat: true });
+    part(new THREE.ConeGeometry(0.07, 0.32, 4), PAL.saffron, 0, 0.2, 0.7, this.deepo).rotation.x = Math.PI / 2;
+    for (const x of [-0.11, 0.11]) part(new THREE.BoxGeometry(0.05, 0.05, 0.05), PAL.ink, x, 0.28, 0.55, this.deepo);
+    part(new THREE.ConeGeometry(0.16, 0.4, 4), 0x7f7c8c, 0, 0.02, -0.6, this.deepo, { flat: true }).rotation.x = -Math.PI / 2;
     this.wings = [-1, 1].map((s) => {
-      const shoulder = pivot(s * 0.25, 0.05, 0.15, this.ptero);
-      part(new THREE.BoxGeometry(1.7, 0.06, 1.6).translate(s * 0.85, 0, -0.35), bone, 0, 0, 0, shoulder);
-      const elbow = pivot(s * 1.7, 0, 0, shoulder);
-      const tip = new THREE.ConeGeometry(0.8, 2.6, 3).rotateZ((-s * Math.PI) / 2).translate(s * 1.3, 0, -0.3);
-      const outer = part(tip, bone, 0, 0, 0, elbow);
-      outer.scale.y = 0.12;
+      const shoulder = pivot(s * 0.2, 0.12, 0.05, this.deepo);
+      part(new THREE.BoxGeometry(0.7, 0.05, 0.42).translate(s * 0.35, 0, 0), concrete, 0, 0, 0, shoulder, { flat: true });
+      const elbow = pivot(s * 0.7, 0, 0, shoulder);
+      part(new THREE.BoxGeometry(0.6, 0.05, 0.32).translate(s * 0.3, 0, -0.04), 0x5f5c6c, 0, 0, 0, elbow, { flat: true });
       return { shoulder, elbow };
     });
-    this.ptero.scale.setScalar(1.3);
-    this.fx.add(this.ptero);
-    this.pteroTarget = new THREE.Vector3();
-    this.pteroAhead = new THREE.Vector3();
+    this.fx.add(this.deepo);
+    this.deepoTarget = new THREE.Vector3();
+    this.deepoAhead = new THREE.Vector3();
   }
 
   update(dt, t, input, camYaw) {
@@ -241,16 +240,12 @@ export class Player {
     const look = idle * (Math.sin(t * 0.37) * 0.5 + Math.sin(t * 0.91) * 0.15);
     this.head.rotation.y = damp(this.head.rotation.y, look, 3, dt);
     this.head.rotation.x = damp(this.head.rotation.x, -run * 0.12, 6, dt);
-    this.hat.rotation.z = Math.sin(t * 1.7) * 0.03 + s * 0.04 * walk;
+    this.quiff.rotation.x = damp(this.quiff.rotation.x, -run * 0.35 + air * 0.3, 10, dt) + Math.abs(s) * 0.08 * walk;
 
-    // Cape: hangs at rest, billows behind at speed, ripples always.
+    // Coat tail swings behind with the stride and flies up on a run.
     const lift = Math.min(hs / RUN_SPEED, 1);
-    this.cape.forEach((seg, i) => {
-      const wave = Math.sin(t * 7 - i * 0.9) * (0.06 + 0.12 * lift);
-      const target = (i === 0 ? 0.12 : 0.04) + lift * (0.35 + i * 0.12) + air * 0.35 + wave;
-      seg.rotation.x = damp(seg.rotation.x, target, 7, dt);
-      seg.rotation.z = Math.sin(t * 2.3 - i * 0.7) * 0.04 * (1 + lift);
-    });
+    this.coatTail.rotation.x = damp(this.coatTail.rotation.x, 0.08 + lift * 0.55 + air * 0.4, 8, dt) + Math.sin(t * 9) * 0.04 * lift;
+    this.coatTail.rotation.z = s * 0.08 * walk;
 
     // Dust kicked up by running feet.
     const step = Math.floor(this.stride / Math.PI);
@@ -267,25 +262,23 @@ export class Player {
       if (p.life <= 0) p.mesh.visible = false;
     }
 
-    // The white pterodactyl circles overhead, gliding with a few lazy wingbeats.
-    const orbit = (k) => {
-      const a = (t + k) * 0.32;
-      return this.pteroTarget.set(
-        this.position.x + Math.cos(a) * 10,
-        this.position.y + 9 + Math.sin((t + k) * 0.7) * 1.2,
-        this.position.z + Math.sin(a) * 10,
+    // Deepo flutters around his shoulder, flapping hard like a bird made of concrete.
+    const orbit = (k, out) => {
+      const a = (t + k) * 0.9;
+      return out.set(
+        this.position.x + Math.cos(a) * 2.6,
+        this.position.y + 3.6 + Math.sin((t + k) * 2.1) * 0.35,
+        this.position.z + Math.sin(a) * 2.6,
       );
     };
-    const goal = orbit(0).clone();
-    this.ptero.position.lerp(goal, 1 - Math.exp(-dt * 2));
-    this.ptero.lookAt(this.pteroAhead.copy(orbit(0.6)));
-    this.ptero.rotateZ(-0.35); // banking into the turn
-    const flapping = Math.sin(t * 0.45) > 0.2;
-    const beat = flapping ? Math.sin(t * 5) : Math.sin(t * 1.2) * 0.15;
+    this.deepo.position.lerp(orbit(0, this.deepoTarget), 1 - Math.exp(-dt * 4));
+    this.deepo.lookAt(orbit(0.3, this.deepoAhead));
+    this.deepo.rotateZ(-0.3);
+    const beat = Math.sin(t * 13);
     this.wings.forEach(({ shoulder, elbow }, i) => {
       const side = i === 0 ? -1 : 1;
-      shoulder.rotation.z = side * (beat * 0.55 + 0.05);
-      elbow.rotation.z = side * beat * 0.35;
+      shoulder.rotation.z = side * beat * 0.7;
+      elbow.rotation.z = side * beat * 0.4;
     });
   }
 }
