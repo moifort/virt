@@ -70,6 +70,9 @@ export const GLOBALS = {
   // The pebble cove: its middle (x, z) and its reach.
   uCove: { value: new THREE.Vector3(0, 0, -1) },
   uHaze: { value: new THREE.Color(0.8, 0.9, 0.95) },
+  // The road of light on the sea: the level direction square to the light (x, z), where the
+  // road lies along it, and how bright it is.
+  uSunPath: { value: new THREE.Vector4(1, 0, 0, 0) },
 };
 
 // Hex (sRGB) → linear GLSL literal.
@@ -226,18 +229,25 @@ vec3 terrainColor(vec3 w, vec3 n) {
   vec2 grain = floor(w.xz * 4.3);
   float fine = pxHash(grain);
   float kind = pxHash(grain + 19.0);
+  // The true facet normal, not the smoothed one: terrace walls stay crisp courses of stone.
+  float slope = 1.0 - min(n.y, abs(normalize(cross(dFdx(w), dFdy(w))).y));
 
   // Rock. Terrace walls are laid dry in level courses of small stones, broken up so they never
-  // read as stripes; the living rock of the mountain runs in thicker, tilted beds, greyer,
-  // split by cracks.
+  // read as stripes. The living rock of the mountain is another thing: thick tilted beds that
+  // hardly differ, greyer, stained warm and cool in great patches, split by cracks.
   float wobble = (pxNoise(w.xz * 0.22) - 0.5) * 1.1;
-  float bedding = mix(wobble * 3.0 + w.x * 0.2 + w.z * 0.08, wobble, vTerrace);
-  float course = floor((w.y + bedding) / mix(1.0, 0.55, vTerrace));
+  float bedding = mix(wobble * 5.0 + w.x * 0.3 + w.z * 0.12, wobble, vTerrace);
+  float course = floor((w.y + bedding) / mix(2.8, 0.55, vTerrace));
   int band = int(mod(course + floor(pxHash(vec2(course, floor((w.x + w.z) * 0.45 + course * 0.5))) * 3.0), 6.0));
   vec3 cliff = STRATA[band];
   if (vTerrace < 0.5) {
-    cliff = mix(cliff, vec3(dot(cliff, vec3(0.3333))) * vec3(0.96, 0.98, 1.04), 0.55);
-    if (pxNoise(vec2((w.x - w.z) * 1.4 + wobble * 2.0, w.y * 0.22)) > 0.72) cliff *= 0.8;
+    vec2 face = vec2(w.x * 0.7 + w.z * 0.37, w.y);
+    cliff = mix(cliff, ${lin(0xb9b2a6)}, 0.62);
+    float stain = pxFbm(face * 0.06 + 7.0);
+    cliff *= stain > 0.6 ? vec3(1.07, 1.0, 0.9) : stain < 0.38 ? vec3(0.9, 0.93, 0.98) : vec3(1.0);
+    if (pxNoise(vec2(face.x * 1.4 + wobble * 2.0, w.y * 0.2)) > 0.74) cliff *= 0.82;
+    // Wherever the face eases, scrub takes hold on it in clumps.
+    if (slope < 0.8 && pxFbm(face * vec2(0.17, 0.26) + 13.0) > 0.57) cliff = fine > 0.6 ? ${lin(0x7aa05c)} : fine > 0.25 ? ${lin(0x55865a)} : ${lin(0x8fb468)};
   }
   if (fine > 0.9) cliff *= 0.88;
   // Every rock face is alive: grass and moss spill over its top, ivy hangs down it in places,
@@ -250,7 +260,6 @@ vec3 terrainColor(vec3 w, vec3 n) {
   float ivy = smoothstep(0.56, 0.8, pxNoise(w.xz * 0.13 + 50.0));
   if (above < 0.45 + creep * 0.55 + ivy * 1.5) cliff = fine > 0.55 ? ${lin(0x7aa05c)} : kind > 0.8 ? ${lin(0x9cbc68)} : ${lin(0x55865a)};
   else if (below < 0.25 + creep * 0.3) cliff *= vec3(0.84, 0.9, 0.82);
-  else if (vTerrace < 0.5 && pxNoise(vec2((w.x - w.z) * 0.4, w.y * 1.2) + 13.0) > 0.72) cliff = fine > 0.5 ? ${lin(0x7aa05c)} : ${lin(0x55865a)};
   // Where the sea washes the rock it is dark and weedy.
   if (w.y < ${(WATER_LEVEL + 0.7).toFixed(2)} + creep * 0.5) cliff = fine > 0.7 ? ${lin(0x5c7a5c)} : ${lin(0x7a7468)};
 
@@ -289,8 +298,6 @@ vec3 terrainColor(vec3 w, vec3 n) {
     else if (fine < 0.05 && path > edge - 0.9) flat_ = ${lin(PAL.grass)};
   }
 
-  // The true facet normal, not the smoothed one: terrace walls stay crisp courses of stone.
-  float slope = 1.0 - min(n.y, abs(normalize(cross(dFdx(w), dFdy(w))).y));
   // As the ground steepens, stones show through the turf before the rock takes over.
   if (!track && fine < smoothstep(0.16, 0.42, slope) * 0.6) flat_ = STRATA[band] * (kind > 0.5 ? 1.0 : 0.88);
   vec3 col = slope > 0.42 + (pxNoise(w.xz * 0.8) - 0.5) * 0.12 ? cliff : flat_;
@@ -329,6 +336,7 @@ vec3 terrainColor(vec3 w, vec3 n) {
 #ifdef WATER
 uniform vec3 uHorizon;
 uniform vec3 uHaze;
+uniform vec4 uSunPath;
 vec3 waterColor(vec3 w) {
   float depth = ${WATER_LEVEL.toFixed(2)} - pxGroundAt(w.xz);
   vec2 grain = floor(w.xz * 4.3);
@@ -364,7 +372,11 @@ vec3 waterColor(vec3 w) {
   // low, silver under the moon.
   float dash = pxHash(floor(vec2(along * 1.1, shoreward * 4.3)) + floor(uTime * 2.5) * vec2(7.0, 3.0));
   float shoal = smoothstep(0.52, 0.8, pxNoise(w.xz * 0.045 + uTime * 0.02)) * (1.0 - overcast);
-  if (dash > 0.998 - shoal * 0.05) col = mix(vec3(1.0, 0.98, 0.92), vec3(1.0, 0.8, 0.5), uGlow * (1.0 - uNight));
+  // Under a low sun, or the moon, the light lays a shimmering road across the water.
+  float aside = dot(w.xz, uSunPath.xy) - uSunPath.z;
+  float road = uSunPath.w * exp(-aside * aside / 500.0) * (1.0 - overcast);
+  col = mix(col, mix(vec3(0.75, 0.82, 1.0), vec3(1.0, 0.72, 0.42), 1.0 - uNight), road * 0.22);
+  if (dash > 0.998 - shoal * 0.035 - road * 0.22) col = mix(vec3(1.0, 0.98, 0.92), vec3(1.0, 0.8, 0.5), uGlow * (1.0 - uNight));
   // Rain dimples the whole surface.
   if (uWet.z > 0.02 && pxRings(w.xz * 0.95, uWet.z * 0.3) > 0.3) col = mix(col, vec3(0.9, 0.95, 1.0), 0.4);
 
@@ -495,6 +507,10 @@ if (pxLit > 0.5) {
 } else {
   pxCol = pxAlb * uShadowTint;
   if (pxNdl < -0.3) pxCol *= 0.84;
+  #ifdef WATER
+    // A cloud's shadow only deepens the sea a little.
+    pxCol = pxAlb * mix(uShadowTint, uSunTint, 0.5);
+  #endif
 }
 #ifdef GLOW
   pxCol = mix(pxCol, pxAlb * 1.5 + 0.06, uGlow);

@@ -131,6 +131,10 @@ renderer.setAnimationLoop(() => {
 
   sun.target.position.copy(player.position);
   sun.position.copy(player.position).addScaledVector(climate.lightDir, 120);
+  // The road the low sun, or the moon, lays on the sea runs through the middle of the view.
+  const level = Math.hypot(climate.lightDir.x, climate.lightDir.z) || 1;
+  const across = { x: -climate.lightDir.z / level, z: climate.lightDir.x / level };
+  GLOBALS.uSunPath.value.set(across.x, across.z, player.position.x * across.x + player.position.z * across.z, Math.max(climate.lowSun, climate.night * 0.5));
 
   // The sea runs out to a horizon a little way behind the last of the land, so the
   // mountain stands against the sky; the sky is painted from that line up.
