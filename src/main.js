@@ -3,7 +3,7 @@ import { PixelCamera, PixelRenderer } from './pixel.js';
 import { Player } from './player.js';
 import { GLOBALS } from './style.js';
 import { Climate } from './climate.js';
-import { createWorld, groundAt } from './world.js';
+import { CORNERS, WATER_LEVEL, createWorld, groundAt } from './world.js';
 
 const clamp = THREE.MathUtils.clamp;
 
@@ -33,6 +33,17 @@ const world = createWorld(scene);
 const player = new Player();
 player.position.set(2, groundAt(2, 20), 20);
 scene.add(player.root, player.fx);
+
+// For looking around while building the map: `?at=x,z` drops the avatar there, `?zoom=` sets the
+// height of the view, `?yaw=` its corner in quarter turns; `virt` in the console holds the rest.
+const params = new URLSearchParams(location.search);
+if (params.has('at')) {
+  const [x, z] = params.get('at').split(',').map(Number);
+  player.position.set(x, groundAt(x, z), z);
+}
+if (params.has('zoom')) view.viewHeight = Number(params.get('zoom'));
+if (params.has('yaw')) view.yaw = (Number(params.get('yaw')) * Math.PI) / 2;
+globalThis.virt = { climate, player, view, scene };
 
 function resize() {
   pixels.setSize(innerWidth, innerHeight);
@@ -95,6 +106,7 @@ function readInput(consume) {
 
 const clock = new THREE.Clock();
 const focus = new THREE.Vector3();
+const ahead = new THREE.Vector2();
 let t = 0;
 
 renderer.setAnimationLoop(() => {
@@ -103,8 +115,8 @@ renderer.setAnimationLoop(() => {
 
   view.yaw += (yawTarget - view.yaw) * (1 - Math.exp(-dt * 8));
   player.update(dt, t, readInput(!player.step), snapYaw(view.yaw));
-  world.update(t, dt);
   climate.update(dt);
+  world.update(t, dt, climate);
 
   GLOBALS.uTime.value = t;
   GLOBALS.uCloud.value.set(t * 0.035, t * 0.012);
@@ -118,5 +130,16 @@ renderer.setAnimationLoop(() => {
   sun.target.position.copy(player.position);
   sun.position.copy(player.position).addScaledVector(climate.lightDir, 120);
 
-  pixels.render(scene, view.camera, { skyTop: climate.skyTop, skyHorizon: climate.skyHorizon, texelWorld: view.texelWorld, time: t, weather: climate.screen });
+  // The sea runs out to a horizon a little way behind the far corner of the diorama, so the
+  // mountain stands against the sky; the sky is painted from that line up.
+  ahead.set(view.forward.x, view.forward.z).normalize();
+  const offing = Math.max(...CORNERS.map(([x, z]) => x * ahead.x + z * ahead.y)) + 30;
+  GLOBALS.uHorizon.value.set(ahead.x, ahead.y, offing);
+  const horizon = focus.set(ahead.x * offing, WATER_LEVEL, ahead.y * offing).project(view.camera).y * 0.5 + 0.5;
+
+  // How far the wind pushes the rain sideways on screen.
+  const weather = climate.screen;
+  weather.horizon = horizon;
+  weather.slant = (climate.wind.x * view.right.x + climate.wind.y * view.right.z) * weather.wind;
+  pixels.render(scene, view.camera, { skyTop: climate.skyTop, skyHorizon: climate.skyHorizon, texelWorld: view.texelWorld, time: t, weather });
 });

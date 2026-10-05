@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { fbm, pick } from './noise.js';
 import { PAL, paint } from './style.js';
-import { estateWeight, footU, groundAt, isWild, slopeAt, toX, toZ, UP } from './terrain.js';
+import { VILLAGES, cultivated, estateWeight, footU, groundAt, isWild, slopeAt, toX, toZ, UP } from './terrain.js';
 
 const SHAPES = {
   box: new THREE.BoxGeometry(1, 1, 1),
@@ -196,11 +196,8 @@ export function buildVillages(scene, rng) {
 
   // Houses packed in rows along the terraces, as in Manarola, inside an organic blob:
   // the main village on the left-hand slopes above the sea, a hamlet on the right headland.
-  const bell = { v: -48, u: footU(-48) + 11 };
-  const villages = [
-    { cu: bell.u, cv: bell.v, radius: 17 },
-    { cu: -46, cv: 84, radius: 10 },
-  ];
+  const bell = VILLAGES[0];
+  const villages = VILLAGES.map((village) => ({ cu: village.u, cv: village.v, radius: village.r }));
   for (const village of villages) {
     for (let v = village.cv - village.radius - 4; v <= village.cv + village.radius + 4; v += 3.4) {
       for (let u = village.cu - village.radius - 4; u <= village.cu + village.radius + 4; u += 3.2) {
@@ -237,9 +234,8 @@ export function buildVillages(scene, rng) {
     for (let u = 40; u < 150; u += 1.6) {
       const x = toX(u, v);
       const z = toZ(u, v);
-      // Vineyards everywhere on the flanks, densest where the old village stood.
-      const vineyard = v > -16 && v < 42 && u < footU(v) + 34;
-      if (u < footU(v) + 1 || (!vineyard && fbm(v * 0.03 + 5, u * 0.03, 2) < 0.36)) continue;
+      // Vines grow wherever the mountain has been terraced for them.
+      if (u < footU(v) + 1 || cultivated(u, v) < 0.6) continue;
       if (estateWeight(u, v) > 0.25) continue; // the estate plants its own rows
       if (slopeAt(x, z) > 0.3 || !isWild(x, z, -1)) continue;
       if (placed.some((p) => Math.hypot(p[0] - x, p[1] - z) < 3)) continue;

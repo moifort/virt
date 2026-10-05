@@ -70,6 +70,7 @@ const railStart = { x: toX(RAIL.a.u, RAIL.a.v), z: toZ(RAIL.a.u, RAIL.a.v) };
 const railEnd = { x: toX(RAIL.b.u, RAIL.b.v), z: toZ(RAIL.b.u, RAIL.b.v) };
 const railLength = Math.hypot(railEnd.x - railStart.x, railEnd.z - railStart.z);
 const railDir = { x: (railEnd.x - railStart.x) / railLength, z: (railEnd.z - railStart.z) / railLength };
+const RAIL_LINE = [railStart.x, railStart.z, railEnd.x, railEnd.z];
 /** World position of a point given along (s) and across (l) the line. */
 export const railPoint = (s, l = 0) => ({ x: railStart.x + railDir.x * s - railDir.z * l, z: railStart.z + railDir.z * s + railDir.x * l });
 function stationYard(x, z) {
@@ -94,26 +95,65 @@ function plotShift(u, v) {
 
 // ---------------------------------------------------------------- Ground
 
+// The villages, in (u, v): the main one on the left-hand slopes above the sea, a hamlet on the
+// right headland.
+export const VILLAGES = [
+  { u: footU(-48) + 11, v: -48, r: 17 },
+  { u: -46, v: 84, r: 10 },
+];
+
+/**
+ * How much of a mountainside is worked (1) rather than left wild (0): terraced for the vines
+ * around the villages and the estate and in patches across the lower flanks, never near the top.
+ */
+export function cultivated(u, v) {
+  const foot = footU(v, u);
+  const heart = smoothstep(-22, -12, v) * smoothstep(48, 38, v) * smoothstep(foot + 40, foot + 30, u);
+  const patches = smoothstep(0.47, 0.55, fbm(v * 0.03 + 5, u * 0.03, 2)) * smoothstep(foot - 2, foot + 6, u) * smoothstep(foot + 78, foot + 52, u);
+  let worked = Math.max(heart, patches, estateWeight(u, v));
+  for (const village of VILLAGES) worked = Math.max(worked, smoothstep(village.r + 12, village.r + 2, Math.hypot(u - village.u, v - village.v)));
+  return worked;
+}
+
 export function heightAt(x, z) {
   const u = toU(x, z);
   const v = toV(x, z);
   let h = 0.7 + (fbm(x * 0.03, z * 0.03, 3) - 0.5) * 2.2;
-  // The mountain: steep terraced slopes, like the Ligurian coast.
+  // The mountain rises behind the bay, as steep as the Ligurian coast.
   const foot = footU(v, u);
   const back = smoothstep(foot, foot + 80, u) * (40 + (fbm(x * 0.015, z * 0.015, 3) - 0.5) * 20) + Math.max(0, u - foot) * 0.05;
   // Side ridges run down from the mountain and plunge into the sea, closing the bay.
   const ridge = headland(v) * (13 + smoothstep(-110, 70, u) * 30 + (fbm(x * 0.03, z * 0.03, 3) - 0.5) * 10);
-  h += Math.max(back, ridge);
+  const mountain = Math.max(back, ridge);
+  const estate = estateWeight(u, v);
+  const worked = cultivated(u, v);
+  // Its flanks are no smooth ramp: spurs and gullies run down them, outcrops of bare rock break
+  // through, buttresses stand out near the top, and the ground is rough underfoot. The estate
+  // and the railway were surveyed on a quieter slope.
+  const lift = smoothstep(0, 10, mountain);
+  const calm = Math.max(estate, smoothstep(30, 8, segmentDistance(x, z, RAIL_LINE)));
+  const spurs = (fbm(v * 0.045 + fbm(u * 0.02, v * 0.02, 2) * 1.5, u * 0.012 + 3.3, 3) - 0.5) * 2;
+  const crag = fbm(x * 0.06 + 40, z * 0.06 - 12, 3);
+  let relief = spurs * (1.5 + mountain * 0.14);
+  relief += smoothstep(0.57, 0.61, crag) * (1.5 + 2.4 * smoothstep(0.61, 0.74, crag)) * (1 - worked);
+  relief += smoothstep(0.52, 0.57, fbm(x * 0.028 + 9, z * 0.028 + 2, 2)) * smoothstep(16, 28, mountain) * 4.5 * (1 - worked);
+  relief += (fbm(x * 0.16, z * 0.16, 2) - 0.5) * 1.3 * (1 - worked);
+  h += mountain + relief * lift * (1 - calm);
   // The sea: sheer cliffs under the headlands, softer coves in the bay.
   const coast = coastU(v, u);
   const sheer = (4 + fbm(v * 0.04 + 11, 2.3, 2) * 14) * (1 - headland(v) * 0.75);
   h -= smoothstep(coast + 2, coast - sheer, u) * (9 + headland(v) * 20);
-  // Terraces: shelves and short dry-stone walls.
+  // Terraces: shelves and short dry-stone walls where the land is worked, and on the plain.
+  // The shelves follow the lie of the land rather than level lines. The wild slopes keep their
+  // fall, only eased here and there into natural benches.
   const step = 2.4;
-  const estate = estateWeight(u, v);
   const shift = estate > 0 ? plotShift(u, v) * step * estate : 0;
-  const shelf = Math.floor((h + shift) / step) * step;
-  h = shelf + smoothstep(0.72, 1, (h + shift - shelf) / step) * step - shift;
+  const wander = (fbm(x * 0.035 + 7, z * 0.035 + 1, 2) - 0.5) * 5 * lift * (1 - estate);
+  const level = h + shift + wander;
+  const shelf = Math.floor(level / step) * step;
+  const terraced = shelf + smoothstep(0.72, 1, (level - shelf) / step) * step - shift - wander;
+  const benches = smoothstep(0.45, 0.7, fbm(x * 0.02 - 3, z * 0.02 + 8, 2)) * 0.45;
+  h += (terraced - h) * Math.max(worked, smoothstep(3, 0.5, mountain), benches);
   // The beach: a smooth gentle slope down into turquoise shallows, no terraces.
   const beach = beachBand(v) * smoothstep(coast + 14, coast + 8, u) * smoothstep(coast - 5, coast + 1, u);
   h += (WATER_LEVEL + 0.25 + Math.max(0, u - coast) * 0.08 - h) * beach;
@@ -124,15 +164,30 @@ export function heightAt(x, z) {
   return h;
 }
 
+/**
+ * Beyond the diorama there is only the sea, with no end to it: the bed carries on from the edge
+ * and sinks into the deep, and where the cut runs through land the water laps at its foot.
+ */
+function seaBed(x, z) {
+  const u = toU(x, z);
+  const v = toV(x, z);
+  const out = Math.max(SQUARE.u0 - u, u - SQUARE.u1, SQUARE.v0 - v, v - SQUARE.v1);
+  const cu = Math.min(SQUARE.u1, Math.max(SQUARE.u0, u));
+  const cv = Math.min(SQUARE.v1, Math.max(SQUARE.v0, v));
+  return Math.max(-14, Math.min(heightAt(toX(cu, cv), toZ(cu, cv)), WATER_LEVEL - 0.3) - out * 0.45);
+}
+
 export const GRID = new Float32Array((SEGMENTS + 1) ** 2);
 for (let iz = 0; iz <= SEGMENTS; iz++) {
   for (let ix = 0; ix <= SEGMENTS; ix++) {
     const x = ix * CELL - HALF;
     const z = iz * CELL - HALF;
-    // Outside the diorama there is only open sea, deep enough to read as such.
-    GRID[iz * (SEGMENTS + 1) + ix] = inSquare(x, z, -1.5) ? Math.max(BASE_Y + 1, heightAt(x, z)) : -14;
+    GRID[iz * (SEGMENTS + 1) + ix] = inSquare(x, z, -1.5) ? Math.max(BASE_Y + 1, heightAt(x, z)) : seaBed(x, z);
   }
 }
+
+/** The corners of the diorama, in world (x, z). */
+export const CORNERS = [[SQUARE.u0, SQUARE.v0], [SQUARE.u0, SQUARE.v1], [SQUARE.u1, SQUARE.v1], [SQUARE.u1, SQUARE.v0]].map(([u, v]) => [toX(u, v), toZ(u, v)]);
 
 /** Ground height matching the rendered triangles exactly. */
 export function groundAt(x, z) {
@@ -187,14 +242,18 @@ export function buildTerrain() {
   const nv = SQUARE.v1 - SQUARE.v0;
   const geo = new THREE.PlaneGeometry(1, 1, nv, nu);
   const pos = geo.attributes.position;
+  const worked = new Float32Array(pos.count);
   for (let iu = 0; iu <= nu; iu++) {
     for (let iv = 0; iv <= nv; iv++) {
       const i = iu * (nv + 1) + iv;
       const x = toX(SQUARE.u0 + iu, SQUARE.v0 + iv);
       const z = toZ(SQUARE.u0 + iu, SQUARE.v0 + iv);
       pos.setXYZ(i, x, groundAt(x, z), z);
+      worked[i] = cultivated(SQUARE.u0 + iu, SQUARE.v0 + iv);
     }
   }
+  // Tells the built terrace walls from the living rock.
+  geo.setAttribute('aTerrace', new THREE.BufferAttribute(worked, 1));
   // Make sure the triangles face up.
   const index = geo.index.array;
   const a = new THREE.Vector3();
@@ -266,56 +325,16 @@ export function buildSides(holes = []) {
   return group;
 }
 
-
-/** The sea stops at the cut of the diorama, like the land: a slab of water with clear sides. */
+/**
+ * The sea has no edge: it runs on past the diorama on every side, out to a horizon that the
+ * view sets for itself (see `uHorizon`).
+ */
 export function buildWater() {
-  const group = new THREE.Group();
-  const corners = [[SQUARE.u0, SQUARE.v0], [SQUARE.u0, SQUARE.v1], [SQUARE.u1, SQUARE.v1], [SQUARE.u1, SQUARE.v0]].map(([u, v]) => [toX(u, v), WATER_LEVEL, toZ(u, v)]);
-  const surface = new THREE.BufferGeometry();
-  surface.setAttribute('position', new THREE.Float32BufferAttribute([0, 1, 2, 0, 2, 3].flatMap((i) => corners[i]), 3));
-  surface.computeVertexNormals();
-  const top = new THREE.Mesh(surface, paint(0xffffff, { water: true, doubleSide: true }));
-  top.receiveShadow = true;
-  group.add(top);
-
-  // Cut faces: wherever the sea bed is below the waterline at the edge, the water shows in
-  // section, paler near the surface and deep blue below.
-  const shallow = [];
-  const deep = [];
-  const band = 1.4;
-  const quad = (out, p0, p1, lo0, lo1, hi0, hi1) => out.push(p0.x, lo0, p0.z, p1.x, lo1, p1.z, p1.x, hi1, p1.z, p0.x, lo0, p0.z, p1.x, hi1, p1.z, p0.x, hi0, p0.z);
-  const edges = [
-    ['u', SQUARE.u1, SQUARE.v0, SQUARE.v1],
-    ['u', SQUARE.u0, SQUARE.v0, SQUARE.v1],
-    ['v', SQUARE.v0, SQUARE.u0, SQUARE.u1],
-    ['v', SQUARE.v1, SQUARE.u0, SQUARE.u1],
-  ];
-  for (const [fixed, value, from, to] of edges) {
-    const point = (s) => {
-      const [u, v] = fixed === 'u' ? [value, s] : [s, value];
-      const p = new THREE.Vector3(toX(u, v), 0, toZ(u, v));
-      p.y = Math.max(BASE_Y, groundAt(p.x, p.z));
-      return p;
-    };
-    for (let s = from; s < to; s++) {
-      const p0 = point(s);
-      const p1 = point(s + 1);
-      if (p0.y >= WATER_LEVEL && p1.y >= WATER_LEVEL) continue;
-      const b0 = Math.min(p0.y, WATER_LEVEL);
-      const b1 = Math.min(p1.y, WATER_LEVEL);
-      const m0 = Math.max(b0, WATER_LEVEL - band);
-      const m1 = Math.max(b1, WATER_LEVEL - band);
-      quad(deep, p0, p1, b0, b1, m0, m1);
-      quad(shallow, p0, p1, m0, m1, WATER_LEVEL, WATER_LEVEL);
-    }
-  }
-  for (const [data, color] of [[shallow, 0x58b4cc], [deep, 0x2f72ac]]) {
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(data, 3));
-    geo.computeVertexNormals();
-    group.add(new THREE.Mesh(geo, paint(color, { doubleSide: true })));
-  }
-  return group;
+  const reach = 2400;
+  const surface = new THREE.PlaneGeometry(reach * 2, reach * 2).rotateX(-Math.PI / 2).translate(0, WATER_LEVEL, 0);
+  const mesh = new THREE.Mesh(surface, paint(0xffffff, { water: true }));
+  mesh.receiveShadow = true;
+  return mesh;
 }
 
 export function scatterInstanced(scene, rng, geo, mat, count, place) {

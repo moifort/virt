@@ -53,6 +53,16 @@ export function bake(root) {
   return root;
 }
 
+/**
+ * Marks a source of light at a point of `parent`: after dark a warm pool spreads `reach` metres
+ * around it on the ground and on whatever stands there (see `lampMap` in world.js).
+ */
+export function lamplight(parent, x, y, z, reach = 6.5) {
+  const mark = at(new THREE.Object3D(), x, y, z, parent);
+  mark.userData.lamp = reach;
+  return mark;
+}
+
 export const INK = 0x2b2533;
 export const STONE = 0xe8d9c0;
 export const DARK_WOOD = 0x8a5a41;
@@ -94,6 +104,7 @@ export function lantern(parent, x, y, z, color = WARM_LIGHT) {
   at(cyl(0.2, 0.13, 0.42, color, 4, { glow: true }), 0.6, 2.55, 0, g).rotation.y = Math.PI / 4;
   at(cone(0.28, 0.2, INK, 4), 0.6, 2.86, 0, g).rotation.y = Math.PI / 4;
   at(cyl(0.14, 0.14, 0.05, INK, 4), 0.6, 2.32, 0, g).rotation.y = Math.PI / 4;
+  lamplight(g, 0.6, 2.5, 0);
 }
 
 
