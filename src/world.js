@@ -1,20 +1,20 @@
-// The VIRT: a Bob-style virtual workplace set in a bay of the Ligurian coast, painted the way a
+// The VIRT: a Bob-style virtual workplace set on an island of the Ligurian coast, painted the way a
 // Ghibli background is.
 import * as THREE from 'three';
 import { mulberry32 } from './noise.js';
 import { GLOBALS, PATH_COUNT } from './style.js';
 import { buildLife } from './life.js';
 import { buildNature } from './nature.js';
-import { GRID, HALF, PATHS, SEGMENTS, WORLD_SIZE, ZONES, buildSides, buildTerrain, buildWater } from './terrain.js';
-import { buildBase, planBase } from './base.js';
+import { COVE, GRID, HALF, PATHS, SEGMENTS, WORLD_SIZE, ZONES, buildTerrain, buildWater, coveAt } from './terrain.js';
 import { buildEstate } from './estate.js';
+import { buildStream } from './stream.js';
 import { bake } from './kit.js';
 import { buildRailway } from './railway.js';
 import { buildSky } from './sky.js';
 import { buildVillages } from './village.js';
 import { buildAgora, buildAtelier, buildLibrary, buildMoot, buildPods, buildPort, buildPub } from './zones.js';
 
-export { CORNERS, SUN_DIR, WATER_LEVEL, ZONES, groundAt, inSquare } from './terrain.js';
+export { LAND_ENDS, SUN_DIR, WATER_LEVEL, ZONES, groundAt, inSquare } from './terrain.js';
 
 // ---------------------------------------------------------------- World
 
@@ -31,9 +31,10 @@ export function createWorld(scene) {
   heightTex.needsUpdate = true;
   GLOBALS.uHeight.value = heightTex;
   GLOBALS.uHeightMap.value.set(HALF, WORLD_SIZE, SEGMENTS + 1);
+  const cove = coveAt((COVE.u0 + COVE.u1) / 2, -3);
+  GLOBALS.uCove.value.set(cove.x, cove.z, (COVE.u1 - COVE.u0) / 2 + 10);
 
-  const rooms = planBase();
-  scene.add(buildTerrain(), buildSides(rooms), buildWater());
+  scene.add(buildTerrain(), buildWater());
   const builders = {
     agora: buildAgora,
     library: buildLibrary,
@@ -50,11 +51,11 @@ export function createWorld(scene) {
     builders[zn.id](g, rng, animated);
     bake(g);
   }
+  buildStream(scene, rng, animated);
   buildVillages(scene, rng, animated);
   buildEstate(scene, rng);
   buildNature(scene, rng);
   buildLife(scene, rng, animated);
-  buildBase(scene, rooms, animated);
   buildRailway(scene, animated);
   buildSky(scene, rng, animated);
   GLOBALS.uLampMap.value = lampMap(scene);

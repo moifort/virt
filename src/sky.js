@@ -106,11 +106,11 @@ export function buildSky(scene, rng, animated) {
   // Most of the flight rises beyond the mountain and peeks over its crest; the rest hang far
   // out over the sea, small with distance.
   const flight = [];
-  for (let i = 0; i < 9; i++) flight.push({ u: 116 + rng() * 40, v: -95 + i * 24 + (rng() - 0.5) * 16, y: 30 + rng() * 26, size: 0.8 + rng() * 0.35 });
+  for (let i = 0; i < 9; i++) flight.push({ u: 150 + rng() * 90, v: -95 + i * 24 + (rng() - 0.5) * 16, y: 98 + rng() * 30, size: 0.8 + rng() * 0.35 });
   for (let i = 0; i < 7; i++) {
     const a = rng() * Math.PI * 2;
-    const d = 210 + rng() * 160;
-    flight.push({ u: Math.cos(a) * d, v: Math.sin(a) * d, y: 26 + rng() * 40, size: 0.5 + rng() * 0.25 });
+    const d = 260 + rng() * 160;
+    flight.push({ u: 60 + Math.cos(a) * d, v: Math.sin(a) * d, y: 26 + rng() * 50, size: 0.5 + rng() * 0.25 });
   }
   for (const home of flight) {
     const { group, fire } = balloon(rng);

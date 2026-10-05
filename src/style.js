@@ -14,16 +14,16 @@ export const PAL = {
   lilac: 0xb7a0cf,
   cream: 0xf7ecd4,
   wetSand: 0xc9b48e,
-  grass: 0x97bf6c,
-  grassDeep: 0x6a9e5e,
-  moss: 0x82aa66,
+  grass: 0x8cc558,
+  grassDeep: 0x559c4e,
+  moss: 0x74ae58,
   teal: 0x4fb0a8,
   ivory: 0xf3ead6,
   coral: 0xe9765c,
   saffron: 0xf6c54f,
   red: 0xc9443c,
   skin: 0xf1c9a3,
-  water: 0x7ad0cc,
+  water: 0x5fd0cc,
   waterLight: 0x9fe3d6,
   plum: 0x7d5c9e,
   sky: 0x8fd3e0,
@@ -67,6 +67,8 @@ export const GLOBALS = {
   // Where the endless sea meets the sky: the direction the view looks in on the ground (x, z)
   // and how far along it the horizon lies; and the haze the far water pales into.
   uHorizon: { value: new THREE.Vector3(0, -1, 1e4) },
+  // The pebble cove: its middle (x, z) and its reach.
+  uCove: { value: new THREE.Vector3(0, 0, -1) },
   uHaze: { value: new THREE.Color(0.8, 0.9, 0.95) },
 };
 
@@ -89,7 +91,7 @@ uniform float uTime;
 uniform vec3 uWind;
 varying vec3 vWorld;
 varying float vGust;
-#ifdef FLOW
+#if defined(FLOW) || defined(CASCADE)
   varying vec2 pxUv;
 #endif
 #ifdef TERRAIN
@@ -139,7 +141,7 @@ vec4 pxW = vec4(transformed, 1.0);
   pxW = instanceMatrix * pxW;
 #endif
 vWorld = (modelMatrix * pxW).xyz;
-#ifdef FLOW
+#if defined(FLOW) || defined(CASCADE)
   pxUv = uv;
 #endif
 #ifdef TERRAIN
@@ -167,7 +169,7 @@ uniform sampler2D uLampMap;
 uniform vec3 uHeightMap;
 varying vec3 vWorld;
 varying float vGust;
-#ifdef FLOW
+#if defined(FLOW) || defined(CASCADE)
   varying vec2 pxUv;
 #endif
 
@@ -206,6 +208,7 @@ float pxGroundAt(vec2 xz) {
 
 #ifdef TERRAIN
 varying float vTerrace;
+uniform vec3 uCove;
 // Dry-stone terrace walls and cliffs: weathered Ligurian sandstone, grey to warm ochre.
 const vec3 STRATA[6] = vec3[6](${[0xcdbb9c, 0xb8a88e, 0xd9c9a8, 0xc2ad8a, 0xa99c88, 0xcfb692].map(lin).join(', ')});
 // 1 inside a puddle.
@@ -258,10 +261,10 @@ vec3 terrainColor(vec3 w, vec3 n) {
   bool green = patchN > mix(0.42, 0.28, smoothstep(4.0, 14.0, w.y));
   vec3 flat_;
   if (green) {
-    flat_ = tuft > 0.64 ? ${lin(PAL.grassDeep)} : tuft < 0.3 ? ${lin(0xb2cf78)} : ${lin(PAL.grass)};
+    flat_ = tuft > 0.64 ? ${lin(PAL.grassDeep)} : tuft < 0.3 ? ${lin(0xaed862)} : ${lin(PAL.grass)};
     // Blades catching the light, clover in the hollows.
-    if (fine > 0.9) flat_ = ${lin(0xc8dc88)};
-    else if (fine < 0.09) flat_ = ${lin(0x5a9264)};
+    if (fine > 0.9) flat_ = ${lin(0xcbe474)};
+    else if (fine < 0.09) flat_ = ${lin(0x3f8c56)};
     // Flowers come in drifts: daisies, buttercups, poppies and wild lavender.
     float bloom = (1.0 - uSeason.y) * (1.0 - uSeason.x * 0.8) * (0.55 + uSeason.z * 0.45);
     if (pxNoise(w.xz * 0.11 + 40.0) > 1.0 - bloom * 0.42 && fine > 0.82 && fine <= 0.9) {
@@ -292,12 +295,20 @@ vec3 terrainColor(vec3 w, vec3 n) {
   if (!track && fine < smoothstep(0.16, 0.42, slope) * 0.6) flat_ = STRATA[band] * (kind > 0.5 ? 1.0 : 0.88);
   vec3 col = slope > 0.42 + (pxNoise(w.xz * 0.8) - 0.5) * 0.12 ? cliff : flat_;
   // White sand just above the waterline, combed by the tide; wet sand at the water's edge.
+  // The cove by the harbour is shingle instead: sea-worn pebbles, white, grey and ochre, dark
+  // where the water has just been.
+  bool shingle = distance(w.xz, uCove.xy) < uCove.z + (pxNoise(w.xz * 0.2) - 0.5) * 6.0;
   if (w.y < ${(WATER_LEVEL + 1.2).toFixed(2)} && slope < 0.3) {
-    col = fine > 0.9 ? ${lin(0xeee2c8)} : ${lin(0xfbf5e6)};
-    if (sin(w.y * 16.0 + pxNoise(w.xz * 0.4) * 5.0) > 0.92) col = ${lin(0xf0e4c8)};
-    if (kind > 0.985) col = ${lin(0xd8a890)};
+    if (shingle) {
+      col = kind > 0.8 ? ${lin(0xf4f1ea)} : kind > 0.55 ? ${lin(0xd6d2ca)} : kind > 0.3 ? ${lin(0xb4b0aa)} : kind > 0.12 ? ${lin(0xd8c4a0)} : ${lin(0x8f8c88)};
+      if (w.y < ${(WATER_LEVEL + 0.45).toFixed(2)}) col *= 0.76;
+    } else {
+      col = fine > 0.9 ? ${lin(0xeee2c8)} : ${lin(0xfbf5e6)};
+      if (sin(w.y * 16.0 + pxNoise(w.xz * 0.4) * 5.0) > 0.92) col = ${lin(0xf0e4c8)};
+      if (kind > 0.985) col = ${lin(0xd8a890)};
+    }
   }
-  if (w.y < ${(WATER_LEVEL + 0.4).toFixed(2)}) col = ${lin(0xdccba6)};
+  if (w.y < ${(WATER_LEVEL + 0.4).toFixed(2)} && !shingle) col = ${lin(0xdccba6)};
 
   // Rain gathers in the hollows of level ground, on the trodden paths first.
   if (uWet.y > 0.01 && slope < 0.05 && w.y > ${(WATER_LEVEL + 1.3).toFixed(2)}) {
@@ -325,12 +336,12 @@ vec3 waterColor(vec3 w) {
   // Mediterranean ramp, clear to the bottom: pale turquoise over the sand, then deep blue.
   // The bands fray into each other pixel by pixel.
   float d = depth + (fine - 0.5) * min(depth, 1.6) * 0.5;
-  vec3 col = d < 0.9 ? ${lin(0xc4f2e4)}
-    : d < 2.0 ? ${lin(0x9fe2d4)}
+  vec3 col = d < 0.9 ? ${lin(0xb6f4e2)}
+    : d < 2.0 ? ${lin(0x84e4d2)}
     : d < 3.6 ? ${lin(PAL.water)}
-    : d < 5.6 ? ${lin(0x66bcd2)}
-    : d < 8.5 ? ${lin(0x58a8ce)}
-    : ${lin(0x4e98c8)};
+    : d < 5.6 ? ${lin(0x46b2d6)}
+    : d < 8.5 ? ${lin(0x3896d2)}
+    : ${lin(0x2f82ca)};
   // The sea bed shows through: dark meadows of posidonia and scattered rock.
   if (depth > 0.9 && depth < 6.5 && pxFbm(w.xz * 0.13 + 31.0) > 0.58) col = mix(col, ${lin(0x1f6f78)}, depth < 3.6 ? 0.5 : 0.28);
   // A net of light dances on the sand in the shallows.
@@ -456,6 +467,14 @@ bool pxGlass = max(max(abs(pxBase.r - 0.040), abs(pxBase.g - 0.032)), abs(pxBase
   }
 #endif
 
+#ifdef CASCADE
+  // Falling water: white threads sliding down over blue, each lane at its own pace. The mesh
+  // gives the distance fallen in its texture coordinate.
+  float pxLane = pxHash(vec2(floor(pxUv.x * 7.0), 3.0));
+  float pxFall = fract(pxUv.y * (0.22 + pxLane * 0.1) - uTime * (0.7 + pxLane * 0.5) + pxLane * 5.0);
+  pxAlb = pxFall < 0.4 ? vec3(0.97, 0.99, 1.0) : pxFall < 0.72 ? vec3(0.74, 0.9, 0.96) : vec3(0.45, 0.74, 0.88);
+#endif
+
 float pxLit = 0.0;
 float pxNdl = 0.0;
 #if NUM_DIR_LIGHTS > 0
@@ -481,8 +500,8 @@ if (pxLit > 0.5) {
   pxCol = mix(pxCol, pxAlb * 1.5 + 0.06, uGlow);
 #endif
 #ifdef WATER
-  // Far out the water pales into the haze, and keeps just enough of itself to draw the horizon.
-  pxCol = mix(pxCol, uHaze, smoothstep(-170.0, -6.0, pxOffing) * 0.82);
+  // Far out the water pales into the haze until nothing tells it from the sky.
+  pxCol = mix(pxCol, uHaze, smoothstep(-190.0, -12.0, pxOffing));
 #endif
 #ifndef WATER
   // Rain bounces off everything that faces the sky.
@@ -513,13 +532,14 @@ gNormal = vec4(normal * 0.5 + 0.5, 1.0);
 `;
 
 const cache = new Map();
-const FLAGS = { terrain: 'TERRAIN', water: 'WATER', sway: 'SWAY', glow: 'GLOW', leaf: 'LEAF', blossom: 'BLOSSOM', roof: 'ROOF', wall: 'WALL', flow: 'FLOW' };
+const FLAGS = { terrain: 'TERRAIN', water: 'WATER', sway: 'SWAY', glow: 'GLOW', leaf: 'LEAF', blossom: 'BLOSSOM', roof: 'ROOF', wall: 'WALL', flow: 'FLOW', cascade: 'CASCADE' };
 
 /**
  * @param {number} color sRGB hex
- * @param {{terrain?: boolean, water?: boolean, sway?: boolean, glow?: boolean, leaf?: boolean, blossom?: boolean, roof?: boolean, wall?: boolean, flow?: boolean, flat?: boolean, doubleSide?: boolean, backSide?: boolean, map?: THREE.Texture}} [opts]
+ * @param {{terrain?: boolean, water?: boolean, sway?: boolean, glow?: boolean, leaf?: boolean, blossom?: boolean, roof?: boolean, wall?: boolean, flow?: boolean, cascade?: boolean, flat?: boolean, doubleSide?: boolean, backSide?: boolean, map?: THREE.Texture}} [opts]
  *   `leaf` is foliage (painted in clumps, rustling), `blossom` an orchard crown that flowers and
- *   sheds, `roof` tiles, `wall` aged plaster, `flow` running rain water.
+ *   sheds, `roof` tiles, `wall` aged plaster, `flow` rain water running off a roof, `cascade` a
+ *   stream or a waterfall.
  */
 export function paint(color, opts = {}) {
   const { map, ...flags } = opts;

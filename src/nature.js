@@ -8,19 +8,19 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { fbm, pick } from './noise.js';
 import { PAL, WATER_LEVEL, paint, solid } from './style.js';
 import { at, bake, ball, box, cone, cyl, lantern } from './kit.js';
-import { PATHS, UP, coastU, cultivated, footU, groundAt, inSquare, isWild, randomSpot, scatterInstanced, slopeAt, toU, toV, toX, toZ } from './terrain.js';
+import { COVE, PATHS, UP, ZONES, anywhere, coastU, coveAt, cultivated, footU, groundAt, isWild, scatterInstanced, slopeAt, toU, toV, toX, toZ } from './terrain.js';
 
 const BARK = 0x7d5a48;
 const DARK_BARK = 0x5e463c;
 const OLIVE_BARK = 0x76695a;
 // Foliage is always three tones, from the depths between the boughs to the sunlit tips.
-const PINE = [0x3f6e4a, 0x538554, 0x6f9e5e];
-const CYPRESS = [0x2f5a44, 0x3c6c4e, 0x4a7c56];
-const OLIVE = [0x7d9778, 0x93ab86, 0xaec29a];
-const OAK = [0x3d6a46, 0x4f8050, 0x69985a];
-const LEMON = [0x3f7848, 0x54905a, 0x74a862];
-const ORCHARD = [0x4f8a52, 0x64a05c, 0x82b46a];
-const PALM = [0x3f7a4a, 0x56925a, 0x74aa66];
+const PINE = [0x2f7046, 0x48904c, 0x74b452];
+const CYPRESS = [0x245a40, 0x327048, 0x44864e];
+const OLIVE = [0x7a9c74, 0x93b482, 0xb2cc96];
+const OAK = [0x2c6a44, 0x43884a, 0x6aa84e];
+const LEMON = [0x357a44, 0x4f9a50, 0x7cb856];
+const ORCHARD = [0x4a9250, 0x62aa56, 0x86c260];
+const PALM = [0x357e48, 0x4f9a54, 0x78b85c];
 const ROCK = [0xcfc3b0, 0xb9ad9c, 0xa99d8e, 0xd8cdb8];
 const LEAF = { leaf: true };
 const BLOSSOM = { blossom: true };
@@ -334,14 +334,14 @@ function prototype(group) {
 }
 
 /** Instances a species across the bay: a few baked variants, many placements. */
-function grow(scene, rng, build, { count, variants = 3, maxR = 112, margin = 0, maxSlope = 0.4, where = () => true, size = [0.8, 1.25], sink = 0.1 }) {
+function grow(scene, rng, build, { count, variants = 3, margin = 0, maxSlope = 0.4, where = () => true, size = [0.8, 1.25], sink = 0.1 }) {
   const protos = Array.from({ length: variants }, () => prototype(build(rng)));
   const placements = protos.map(() => []);
   const p = new THREE.Vector3();
   const q = new THREE.Quaternion();
   const s = new THREE.Vector3();
   for (let i = 0, n = 0; i < count * 20 && n < count; i++) {
-    randomSpot(rng, p, maxR);
+    anywhere(rng, p);
     const slope = slopeAt(p.x, p.z);
     if (!isWild(p.x, p.z, margin) || slope > maxSlope || !where(p.x, p.z)) continue;
     q.setFromAxisAngle(UP, rng() * Math.PI * 2);
@@ -376,8 +376,8 @@ export function buildNature(scene, rng) {
     b.rotateY((k / 5) * Math.PI);
     blades.push(b);
   }
-  scatterInstanced(scene, rng, mergeGeometries(blades), paint(0xffffff, { sway: true }), 7000, (r, p, s, c) => {
-    randomSpot(r, p, 135);
+  scatterInstanced(scene, rng, mergeGeometries(blades), paint(0xffffff, { sway: true }), 11000, (r, p, s, c) => {
+    anywhere(r, p);
     if (!isWild(p.x, p.z, -1.5) || slopeAt(p.x, p.z) > 0.8) return false;
     if (p.y < WATER_LEVEL + 1.3) return false; // keep the beach clean
     const lush = fbm(p.x * 0.05 + 3, p.z * 0.05 - 8, 3);
@@ -394,8 +394,8 @@ export function buildNature(scene, rng) {
     const a = (k / 5) * Math.PI * 2;
     petals.push(new THREE.IcosahedronGeometry(0.09, 0).scale(1.4, 0.5, 1).translate(Math.cos(a) * 0.11, 0.64, Math.sin(a) * 0.11));
   }
-  scatterInstanced(scene, rng, mergeGeometries(petals), paint(0xffffff, { sway: true }), 3400, (r, p, s, c) => {
-    randomSpot(r, p, 135);
+  scatterInstanced(scene, rng, mergeGeometries(petals), paint(0xffffff, { sway: true }), 5200, (r, p, s, c) => {
+    anywhere(r, p);
     if (!isWild(p.x, p.z, -1) || slopeAt(p.x, p.z) > 0.6) return false;
     if (p.y < WATER_LEVEL + 1.3) return false;
     // Each drift of flowers is mostly one kind: poppies, buttercups, daisies or wild lavender.
@@ -408,8 +408,8 @@ export function buildNature(scene, rng) {
   });
 
   // Pebbles: fine speckle on the sand.
-  scatterInstanced(scene, rng, new THREE.DodecahedronGeometry(0.22, 0), paint(0xffffff, { flat: true }), 1400, (r, p, s, c) => {
-    randomSpot(r, p, 125);
+  scatterInstanced(scene, rng, new THREE.DodecahedronGeometry(0.22, 0), paint(0xffffff, { flat: true }), 2000, (r, p, s, c) => {
+    anywhere(r, p);
     if (!isWild(p.x, p.z, -2) || region(p.x, p.z) === 'mountain') return false;
     s.set(0.6 + r() * 1.2, 0.4 + r() * 0.6, 0.6 + r() * 1.2);
     c.setHex(pick(r, ROCK));
@@ -417,8 +417,8 @@ export function buildNature(scene, rng) {
   });
 
   // Boulders, thickest on the wild flanks where they have rolled down from the crags.
-  scatterInstanced(scene, rng, new THREE.DodecahedronGeometry(1, 0), paint(0xffffff, { flat: true }), 150, (r, p, s, c) => {
-    randomSpot(r, p, 140);
+  scatterInstanced(scene, rng, new THREE.DodecahedronGeometry(1, 0), paint(0xffffff, { flat: true }), 240, (r, p, s, c) => {
+    anywhere(r, p);
     if (!isWild(p.x, p.z)) return false;
     if (region(p.x, p.z) !== 'mountain' ? r() < 0.6 : worked(p.x, p.z) > 0.5) return false;
     s.set(0.6 + r() * 1.4, 0.5 + r() * 1.5, 0.6 + r() * 1.4);
@@ -428,39 +428,61 @@ export function buildNature(scene, rng) {
   });
 
   // Rocks standing in the shallows, with the swell breaking white around them.
-  scatterInstanced(scene, rng, new THREE.DodecahedronGeometry(1, 0), paint(0xffffff, { flat: true }), 46, (r, p, s, c) => {
-    randomSpot(r, p, 140);
+  const port = ZONES.find((zn) => zn.id === 'port');
+  scatterInstanced(scene, rng, new THREE.DodecahedronGeometry(1, 0), paint(0xffffff, { flat: true }), 130, (r, p, s, c) => {
+    anywhere(r, p);
     const u = toU(p.x, p.z);
     const v = toV(p.x, p.z);
-    // Off the rocky shores only: the beach and the harbour stay clear.
-    if (!inSquare(p.x, p.z, 2) || p.y > WATER_LEVEL - 0.3 || p.y < WATER_LEVEL - 2.6 || (v > -32 && v < 52) || v < -60 || u > coastU(v) + 4) return false;
+    // Off the rocky shores only: the sandy beach, the cove and the harbour stay clear.
+    if (p.y > WATER_LEVEL - 0.3 || p.y < WATER_LEVEL - 2.6 || (v > -32 && v < 52 && u < 0)) return false;
+    if (Math.hypot(p.x - port.x, p.z - port.z) < port.r + 22 || (u > COVE.u0 - 6 && u < COVE.u1 + 6 && v < -60)) return false;
     s.set(0.8 + r() * 1.6, 0.9 + r() * 1.4, 0.8 + r() * 1.6);
     p.y = WATER_LEVEL - 0.3;
     c.setHex(pick(r, [0x8f8678, 0x9d9484, 0x7f7a70]));
     return true;
   });
 
+  // The cove beside the harbour: pebbles strewn up the shingle, and smooth stones standing in
+  // the clear shallows.
+  const SHINGLE = [0xf4f1ea, 0xd6d2ca, 0xb4b0aa, 0xd8c4a0, 0x9a9690];
+  scatterInstanced(scene, rng, new THREE.DodecahedronGeometry(0.3, 1), paint(0xffffff, { flat: true }), 260, (r, p, s, c) => {
+    const at = coveAt(COVE.u0 + r() * (COVE.u1 - COVE.u0), -5 + r() * 14);
+    p.set(at.x, groundAt(at.x, at.z), at.z);
+    if (p.y > WATER_LEVEL + 1.4 || p.y < WATER_LEVEL - 0.7) return false;
+    s.set(0.5 + r() * 1.3, 0.35 + r() * 0.5, 0.5 + r() * 1.3);
+    c.setHex(pick(r, SHINGLE));
+    return true;
+  });
+  scatterInstanced(scene, rng, new THREE.DodecahedronGeometry(1, 1), paint(0xffffff, { flat: true }), 16, (r, p, s, c) => {
+    const at = coveAt(COVE.u0 + r() * (COVE.u1 - COVE.u0), -15 + r() * 13);
+    p.set(at.x, WATER_LEVEL - 0.25, at.z);
+    if (groundAt(at.x, at.z) > WATER_LEVEL - 0.2) return false;
+    s.set(0.6 + r() * 1.1, 0.5 + r() * 0.7, 0.6 + r() * 1.1);
+    c.setHex(pick(r, [0xb8b4ac, 0xa6a29c, 0xcfc8ba]));
+    return true;
+  });
+
   // Trees. On the wild flanks pines and oaks close into groves; olive, lemon and almond keep
   // to the worked land; cypresses stand about the plain; palms line the sea front.
   const tame = (x, z) => region(x, z) !== 'mountain' || worked(x, z) > 0.4;
-  grow(scene, rng, stonePine, { count: 80, variants: 4, maxR: 140, margin: 1.5, maxSlope: 0.75, where: (x, z) => region(x, z) !== 'mountain' || wood(x, z) > 0.44 });
-  grow(scene, rng, holmOak, { count: 110, variants: 4, maxR: 140, margin: 1.5, maxSlope: 0.75, where: (x, z) => wood(x, z) > (region(x, z) === 'mountain' ? 0.5 : 0.56) });
-  grow(scene, rng, cypress, { count: 54, variants: 3, maxR: 135, margin: 1, maxSlope: 0.6, where: tame, size: [0.8, 1.3] });
-  grow(scene, rng, oliveTree, { count: 80, variants: 4, maxR: 135, margin: 1, maxSlope: 0.4, where: (x, z) => region(x, z) !== 'shore' && tame(x, z) });
-  grow(scene, rng, lemonTree, { count: 30, variants: 3, maxR: 135, maxSlope: 0.4, where: (x, z) => region(x, z) !== 'shore' && tame(x, z) });
-  grow(scene, rng, almondTree, { count: 46, variants: 4, maxR: 135, margin: 1, maxSlope: 0.45, where: (x, z) => region(x, z) !== 'shore' && tame(x, z), size: [0.9, 1.35] });
-  grow(scene, rng, palm, { count: 14, variants: 3, maxR: 125, margin: 1.5, maxSlope: 0.3, where: (x, z) => region(x, z) === 'shore' && groundAt(x, z) < 1.5 && toV(x, z) < 60, size: [0.85, 1.2] });
+  grow(scene, rng, stonePine, { count: 130, variants: 4, margin: 1.5, maxSlope: 0.75, where: (x, z) => region(x, z) !== 'mountain' || wood(x, z) > 0.44 });
+  grow(scene, rng, holmOak, { count: 190, variants: 4, margin: 1.5, maxSlope: 0.75, where: (x, z) => wood(x, z) > (region(x, z) === 'mountain' ? 0.5 : 0.56) });
+  grow(scene, rng, cypress, { count: 70, variants: 3, margin: 1, maxSlope: 0.6, where: tame, size: [0.8, 1.3] });
+  grow(scene, rng, oliveTree, { count: 110, variants: 4, margin: 1, maxSlope: 0.4, where: (x, z) => region(x, z) !== 'shore' && tame(x, z) });
+  grow(scene, rng, lemonTree, { count: 40, variants: 3, maxSlope: 0.4, where: (x, z) => region(x, z) !== 'shore' && tame(x, z) });
+  grow(scene, rng, almondTree, { count: 64, variants: 4, margin: 1, maxSlope: 0.45, where: (x, z) => region(x, z) !== 'shore' && tame(x, z), size: [0.9, 1.35] });
+  grow(scene, rng, palm, { count: 14, variants: 3, margin: 1.5, maxSlope: 0.3, where: (x, z) => region(x, z) === 'shore' && groundAt(x, z) < 1.5 && toV(x, z) < 60, size: [0.85, 1.2] });
 
   // Shrubs: the maquis clings even to the steep slopes.
-  grow(scene, rng, maquis, { count: 420, variants: 6, maxR: 145, margin: -1, maxSlope: 1.4, size: [0.7, 1.5] });
-  grow(scene, rng, broom, { count: 110, variants: 3, maxR: 145, maxSlope: 1.1, where: on('mountain', 'shore'), size: [0.8, 1.3] });
-  grow(scene, rng, oleander, { count: 46, variants: 4, maxR: 120, margin: 0.5, maxSlope: 0.4, where: on('plain', 'shore'), size: [0.8, 1.25] });
-  grow(scene, rng, lavender, { count: 220, variants: 3, maxR: 140, maxSlope: 0.7, where: (x, z) => fbm(x * 0.07 + 30, z * 0.07 - 11, 2) > 0.56, size: [0.8, 1.4], sink: 0.02 });
-  grow(scene, rng, agave, { count: 60, variants: 3, maxR: 130, maxSlope: 0.8, where: on('shore', 'mountain'), size: [0.7, 1.2] });
-  grow(scene, rng, pricklyPear, { count: 45, variants: 3, maxR: 130, maxSlope: 0.7, where: on('shore', 'plain') });
+  grow(scene, rng, maquis, { count: 650, variants: 6, margin: -1, maxSlope: 1.4, size: [0.7, 1.5] });
+  grow(scene, rng, broom, { count: 170, variants: 3, maxSlope: 1.1, where: on('mountain', 'shore'), size: [0.8, 1.3] });
+  grow(scene, rng, oleander, { count: 60, variants: 4, margin: 0.5, maxSlope: 0.4, where: on('plain', 'shore'), size: [0.8, 1.25] });
+  grow(scene, rng, lavender, { count: 330, variants: 3, maxSlope: 0.7, where: (x, z) => fbm(x * 0.07 + 30, z * 0.07 - 11, 2) > 0.56, size: [0.8, 1.4], sink: 0.02 });
+  grow(scene, rng, agave, { count: 90, variants: 3, maxSlope: 0.8, where: on('shore', 'mountain'), size: [0.7, 1.2] });
+  grow(scene, rng, pricklyPear, { count: 60, variants: 3, maxSlope: 0.7, where: on('shore', 'plain') });
 
   // Limestone outcrops on the wild ground.
-  grow(scene, rng, outcrop, { count: 60, variants: 4, maxR: 140, margin: 1, maxSlope: 1.3, where: (x, z) => worked(x, z) < 0.5, size: [0.7, 1.6], sink: 0.25 });
+  grow(scene, rng, outcrop, { count: 100, variants: 4, margin: 1, maxSlope: 1.3, where: (x, z) => worked(x, z) < 0.5, size: [0.7, 1.6], sink: 0.25 });
 
   // Lanterns along the footpaths, baked together.
   const lamps = new THREE.Group();

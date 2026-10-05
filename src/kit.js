@@ -107,24 +107,3 @@ export function lantern(parent, x, y, z, color = WARM_LIGHT) {
   lamplight(g, 0.6, 2.5, 0);
 }
 
-
-/** Incal-style aerotaxi: bulbous hull, glass canopy, side pods with glowing thrusters. */
-export function aerocar(color = PAL.saffron) {
-  const g = new THREE.Group();
-  const hull = at(ball(1, color, {}, 14, 10), 0, 0, 0, g);
-  hull.scale.set(1.05, 0.62, 2.1);
-  at(ball(0.8, 0x9fe3e8, { glow: true }, 12, 8), 0, 0.42, 0.5, g).scale.set(0.9, 0.62, 1.1);
-  at(ring(0.82, 0.06, INK, Math.PI * 2, 16), 0, 0.35, 0.5, g).rotation.x = Math.PI / 2;
-  at(cone(0.35, 0.9, PAL.ivory, 10), 0, -0.05, 2.25, g).rotation.x = Math.PI / 2;
-  for (const s of [-1, 1]) {
-    const pod = at(cyl(0.32, 0.38, 1.9, PAL.ivory, 10), s * 1.15, -0.15, -0.4, g);
-    pod.rotation.x = Math.PI / 2;
-    at(cyl(0.26, 0.26, 0.1, PAL.coral, 10, { glow: true }), s * 1.15, -0.15, -1.38, g).rotation.x = Math.PI / 2;
-    const fin = at(box(0.08, 0.7, 0.7, color), s * 1.15, 0.35, -0.9, g);
-    fin.rotation.x = -0.4;
-  }
-  at(box(0.06, 0.9, 0.06, INK), 0.4, 0.95, -0.9, g);
-  at(ball(0.07, PAL.red, { glow: true }, 4, 3), 0.4, 1.42, -0.9, g);
-  at(cyl(0.7, 0.7, 0.05, SCREEN, 16, { glow: true }), 0, -0.6, 0, g);
-  return g;
-}

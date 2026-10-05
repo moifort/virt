@@ -24,15 +24,16 @@ const KEYS = [
   { e: -0.1, sun: 0x8590cc, shade: 0x4a5088, top: 0x222a60, horizon: 0x5a5a98, glow: 1, night: 1 },
   { e: -0.02, sun: 0x9488b4, shade: 0x8078ac, top: 0x4450a0, horizon: 0xf09a7a, glow: 0.95, night: 0.5 },
   { e: 0.1, sun: 0xffbc92, shade: 0x8480b4, top: 0x6274c4, horizon: 0xffb080, glow: 0.9, night: 0.1 },
-  { e: 0.28, sun: 0xffdcaa, shade: 0x9090bc, top: 0x6c8ad0, horizon: 0xffd0a0, glow: 0.6, night: 0 },
-  { e: 0.55, sun: 0xfff6e2, shade: 0xaeb4da, top: 0x6aaee6, horizon: 0xdaeef6, glow: 0, night: 0 },
-  { e: 1, sun: 0xffffff, shade: 0xb8bfe0, top: 0x5ea8e8, horizon: 0xd2eaf6, glow: 0, night: 0 },
+  { e: 0.28, sun: 0xffdcaa, shade: 0x9090bc, top: 0x5a86d8, horizon: 0xffcc98, glow: 0.6, night: 0 },
+  { e: 0.55, sun: 0xfff6e2, shade: 0xaeb4da, top: 0x4f9fea, horizon: 0xc6e8fa, glow: 0, night: 0 },
+  { e: 1, sun: 0xffffff, shade: 0xb8bfe0, top: 0x3f95ea, horizon: 0xbfe6fa, glow: 0, night: 0 },
 ];
 for (const key of KEYS) for (const name of ['sun', 'shade', 'top', 'horizon']) key[name] = new THREE.Color(key[name]);
 
 const OVERCAST_DAY = new THREE.Color(0x9aa3b2);
 const OVERCAST_NIGHT = new THREE.Color(0x242a40);
 const OVERCAST_LIGHT = new THREE.Color(0xd2d6e0);
+const DAWN_ROSE = new THREE.Color(0xffc0b4);
 const WEATHERS = ['real', 'clear', 'cloudy', 'rain', 'snow', 'mist'];
 const PRESETS = {
   clear: { cloud: 0.12, rain: 0, snow: 0, mist: 0, wind: 0.3 },
@@ -94,6 +95,8 @@ export class Climate {
     this._sun = new THREE.Color();
     this._shade = new THREE.Color();
     this._soft = new THREE.Color();
+    this.sunDir = new THREE.Vector3(0, 1, 0);
+    this.lowSun = 0;
 
     this.previewFromUrl();
     this.locate();
@@ -202,6 +205,12 @@ export class Climate {
     this._shade.lerpColors(a.shade, b.shade, k);
     this.skyTop.lerpColors(a.top, b.top, k);
     this.skyHorizon.lerpColors(a.horizon, b.horizon, k);
+    // Where the sun really stands, below the horizon included, and how much of a sunrise or a
+    // sunset this is: nothing at noon or in the night, everything as it touches the sea. Dawn
+    // is the cooler of the two, rose where the evening is amber.
+    this.sunDir.set(0, 0, 0).addScaledVector(WEST, -sun.east).addScaledVector(NORTH, sun.north).setY(sun.up).normalize();
+    this.lowSun = smooth(0.42, 0.06, sun.up) * smooth(-0.14, -0.01, sun.up);
+    if (sun.solarHours < 12) this.skyHorizon.lerp(DAWN_ROSE, 0.45 * this.lowSun);
     // Clouds take the colour of the light: white at noon, peach and rose at the ends of the day.
     this.cloudLight.copy(this._sun).lerp(this.skyHorizon, 0.25 + 0.3 * this.night);
 
@@ -270,6 +279,7 @@ export class Climate {
       snow: this.now.snow,
       wind: this.now.wind,
       night: this.night,
+      lowSun: this.lowSun * (1 - this.now.cloud * 0.7),
       cloudTint: this.cloudTint,
       cloudLight: this.cloudLight,
       // Leaves fall in autumn and petals in spring, on fair days only.

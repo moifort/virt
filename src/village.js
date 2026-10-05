@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { fbm, pick } from './noise.js';
 import { PAL, paint } from './style.js';
 import { lamplight } from './kit.js';
-import { VILLAGES, cultivated, estateWeight, footU, groundAt, isWild, slopeAt, toX, toZ, UP } from './terrain.js';
+import { SQUARE, VILLAGES, cultivated, estateWeight, footU, groundAt, isWild, slopeAt, toX, toZ, UP } from './terrain.js';
 
 const ballShape = new THREE.SphereGeometry(0.5, 8, 6);
 const boxShape = new THREE.BoxGeometry(1, 1, 1);
@@ -329,8 +329,7 @@ export function buildVillages(scene, rng, animated) {
   const SUNK = 1.4; // houses are dug into the slope: their street door is this far up
 
   // Houses packed in rows along the slope, as in Manarola, inside an organic blob.
-  const bell = VILLAGES[0];
-  const villages = VILLAGES.map((village) => ({ cu: village.u, cv: village.v, radius: village.r }));
+  const villages = VILLAGES.map((village) => ({ cu: village.u, cv: village.v, radius: village.r, bell: village.bell }));
   for (const village of villages) {
     for (let v = village.cv - village.radius - 4; v <= village.cv + village.radius + 4; v += 3.4) {
       for (let u = village.cu - village.radius - 4; u <= village.cu + village.radius + 4; u += 3.2) {
@@ -343,7 +342,7 @@ export function buildVillages(scene, rng, animated) {
         const ju = u + (rng() - 0.5) * 0.3;
         const x = toX(ju, jv);
         const z = toZ(ju, jv);
-        if (rng() < 0.05 || Math.hypot(ju - bell.u, jv - bell.v) < 3.5) continue;
+        if (rng() < 0.05 || (village.bell && Math.hypot(ju - village.cu, jv - village.cv) < 3.5)) continue;
         if (!isWild(x, z, -2) || slopeAt(x, z) > 1.8 || groundAt(x, z) < 0.5) continue;
         placed.push([x, z]);
         parts.at(new THREE.Vector3(x, groundAt(x, z) - SUNK, z), yaw);
@@ -352,19 +351,18 @@ export function buildVillages(scene, rng, animated) {
         house(parts, rng, 2.8 + rng() * 0.6, 2.6 + rng() * 0.5, floors, SUNK);
       }
     }
-  }
-
-  {
-    const x = toX(bell.u, bell.v);
-    const z = toZ(bell.u, bell.v);
-    parts.at(new THREE.Vector3(x, groundAt(x, z) - 0.5, z), yaw);
-    campanile(parts, rng);
-    placed.push([x, z]);
+    if (village.bell) {
+      const x = toX(village.cu, village.cv);
+      const z = toZ(village.cu, village.cv);
+      parts.at(new THREE.Vector3(x, groundAt(x, z) - 0.5, z), yaw);
+      campanile(parts, rng);
+      placed.push([x, z]);
+    }
   }
 
   // Vineyards: rows of vines on posts, following the terraces.
-  for (let v = -110; v < 110; v += 0.95) {
-    for (let u = 40; u < 150; u += 1.6) {
+  for (let v = SQUARE.v0; v < SQUARE.v1; v += 0.95) {
+    for (let u = 40; u < SQUARE.u1; u += 1.6) {
       const x = toX(u, v);
       const z = toZ(u, v);
       // Vines grow wherever the mountain has been terraced for them.

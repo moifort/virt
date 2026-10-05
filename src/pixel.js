@@ -34,6 +34,10 @@ uniform float uSlant;
 uniform float uWind;
 uniform vec2 uLitter;
 uniform float uHorizonY;
+uniform float uOffing;
+uniform float uLowSun;
+uniform vec3 uSun;
+uniform vec3 uMoon;
 varying vec2 vUv;
 
 float hash1(float n) { return fract(sin(n * 12.9898) * 43758.5453); }
@@ -81,29 +85,49 @@ void main() {
   vec2 fp = gl_FragCoord.xy;
 
   if (raw >= 0.99999) {
-    // The sky is painted from the sea horizon up, wherever that falls on the screen.
+    // The sky is painted from the sea horizon up, wherever that falls on the screen: the
+    // colour of the horizon, a band of rose at the ends of the day, then the deep of the sky.
     float alt = vUv.y - uHorizonY;
-    col = mix(uSkyHorizon, uSkyTop, smoothstep(0.0, 0.8, alt));
+    vec3 band = mix(uSkyHorizon, uSkyTop, 0.42) + uLowSun * vec3(0.16, -0.01, 0.07);
+    col = alt < 0.22 ? mix(uSkyHorizon, band, clamp(alt / 0.22, 0.0, 1.0)) : mix(band, uSkyTop, smoothstep(0.22, 0.85, alt));
     vec2 sp = floor(vec2(vUv.x, alt) * uRes);
+    vec2 sky = vec2(vUv.x * uRes.x / uRes.y, alt);
     // Stars come out with the night: many faint ones, a few bright ones that twinkle.
     float star = hash2(sp);
     if (star > 0.9955 && alt > 0.08) col += uNight * (star > 0.9992 ? 1.0 : 0.3 + 0.25 * sin(uTime * 2.0 + star * 600.0)) * vec3(0.9, 0.9, 0.8);
     // The moon keeps watch, round and creamy, with its seas in grey.
-    vec2 moon = sp - floor(uRes * vec2(0.8, 0.34));
-    float moonR = max(5.0, floor(uRes.y * 0.028));
-    if (length(moon) < moonR) col = mix(col, noise2(moon * 0.45 + 3.0) > 0.62 ? vec3(0.78, 0.8, 0.82) : vec3(1.0, 0.97, 0.86), uNight);
-    else if (length(moon) < moonR * 2.2) col += uNight * vec3(0.05, 0.06, 0.09);
+    float moonD = length(sky - vec2(uMoon.x * uRes.x / uRes.y, uMoon.y));
+    if (uMoon.z > 0.5) {
+      if (moonD < 0.03) col = mix(col, noise2((sky - uMoon.xy) * 150.0 + 3.0) > 0.62 ? vec3(0.78, 0.8, 0.82) : vec3(1.0, 0.97, 0.86), uNight);
+      else if (moonD < 0.075) col += uNight * vec3(0.05, 0.06, 0.09);
+    }
+    // The sun, when it stands low ahead: a wide glow spreading from it, its disc gold then
+    // red as it meets the sea.
+    float sunD = length(sky - vec2(uSun.x * uRes.x / uRes.y, uSun.y));
+    float glare = uSun.z * uLowSun * smoothstep(0.75, 0.0, sunD);
+    col += glare * glare * vec3(0.6, 0.3, 0.08) + uSun.z * uLowSun * smoothstep(0.2, 0.0, sunD) * vec3(0.35, 0.25, 0.1);
+    vec3 disc = mix(vec3(1.0, 0.98, 0.86), vec3(1.0, 0.56, 0.26), uLowSun * smoothstep(0.16, 0.0, uSun.y));
+    if (uSun.z > 0.5 && sunD < 0.042) col = disc;
+    else if (uSun.z > 0.5 && sunD < 0.052) col = mix(col, disc, 0.55);
+
+    // Mares' tails very high up, the first clouds to catch the colours of dawn and dusk.
+    float wisp = noise2(vec2(sky.x * 2.2 + uTime * 0.004, alt * 26.0)) * 0.6 + noise2(vec2(sky.x * 6.0 - uTime * 0.006, alt * 60.0 + 4.0)) * 0.4;
+    vec3 lit = uCloudLight * (1.0 - 0.4 * uNight) + glare * vec3(0.3, 0.12, 0.0);
+    if (alt > 0.3 && wisp > 0.7 - 0.12 * uCloud - 0.1 * smoothstep(0.3, 0.6, alt)) col = mix(col, mix(lit, vec3(1.0, 0.6, 0.55), uLowSun * 0.6), 0.5);
 
     // Fair-weather cumulus in three banks, the far ones small and pale on the horizon.
     float breeze = uTime * (0.4 + uWind);
     float far = cumulus(sp, uRes.y * 0.012, 0.017, breeze * 0.0035, uCloud - 0.1);
-    float mid = cumulus(sp, uRes.y * 0.07, 0.0095, 7.0 + breeze * 0.006, uCloud);
-    float high = cumulus(sp, uRes.y * 0.32, 0.021, 3.0 + breeze * 0.011, uCloud - 0.25);
+    float mid = cumulus(sp, uRes.y * 0.06, 0.0085, 7.0 + breeze * 0.006, uCloud + 0.04);
+    float high = cumulus(sp, uRes.y * 0.34, 0.019, 3.0 + breeze * 0.011, uCloud - 0.22);
     float tone = mid > 0.0 ? mid : high > 0.0 ? high : far;
     if (tone > 0.0) {
-      vec3 lit = uCloudLight * (1.0 - 0.4 * uNight);
+      // By day the crowns are white and the hollows blue; at the ends of the day the light
+      // comes from below: gold bellies, rose bodies, crowns already in the evening.
       vec3 shade = mix(uSkyTop, lit, 0.5) * 0.92;
-      vec3 cloud = tone > 2.5 ? lit * 1.04 : tone > 1.5 ? mix(shade, lit, 0.72) : shade;
+      vec3 crown = mix(lit * 1.04, mix(lit, vec3(1.0, 0.82, 0.8), 0.5), uLowSun);
+      vec3 belly = mix(shade, mix(vec3(1.0, 0.6, 0.32), uSkyTop, 0.25), uLowSun * 0.8);
+      vec3 cloud = tone > 2.5 ? crown : tone > 1.5 ? mix(shade, lit, 0.72) : belly;
       // Under a closed sky the heaps flatten into grey.
       cloud = mix(cloud, uCloudTint * (0.86 + 0.07 * tone), smoothstep(0.45, 0.95, uCloud) * 0.85);
       col = mid > 0.0 || high > 0.0 ? cloud : mix(col, cloud, 0.7);
@@ -130,8 +154,10 @@ void main() {
       creases += (1.0 - dot(n, nn)) * towardBias * shallower;
     }
 
-    // The line is a deeper shade of the colour it borders rather than flat ink.
-    if (depthEdge > uDepthThreshold) {
+    // The line is a deeper shade of the colour it borders rather than flat ink. The far sea
+    // gets none: it melts into the sky without a seam.
+    if (d > uOffing) {
+    } else if (depthEdge > uDepthThreshold) {
       col = mix(col * 0.42, uInk, 0.22);
     } else if (creases > 0.12) {
       col = col * 1.3 + vec3(0.035, 0.028, 0.012);
@@ -188,10 +214,10 @@ void main() {
     }
   }
 
-  // A soft wash over the whole picture, like gouache on tinted paper: colours a little
-  // quieter, the darks lifted toward the colour of the air.
-  col = mix(vec3(dot(col, vec3(0.3, 0.59, 0.11))), col, 0.9);
-  col = mix(col, mix(vec3(1.0, 0.95, 0.86), vec3(0.4, 0.48, 0.78), uNight), 0.07);
+  // The grade of a Ghibli background in poster colour: pigments a little richer than life,
+  // and the darks lifted toward the colour of the air so nothing ever goes to black.
+  col = mix(vec3(dot(col, vec3(0.3, 0.59, 0.11))), col, 1.14);
+  col = mix(col, mix(vec3(1.0, 0.96, 0.88), vec3(0.4, 0.48, 0.78), uNight), 0.04);
 
   // Ordered dithering onto 24 levels per channel: gradients become pixel-art ramps.
   vec3 s = toSRGB(col);
@@ -254,6 +280,10 @@ export class PixelRenderer {
         uWind: { value: 0.3 },
         uLitter: { value: new THREE.Vector2() },
         uHorizonY: { value: 0.5 },
+        uOffing: { value: 1e6 },
+        uLowSun: { value: 0 },
+        uSun: { value: new THREE.Vector3() },
+        uMoon: { value: new THREE.Vector3() },
       },
       vertexShader: FULLSCREEN_VERTEX,
       fragmentShader: COMPOSITE_FRAGMENT,
@@ -289,8 +319,11 @@ export class PixelRenderer {
 
   /**
    * @param {{skyTop: THREE.Color, skyHorizon: THREE.Color, texelWorld: number, time?: number, weather?: object}} frame
-   *   `weather` is `Climate.screen`, plus `slant`, how far the wind pushes the rain sideways,
-   *   and `horizon`, the height of the sea horizon on the screen (0 at the bottom, 1 at the top).
+   *   `weather` is `Climate.screen`, plus what depends on the view: `slant`, how far the wind
+   *   pushes the rain sideways; `horizon`, the height of the sea horizon on the screen (0 at the
+   *   bottom, 1 at the top) and `offing`, the depth beyond which the sea is drawn without a
+   *   line; `sun` and `moon`, where each stands in the sky as (x across the screen, height
+   *   above the horizon in screens, 1 if it is ahead of the view).
    */
   render(scene, camera, { skyTop, skyHorizon, texelWorld, time = 0, weather }) {
     const r = this.renderer;
@@ -311,6 +344,10 @@ export class PixelRenderer {
       u.uWind.value = weather.wind;
       u.uLitter.value.set(weather.leaves, weather.petals);
       u.uHorizonY.value = weather.horizon ?? 0.5;
+      u.uOffing.value = weather.offing ?? 1e6;
+      u.uLowSun.value = weather.lowSun;
+      if (weather.sun) u.uSun.value.copy(weather.sun);
+      if (weather.moon) u.uMoon.value.copy(weather.moon);
     }
 
     r.setRenderTarget(this.gbuffer);

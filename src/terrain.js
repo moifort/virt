@@ -4,15 +4,16 @@ import { fbm, hash, smoothstep } from './noise.js';
 import { GLOBALS, PATH_COUNT, WATER_LEVEL, paint } from './style.js';
 
 export { WATER_LEVEL };
-// The map is a square diorama aligned with the bay (u toward the mountain, v along the shore),
-// cut out of the land with its sides showing the cross-section down to a base.
-export const SQUARE = { u0: -100, u1: 110, v0: -105, v1: 105 };
-export const BASE_Y = -16;
+// The map is an island of its own in an endless sea, laid out along its bay (u from the open
+// sea toward the mountain, v along the shore). The square is only the bounds of what can be
+// walked and planted: the land falls into the water well inside it on every side.
+export const SQUARE = { u0: -100, u1: 250, v0: -145, v1: 148 };
+const SEA_FLOOR = -14;
 // The sun is low over the sea, a little to the left: it lights the slopes that face the bay.
 export const SUN_DIR = new THREE.Vector3(-0.5, 0.36, 1).normalize();
 
-export const WORLD_SIZE = 380;
-export const SEGMENTS = 380;
+export const WORLD_SIZE = 570;
+export const SEGMENTS = 570;
 export const CELL = WORLD_SIZE / SEGMENTS;
 export const HALF = WORLD_SIZE / 2;
 export const UP = new THREE.Vector3(0, 1, 0);
@@ -43,14 +44,27 @@ export const ZONES = [
   placeZone('pub', 'Le Pub', 'après le travail', -22, -40, 12),
   placeZone('pods', 'Bulles focus', 'concentration', 2, 52, 13),
   placeZone('atelier', "L'Atelier", 'prototypes', 8, -54, 12),
-  placeZone('port', 'Le Port', 'pause au bord de l\'eau', 4, -72, 16),
+  // The harbour lies at the foot of the main village, as in the Cinque Terre.
+  placeZone('port', 'Le Port', 'pause au bord de l\'eau', 57, -82, 16),
 ];
 export const zone = (id) => ZONES.find((z) => z.id === id);
 
+// The villages, in (u, v), all of a size: the main one climbing from its harbour up the
+// left-hand slopes, a hamlet on the right headland, and a third high on the mountain behind,
+// looking out over the sea. `bell` gives a village its campanile.
+export const VILLAGES = [
+  { u: footU(-56) + 6, v: -56, r: 17, bell: true },
+  { u: -46, v: 84, r: 10 },
+  { u: 150, v: -24, r: 17, bell: true },
+];
+const hub = { x: toX(VILLAGES[0].u, VILLAGES[0].v), z: toZ(VILLAGES[0].u, VILLAGES[0].v) };
+
+// Footpaths: from the agora to each work area, then the lane from the library to the harbour
+// and the village street that comes down to it from the bell tower.
 export const PATHS = [
-  ...ZONES.slice(1).map((z) => [0, 0, z.x, z.z]),
-  [zone('pub').x, zone('pub').z, zone('port').x, zone('port').z],
-  [zone('atelier').x, zone('atelier').z, zone('port').x, zone('port').z],
+  ...ZONES.slice(1, -1).map((z) => [0, 0, z.x, z.z]),
+  [zone('library').x, zone('library').z, zone('port').x, zone('port').z],
+  [hub.x, hub.z, zone('port').x, zone('port').z],
 ];
 
 // The wine estate on the mountain side, left of the railway: a Florentine villa on its own
@@ -95,13 +109,6 @@ function plotShift(u, v) {
 
 // ---------------------------------------------------------------- Ground
 
-// The villages, in (u, v): the main one on the left-hand slopes above the sea, a hamlet on the
-// right headland.
-export const VILLAGES = [
-  { u: footU(-48) + 11, v: -48, r: 17 },
-  { u: -46, v: 84, r: 10 },
-];
-
 /**
  * How much of a mountainside is worked (1) rather than left wild (0): terraced for the vines
  * around the villages and the estate and in patches across the lower flanks, never near the top.
@@ -115,13 +122,26 @@ export function cultivated(u, v) {
   return worked;
 }
 
-export function heightAt(x, z) {
+// A small island stands off the back of the mountain: sheer rock all round, pines on top.
+const ISLET = { u: 224, v: -114, r: 12 };
+// The pebble cove beside the harbour, along the left shore: where it lies along u, and the
+// line of its water's edge.
+export const COVE = { u0: 76, u1: 104 };
+const coveShore = (u) => -85 - wander(u);
+const inCove = (u) => smoothstep(COVE.u0 - 4, COVE.u0 + 3, u) * smoothstep(COVE.u1 + 4, COVE.u1 - 3, u);
+/** A point of the cove's water line, `inland` metres up the beach (negative: out in the water). */
+export const coveAt = (u, inland = 0) => ({ x: toX(u, coveShore(u) + inland), z: toZ(u, coveShore(u) + inland) });
+
+/** The lie of the land before the stream has cut its bed into it. */
+function landAt(x, z) {
   const u = toU(x, z);
   const v = toV(x, z);
   let h = 0.7 + (fbm(x * 0.03, z * 0.03, 3) - 0.5) * 2.2;
-  // The mountain rises behind the bay, as steep as the Ligurian coast.
+  // The mountain rises behind the bay, as steep as the Ligurian coast. Behind its first crest
+  // it carries on and climbs to its true summit.
   const foot = footU(v, u);
-  const back = smoothstep(foot, foot + 80, u) * (40 + (fbm(x * 0.015, z * 0.015, 3) - 0.5) * 20) + Math.max(0, u - foot) * 0.05;
+  const massif = 38 * smoothstep(1, 0, Math.hypot((u - 172) / 52, (v + 5) / 85) + (fbm(x * 0.012 + 4, z * 0.012 - 6, 2) - 0.5) * 0.4) ** 1.3;
+  const back = smoothstep(foot, foot + 80, u) * (40 + (fbm(x * 0.015, z * 0.015, 3) - 0.5) * 20) + Math.max(0, u - foot) * 0.05 + massif * smoothstep(foot, foot + 50, u);
   // Side ridges run down from the mountain and plunge into the sea, closing the bay.
   const ridge = headland(v) * (13 + smoothstep(-110, 70, u) * 30 + (fbm(x * 0.03, z * 0.03, 3) - 0.5) * 10);
   const mountain = Math.max(back, ridge);
@@ -143,6 +163,11 @@ export function heightAt(x, z) {
   const coast = coastU(v, u);
   const sheer = (4 + fbm(v * 0.04 + 11, 2.3, 2) * 14) * (1 - headland(v) * 0.75);
   h -= smoothstep(coast + 2, coast - sheer, u) * (9 + headland(v) * 20);
+  // On its far sides, behind and to the right, the mountain falls straight into the water.
+  const farShore = 214 + (fbm(v * 0.03 + 2, 6.1, 3) - 0.5) * 24;
+  const rightShore = 128 + (fbm(u * 0.03 - 4, 1.7, 3) - 0.5) * 18;
+  const steep = 12 + fbm(x * 0.04 + 15, z * 0.04, 2) * 16;
+  h += (-9.5 - h) * Math.max(smoothstep(farShore - steep, farShore + 2, u), smoothstep(rightShore - steep, rightShore + 2, v));
   // Terraces: shelves and short dry-stone walls where the land is worked, and on the plain.
   // The shelves follow the lie of the land rather than level lines. The wild slopes keep their
   // fall, only eased here and there into natural benches.
@@ -157,37 +182,91 @@ export function heightAt(x, z) {
   // The beach: a smooth gentle slope down into turquoise shallows, no terraces.
   const beach = beachBand(v) * smoothstep(coast + 14, coast + 8, u) * smoothstep(coast - 5, coast + 1, u);
   h += (WATER_LEVEL + 0.25 + Math.max(0, u - coast) * 0.08 - h) * beach;
+  // The cove beside the harbour: a shingle beach shelving very gently, so the water stays
+  // shallow and turquoise a long way out.
+  const inland = v - coveShore(u);
+  const shingle = inCove(u) * smoothstep(-24, -16, inland) * smoothstep(13, 7, inland);
+  h += (WATER_LEVEL + (inland > 0 ? 0.3 + inland * 0.1 : -0.12 + inland * 0.13) - h) * shingle;
   // Work areas sit on level pads.
   for (const zn of ZONES) h += (0 - h) * smoothstep(zn.r + 7, zn.r + 1, Math.hypot(x - zn.x, z - zn.z));
   h += (VILLA.y - h) * smoothstep(VILLA.r + 4, VILLA.r + 0.5, Math.hypot(x - VILLA.x, z - VILLA.z));
   h += (RAIL.level - 0.05 - h) * stationYard(x, z);
-  return h;
+  // The islet off the back of the mountain.
+  const off = Math.hypot(u - ISLET.u, v - ISLET.v) / ISLET.r + (fbm(x * 0.09 + 2, z * 0.09, 2) - 0.5) * 0.5;
+  if (off < 1.4) h = Math.max(h, -9.5 + smoothstep(1.4, 1, off) * 7 + smoothstep(1, 0.86, off) * (13 + fbm(x * 0.1, z * 0.1 + 3, 2) * 7) + smoothstep(0.86, 0, off) * 7);
+  // Whatever happens, the land has sunk under the sea before the bounds of the map.
+  const brink = Math.min(u - SQUARE.u0, SQUARE.u1 - u, v - SQUARE.v0, SQUARE.v1 - v) + (fbm(x * 0.05 + 8, z * 0.05, 2) - 0.5) * 8;
+  return h + (-12 - h) * smoothstep(11, 2, brink);
 }
+
+// A stream rises high on the left flank of the mountain, plunges over a rock step beside the
+// upper village, runs down a ravine and goes over the sea cliff into the water. Its course in
+// (u, v); `plunge` is how far along it the great fall is, and how high.
+const COURSE = [[178, -40], [168, -50], [160, -60], [150, -72], [142, -84], [136, -94], [131, -103], [126, -114]];
+const PLUNGE = { at: 0.2, drop: 13 };
 
 /**
- * Beyond the diorama there is only the sea, with no end to it: the bed carries on from the edge
- * and sinks into the deep, and where the cut runs through land the water laps at its foot.
+ * The bed of the stream, a point every metre or so: { x, z, y, run, pool }. It keeps just under
+ * the lie of the land and never climbs, so it tumbles wherever the slope is steep.
  */
-function seaBed(x, z) {
-  const u = toU(x, z);
-  const v = toV(x, z);
-  const out = Math.max(SQUARE.u0 - u, u - SQUARE.u1, SQUARE.v0 - v, v - SQUARE.v1);
-  const cu = Math.min(SQUARE.u1, Math.max(SQUARE.u0, u));
-  const cv = Math.min(SQUARE.v1, Math.max(SQUARE.v0, v));
-  return Math.max(-14, Math.min(heightAt(toX(cu, cv), toZ(cu, cv)), WATER_LEVEL - 0.3) - out * 0.45);
-}
+export const STREAM = (() => {
+  const bed = [];
+  let length = 0;
+  for (let i = 1; i < COURSE.length; i++) length += Math.hypot(COURSE[i][0] - COURSE[i - 1][0], COURSE[i][1] - COURSE[i - 1][1]);
+  let run = 0;
+  let level = Infinity;
+  let plunged = false;
+  for (let i = 1; i < COURSE.length; i++) {
+    const [u0, v0] = COURSE[i - 1];
+    const [u1, v1] = COURSE[i];
+    const span = Math.hypot(u1 - u0, v1 - v0);
+    for (let d = 0; d < span; d += 1) {
+      const u = u0 + ((u1 - u0) * d) / span;
+      const v = v0 + ((v1 - v0) * d) / span + Math.sin((run + d) * 0.35) * 1.2;
+      const x = toX(u, v);
+      const z = toZ(u, v);
+      level = Math.min(level - 0.06, landAt(x, z) - 0.9);
+      const pool = !plunged && (run + d) / length > PLUNGE.at;
+      if (pool) {
+        level -= PLUNGE.drop;
+        plunged = true;
+      }
+      if (level < WATER_LEVEL) return bed;
+      bed.push({ x, z, y: level, pool });
+    }
+    run += span;
+  }
+  return bed;
+})();
+const streamBounds = STREAM.reduce((b, p) => ({ x0: Math.min(b.x0, p.x - 9), x1: Math.max(b.x1, p.x + 9), z0: Math.min(b.z0, p.z - 9), z1: Math.max(b.z1, p.z + 9) }), { x0: Infinity, x1: -Infinity, z0: Infinity, z1: -Infinity });
 
+export function heightAt(x, z) {
+  const h = landAt(x, z);
+  if (x < streamBounds.x0 || x > streamBounds.x1 || z < streamBounds.z0 || z > streamBounds.z1) return h;
+  // The stream has cut its bed: level with the water where it runs, banks easing back to the
+  // lie of the land, wider around the pool under the great fall.
+  let nearest = Infinity;
+  let bed = null;
+  for (const p of STREAM) {
+    const d = Math.hypot(x - p.x, z - p.z) - (p.pool ? 3 : 0);
+    if (d < nearest) [nearest, bed] = [d, p];
+  }
+  return nearest > 7 ? h : bed.y + (h - bed.y) * smoothstep(1, 7, nearest);
+}
+for (const p of STREAM) CLEARINGS.push({ x: p.x, z: p.z, r: p.pool ? 6 : 3 });
+
+// The heightfield everything else reads: the land inside the bounds, open sea beyond them.
 export const GRID = new Float32Array((SEGMENTS + 1) ** 2);
 for (let iz = 0; iz <= SEGMENTS; iz++) {
   for (let ix = 0; ix <= SEGMENTS; ix++) {
     const x = ix * CELL - HALF;
     const z = iz * CELL - HALF;
-    GRID[iz * (SEGMENTS + 1) + ix] = inSquare(x, z, -1.5) ? Math.max(BASE_Y + 1, heightAt(x, z)) : seaBed(x, z);
+    GRID[iz * (SEGMENTS + 1) + ix] = inSquare(x, z, -1.5) ? Math.max(SEA_FLOOR, heightAt(x, z)) : SEA_FLOOR;
   }
 }
 
-/** The corners of the diorama, in world (x, z). */
-export const CORNERS = [[SQUARE.u0, SQUARE.v0], [SQUARE.u0, SQUARE.v1], [SQUARE.u1, SQUARE.v1], [SQUARE.u1, SQUARE.v0]].map(([u, v]) => [toX(u, v), toZ(u, v)]);
+/** The corners of the map, in world (x, z): the horizon lies beyond them all. */
+export const LAND_ENDS = [[SQUARE.u0, SQUARE.v0], [SQUARE.u0, SQUARE.v1], [SQUARE.u1, SQUARE.v1], [SQUARE.u1, SQUARE.v0]].map(([u, v]) => [toX(u, v), toZ(u, v)]);
 
 /** Ground height matching the rendered triangles exactly. */
 export function groundAt(x, z) {
@@ -236,20 +315,21 @@ export function slopeAt(x, z) {
   return (Math.abs(groundAt(x + 1, z) - groundAt(x - 1, z)) + Math.abs(groundAt(x, z + 1) - groundAt(x, z - 1))) / 4;
 }
 
-/** Terrain surface: a grid laid out in (u, v) so its edges are the sides of the square. */
+/** The ground of the island: a grid laid out in (u, v), out to where it is all under the sea. */
 export function buildTerrain() {
-  const nu = SQUARE.u1 - SQUARE.u0;
-  const nv = SQUARE.v1 - SQUARE.v0;
+  const { u0, v0 } = SQUARE;
+  const nu = SQUARE.u1 - u0;
+  const nv = SQUARE.v1 - v0;
   const geo = new THREE.PlaneGeometry(1, 1, nv, nu);
   const pos = geo.attributes.position;
   const worked = new Float32Array(pos.count);
   for (let iu = 0; iu <= nu; iu++) {
     for (let iv = 0; iv <= nv; iv++) {
       const i = iu * (nv + 1) + iv;
-      const x = toX(SQUARE.u0 + iu, SQUARE.v0 + iv);
-      const z = toZ(SQUARE.u0 + iu, SQUARE.v0 + iv);
+      const x = toX(u0 + iu, v0 + iv);
+      const z = toZ(u0 + iu, v0 + iv);
       pos.setXYZ(i, x, groundAt(x, z), z);
-      worked[i] = cultivated(SQUARE.u0 + iu, SQUARE.v0 + iv);
+      worked[i] = cultivated(u0 + iu, v0 + iv);
     }
   }
   // Tells the built terrace walls from the living rock.
@@ -270,61 +350,6 @@ export function buildTerrain() {
   mesh.receiveShadow = true;
   return mesh;
 }
-
-/**
- * The cut faces of the island: earth strata from the base up to the ground. `holes` open windows in the back face
- * ({ v0, v1, y0, y1 } in back-face coordinates) to look into the mountain.
- */
-export function buildSides(holes = []) {
-  const earth = [];
-  const quad = (out, p0, p1, y0a, y0b, y1a, y1b) => {
-    // p0, p1: column positions (x, z); bottom y0a/y0b, top y1a/y1b.
-    out.push(p0.x, y0a, p0.z, p1.x, y0b, p1.z, p1.x, y1b, p1.z, p0.x, y0a, p0.z, p1.x, y1b, p1.z, p0.x, y1a, p0.z);
-  };
-  const edges = [
-    { fixed: 'u', at: SQUARE.u1, from: SQUARE.v0, to: SQUARE.v1, back: true },
-    { fixed: 'u', at: SQUARE.u0, from: SQUARE.v0, to: SQUARE.v1 },
-    { fixed: 'v', at: SQUARE.v0, from: SQUARE.u0, to: SQUARE.u1 },
-    { fixed: 'v', at: SQUARE.v1, from: SQUARE.u0, to: SQUARE.u1 },
-  ];
-  for (const edge of edges) {
-    const point = (s) => {
-      const [u, v] = edge.fixed === 'u' ? [edge.at, s] : [s, edge.at];
-      const p = new THREE.Vector3(toX(u, v), 0, toZ(u, v));
-      p.y = groundAt(p.x, p.z);
-      return p;
-    };
-    for (let s = edge.from; s < edge.to; s++) {
-      const p0 = point(s);
-      const p1 = point(s + 1);
-      // Vertical intervals of earth, minus any window opened in the back face.
-      let spans = [[BASE_Y, Infinity]];
-      if (edge.back) {
-        for (const h of holes) {
-          if (s + 0.5 < h.v0 || s + 0.5 > h.v1) continue;
-          spans = spans.flatMap(([lo, hi]) => (h.y1 <= lo || h.y0 >= hi ? [[lo, hi]] : [[lo, h.y0], [h.y1, hi]].filter(([a, b]) => b > a)));
-        }
-      }
-      for (const [lo, hi] of spans) {
-        const ta = Math.min(hi, p0.y);
-        const tb = Math.min(hi, p1.y);
-        if (ta > lo || tb > lo) quad(earth, p0, p1, lo, lo, Math.max(lo, ta), Math.max(lo, tb));
-      }
-    }
-  }
-  const group = new THREE.Group();
-  const make = (data, material) => {
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(data, 3));
-    geo.computeVertexNormals();
-    const mesh = new THREE.Mesh(geo, material);
-    mesh.receiveShadow = true;
-    group.add(mesh);
-  };
-  make(earth, paint(0xffffff, { terrain: true, doubleSide: true }));
-  return group;
-}
-
 /**
  * The sea has no edge: it runs on past the diorama on every side, out to a horizon that the
  * view sets for itself (see `uHorizon`).
@@ -360,6 +385,16 @@ export function scatterInstanced(scene, rng, geo, mat, count, place) {
   return mesh;
 }
 
+/** A random point of the map, anywhere within its bounds, on the ground or the sea bed. */
+export function anywhere(rng, p) {
+  const u = SQUARE.u0 + rng() * (SQUARE.u1 - SQUARE.u0);
+  const v = SQUARE.v0 + rng() * (SQUARE.v1 - SQUARE.v0);
+  p.set(toX(u, v), 0, toZ(u, v));
+  p.y = groundAt(p.x, p.z);
+  return p;
+}
+
+/** A random point within `maxR` of the agora. */
 export function randomSpot(rng, p, maxR = 110) {
   const a = rng() * Math.PI * 2;
   const r = Math.sqrt(rng()) * maxR;

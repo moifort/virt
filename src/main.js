@@ -3,7 +3,7 @@ import { PixelCamera, PixelRenderer } from './pixel.js';
 import { Player } from './player.js';
 import { GLOBALS } from './style.js';
 import { Climate } from './climate.js';
-import { CORNERS, WATER_LEVEL, createWorld, groundAt } from './world.js';
+import { LAND_ENDS, WATER_LEVEL, createWorld, groundAt } from './world.js';
 
 const clamp = THREE.MathUtils.clamp;
 
@@ -85,7 +85,7 @@ addEventListener('pointerup', () => {
 addEventListener('pointermove', (e) => {
   if (dragging) yawTarget -= e.movementX * 0.006;
 });
-addEventListener('wheel', (e) => (view.viewHeight = clamp(view.viewHeight * (1 + Math.sign(e.deltaY) * 0.1), 24, 220)), {
+addEventListener('wheel', (e) => (view.viewHeight = clamp(view.viewHeight * (1 + Math.sign(e.deltaY) * 0.1), 24, 260)), {
   passive: true,
 });
 
@@ -107,6 +107,8 @@ function readInput(consume) {
 const clock = new THREE.Clock();
 const focus = new THREE.Vector3();
 const ahead = new THREE.Vector2();
+const sunSpot = new THREE.Vector3();
+const moonSpot = new THREE.Vector3();
 let t = 0;
 
 renderer.setAnimationLoop(() => {
@@ -130,16 +132,23 @@ renderer.setAnimationLoop(() => {
   sun.target.position.copy(player.position);
   sun.position.copy(player.position).addScaledVector(climate.lightDir, 120);
 
-  // The sea runs out to a horizon a little way behind the far corner of the diorama, so the
+  // The sea runs out to a horizon a little way behind the last of the land, so the
   // mountain stands against the sky; the sky is painted from that line up.
   ahead.set(view.forward.x, view.forward.z).normalize();
-  const offing = Math.max(...CORNERS.map(([x, z]) => x * ahead.x + z * ahead.y)) + 30;
+  const offing = Math.max(...LAND_ENDS.map(([x, z]) => x * ahead.x + z * ahead.y)) + 30;
   GLOBALS.uHorizon.value.set(ahead.x, ahead.y, offing);
-  const horizon = focus.set(ahead.x * offing, WATER_LEVEL, ahead.y * offing).project(view.camera).y * 0.5 + 0.5;
-
-  // How far the wind pushes the rain sideways on screen.
+  focus.set(ahead.x * offing, WATER_LEVEL, ahead.y * offing);
   const weather = climate.screen;
-  weather.horizon = horizon;
+  // The last of the sea before that line is drawn without an outline, so no seam shows.
+  weather.offing = focus.clone().sub(view.camera.position).dot(view.forward) - view.camera.near - 16;
+  weather.horizon = focus.project(view.camera).y * 0.5 + 0.5;
+  // Where the sun and the moon stand in the painted sky: across the screen by their bearing
+  // from the way the view looks, above the horizon by their height. The moon is opposite the sun.
+  for (const [body, sign, spot] of [['sun', 1, sunSpot], ['moon', -1, moonSpot]]) {
+    const bearing = Math.atan2((climate.sunDir.x * view.right.x + climate.sunDir.z * view.right.z) * sign, (climate.sunDir.x * ahead.x + climate.sunDir.z * ahead.y) * sign);
+    weather[body] = spot.set(0.5 + bearing / 1.7, Math.asin(clamp(climate.sunDir.y * sign, -1, 1)) / 1.15, Math.abs(bearing) < 1.4 ? 1 : 0);
+  }
+  // How far the wind pushes the rain sideways on screen.
   weather.slant = (climate.wind.x * view.right.x + climate.wind.y * view.right.z) * weather.wind;
   pixels.render(scene, view.camera, { skyTop: climate.skyTop, skyHorizon: climate.skyHorizon, texelWorld: view.texelWorld, time: t, weather });
 });
