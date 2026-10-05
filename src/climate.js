@@ -25,8 +25,8 @@ const KEYS = [
   { e: -0.02, sun: 0x9488b4, shade: 0x8078ac, top: 0x4450a0, horizon: 0xf09a7a, glow: 0.95, night: 0.5 },
   { e: 0.1, sun: 0xffbc92, shade: 0x8480b4, top: 0x6274c4, horizon: 0xffb080, glow: 0.9, night: 0.1 },
   { e: 0.28, sun: 0xffdcaa, shade: 0x9090bc, top: 0x6c8ad0, horizon: 0xffd0a0, glow: 0.6, night: 0 },
-  { e: 0.55, sun: 0xfff6e2, shade: 0xa4acd6, top: 0x58a4e4, horizon: 0xd4ecf6, glow: 0, night: 0 },
-  { e: 1, sun: 0xffffff, shade: 0xaeb6dc, top: 0x4a9ce6, horizon: 0xcce8f6, glow: 0, night: 0 },
+  { e: 0.55, sun: 0xfff6e2, shade: 0xaeb4da, top: 0x6aaee6, horizon: 0xdaeef6, glow: 0, night: 0 },
+  { e: 1, sun: 0xffffff, shade: 0xb8bfe0, top: 0x5ea8e8, horizon: 0xd2eaf6, glow: 0, night: 0 },
 ];
 for (const key of KEYS) for (const name of ['sun', 'shade', 'top', 'horizon']) key[name] = new THREE.Color(key[name]);
 

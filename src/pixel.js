@@ -188,6 +188,11 @@ void main() {
     }
   }
 
+  // A soft wash over the whole picture, like gouache on tinted paper: colours a little
+  // quieter, the darks lifted toward the colour of the air.
+  col = mix(vec3(dot(col, vec3(0.3, 0.59, 0.11))), col, 0.9);
+  col = mix(col, mix(vec3(1.0, 0.95, 0.86), vec3(0.4, 0.48, 0.78), uNight), 0.07);
+
   // Ordered dithering onto 24 levels per channel: gradients become pixel-art ramps.
   vec3 s = toSRGB(col);
   s = floor(s * 23.0 + 0.5 + bayer4(gl_FragCoord.xy) * 0.9) / 23.0;

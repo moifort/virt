@@ -50,7 +50,7 @@ export function createWorld(scene) {
     builders[zn.id](g, rng, animated);
     bake(g);
   }
-  buildVillages(scene, rng);
+  buildVillages(scene, rng, animated);
   buildEstate(scene, rng);
   buildNature(scene, rng);
   buildLife(scene, rng, animated);

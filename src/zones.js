@@ -660,9 +660,9 @@ export function buildAgora(g, rng) {
     const tilt = at(new THREE.Group(), 0, 0, 0, yaw);
     tilt.rotation.z = -0.8 - (k % 2) * 0.2;
     at(cyl(0.2, 0.42, 4.6, BARK, 6), 0, 2.3, 0, tilt);
-    at(ball(2.1 + (k % 3) * 0.3, color, { flat: true }, 9, 6), 0, 5, 0, tilt);
+    at(ball(2.1 + (k % 3) * 0.3, color, { flat: true, leaf: true }, 9, 6), 0, 5, 0, tilt);
   });
-  at(ball(2.6, 0x5a8050, { flat: true }, 9, 6), 0, 11.5, 0, g);
+  at(ball(2.6, 0x5a8050, { flat: true, leaf: true }, 9, 6), 0, 11.5, 0, g);
   for (let k = 0; k < 6; k++) {
     const a = (k / 6) * Math.PI * 2 + Math.PI / 6;
     const bench = at(new THREE.Group(), Math.cos(a) * 7, 0, Math.sin(a) * 7, g);

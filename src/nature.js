@@ -1,20 +1,29 @@
 // Mediterranean flora and rock, as on the Ligurian coast: stone pines, cypresses, olive and
-// lemon trees, holm oaks, maquis shrubs, broom, agaves and prickly pears among limestone boulders.
-// Each species is modelled in detail once, baked, then instanced across the bay.
+// lemon trees, holm oaks, almond trees in blossom, palms on the front, maquis, broom, oleander
+// and lavender, agaves and prickly pears among limestone boulders. Trees gather in groves and
+// leave meadows open between them. Each species is modelled in detail once, baked, then
+// instanced across the bay.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { fbm, pick } from './noise.js';
 import { PAL, WATER_LEVEL, paint, solid } from './style.js';
 import { at, bake, ball, box, cone, cyl, lantern } from './kit.js';
-import { PATHS, UP, coastU, footU, groundAt, isWild, randomSpot, scatterInstanced, slopeAt, toU, toV, toX, toZ } from './terrain.js';
+import { PATHS, UP, coastU, cultivated, footU, groundAt, inSquare, isWild, randomSpot, scatterInstanced, slopeAt, toU, toV, toX, toZ } from './terrain.js';
 
 const BARK = 0x7d5a48;
+const DARK_BARK = 0x5e463c;
 const OLIVE_BARK = 0x76695a;
-const PINE = [0x3f6a42, 0x4f7c4a, 0x5f8a52];
-const CYPRESS = 0x2f5840;
-const OLIVE = [0x8a9f78, 0x7a906c, 0x9fb08a];
-const OAK = [0x3f6540, 0x4c7448, 0x5a8050];
+// Foliage is always three tones, from the depths between the boughs to the sunlit tips.
+const PINE = [0x3f6e4a, 0x538554, 0x6f9e5e];
+const CYPRESS = [0x2f5a44, 0x3c6c4e, 0x4a7c56];
+const OLIVE = [0x7d9778, 0x93ab86, 0xaec29a];
+const OAK = [0x3d6a46, 0x4f8050, 0x69985a];
+const LEMON = [0x3f7848, 0x54905a, 0x74a862];
+const ORCHARD = [0x4f8a52, 0x64a05c, 0x82b46a];
+const PALM = [0x3f7a4a, 0x56925a, 0x74aa66];
 const ROCK = [0xcfc3b0, 0xb9ad9c, 0xa99d8e, 0xd8cdb8];
+const LEAF = { leaf: true };
+const BLOSSOM = { blossom: true };
 
 /** Where a point sits in the bay: up the mountain, along the shore, or on the plain. */
 function region(x, z) {
@@ -25,16 +34,24 @@ function region(x, z) {
   return 'plain';
 }
 
+/** Woodland gathers in patches: above about a half the trees close into a grove. */
+const wood = (x, z) => fbm(x * 0.035 + 12, z * 0.035 - 7, 2);
+const worked = (x, z) => cultivated(toU(x, z), toV(x, z));
+
 // ---------------------------------------------------------------- Flora
 
-/** A lumpy mass of foliage: a few flattened faceted balls around a centre. */
-function foliage(g, rng, x, y, z, r, colors, lumps = 4, squash = 0.7) {
-  at(ball(r, colors[0], { flat: true }, 7, 5), x, y, z, g).scale.y = squash;
+/**
+ * A lumpy mass of foliage: flattened faceted balls around a centre, the high ones in the
+ * lightest tone and the low ones in the darkest.
+ */
+function foliage(g, rng, x, y, z, r, colors, lumps = 4, squash = 0.7, kind = LEAF) {
+  at(ball(r, colors[1], kind, 10, 7), x, y, z, g).scale.y = squash;
   for (let k = 0; k < lumps; k++) {
     const a = (k / lumps) * Math.PI * 2 + rng();
-    const d = r * (0.45 + rng() * 0.3);
-    const lump = at(ball(r * (0.5 + rng() * 0.25), colors[1 + (k % (colors.length - 1))], { flat: true }, 6, 4), x + Math.cos(a) * d, y + (rng() - 0.3) * r * 0.5, z + Math.sin(a) * d, g);
-    lump.scale.y = squash;
+    const d = r * (0.45 + rng() * 0.35);
+    const dy = (rng() - 0.35) * r * 0.6;
+    const tone = dy > r * 0.12 ? colors[2] : dy < -r * 0.06 ? colors[0] : colors[1];
+    at(ball(r * (0.45 + rng() * 0.3), tone, kind, 9, 6), x + Math.cos(a) * d, y + dy, z + Math.sin(a) * d, g).scale.y = squash;
   }
 }
 
@@ -45,37 +62,45 @@ function stonePine(rng) {
   const lean = (rng() - 0.5) * 0.35;
   const low = at(cyl(0.2, 0.32, H * 0.62, BARK, 6), Math.sin(lean) * H * 0.31, H * 0.31, 0, g);
   low.rotation.z = -lean;
+  at(cyl(0.34, 0.44, 0.5, DARK_BARK, 6, { flat: true }), 0, 0.2, 0, g);
   const tx = Math.sin(lean) * H * 0.62;
   // Boughs fanning out under the canopy.
-  for (let k = 0; k < 4; k++) {
-    const a = (k / 4) * Math.PI * 2 + rng();
+  for (let k = 0; k < 5; k++) {
+    const a = (k / 5) * Math.PI * 2 + rng();
     const bough = new THREE.Group();
     bough.position.set(tx, H * 0.6, 0);
     bough.rotation.set(Math.sin(a) * 0.55, 0, -Math.cos(a) * 0.55);
     at(cyl(0.07, 0.14, H * 0.42, BARK, 4), 0, H * 0.21, 0, bough);
     g.add(bough);
   }
+  // The umbrella: a dark underside, a wide middle, bright cushions of needles on top.
   const R = 2.3 + rng() * 0.8;
-  [[R, 0, PINE[0]], [R * 0.78, 0.36, PINE[1]], [R * 0.5, 0.66, PINE[2]]].forEach(([r, dy, color], i) => {
-    const disc = at(ball(r, color, { flat: true }, 10, 5), tx + (i - 1) * 0.25, H + dy, (i % 2) * 0.3, g);
-    disc.scale.y = 0.28;
-  });
+  at(ball(R, PINE[0], LEAF, 10, 5), tx, H - 0.08, 0, g).scale.y = 0.24;
+  at(ball(R * 0.86, PINE[1], LEAF, 10, 5), tx + 0.1, H + 0.3, 0.15, g).scale.y = 0.3;
+  for (let k = 0; k < 7; k++) {
+    const a = (k / 7) * Math.PI * 2 + rng();
+    const d = R * (0.5 + rng() * 0.3);
+    at(ball(R * (0.3 + rng() * 0.14), PINE[k % 3 === 0 ? 1 : 2], LEAF, 6, 4), tx + Math.cos(a) * d, H + 0.42 + rng() * 0.25, Math.sin(a) * d, g).scale.y = 0.42;
+  }
   for (let k = 0; k < 5; k++) {
     const a = (k / 5) * Math.PI * 2 + rng();
-    at(ball(R * 0.42, PINE[k % 2], { flat: true }, 6, 4), tx + Math.cos(a) * R * 0.72, H - 0.05, Math.sin(a) * R * 0.72, g).scale.y = 0.4;
+    at(ball(R * 0.4, PINE[k % 2], LEAF, 6, 4), tx + Math.cos(a) * R * 0.78, H - 0.05, Math.sin(a) * R * 0.78, g).scale.y = 0.4;
   }
   return g;
 }
 
-/** Italian cypress: a slim dark spindle. */
+/** Italian cypress: a slim dark spindle, never quite regular. */
 export function cypress(rng) {
   const g = new THREE.Group();
   const H = 5.5 + rng() * 3.5;
   at(cyl(0.1, 0.15, 0.7, BARK, 5), 0, 0.35, 0, g);
-  const body = at(ball(0.62, CYPRESS, { flat: true }, 7, 6), 0, H * 0.4, 0, g);
+  const body = at(ball(0.62, CYPRESS[0], LEAF, 7, 6), 0, H * 0.4, 0, g);
   body.scale.y = H / 2.9;
-  at(cone(0.42, H * 0.42, CYPRESS, 7, { flat: true }), 0, H * 0.8, 0, g);
-  at(ball(0.34, 0x3d6a4a, { flat: true }, 5, 4), 0.3, H * 0.45, 0.25, g).scale.y = 2.2;
+  at(cone(0.42, H * 0.42, CYPRESS[1], 7, LEAF), 0, H * 0.8, 0, g);
+  for (let k = 0; k < 3; k++) {
+    const a = rng() * Math.PI * 2;
+    at(ball(0.3 + rng() * 0.08, CYPRESS[1 + (k % 2)], LEAF, 5, 4), Math.cos(a) * 0.32, H * (0.25 + k * 0.2), Math.sin(a) * 0.32, g).scale.y = 2.0 + rng();
+  }
   return g;
 }
 
@@ -86,12 +111,13 @@ export function oliveTree(rng) {
   const trunk = at(cyl(0.2, 0.36, H, OLIVE_BARK, 6, { flat: true }), 0, H / 2, 0, g);
   trunk.rotation.z = (rng() - 0.5) * 0.3;
   at(ball(0.34, OLIVE_BARK, { flat: true }, 5, 4), 0.05, 0.25, 0.05, g);
+  at(ball(0.24, OLIVE_BARK, { flat: true }, 5, 4), -0.12, H * 0.6, 0.1, g);
   for (const s of [-1, 1]) {
     const limb = at(cyl(0.1, 0.18, 1.5, OLIVE_BARK, 5, { flat: true }), s * 0.42, H + 0.5, s * 0.1, g);
     limb.rotation.z = -s * (0.55 + rng() * 0.3);
-    foliage(g, rng, s * 0.95, H + 1.25 + rng() * 0.3, s * 0.2, 1.0 + rng() * 0.25, OLIVE, 4, 0.72);
+    foliage(g, rng, s * 0.95, H + 1.25 + rng() * 0.3, s * 0.2, 1.0 + rng() * 0.25, OLIVE, 5, 0.72);
   }
-  foliage(g, rng, 0, H + 1.6, -0.2, 1.05, OLIVE, 3, 0.7);
+  foliage(g, rng, 0, H + 1.6, -0.2, 1.05, OLIVE, 4, 0.7);
   return g;
 }
 
@@ -99,43 +125,125 @@ export function oliveTree(rng) {
 export function lemonTree(rng) {
   const g = new THREE.Group();
   at(cyl(0.11, 0.16, 1.3, BARK, 5), 0, 0.65, 0, g);
-  const crown = at(ball(1.1, 0x3f7645, { flat: true }, 8, 6), 0, 1.95, 0, g);
-  crown.scale.y = 0.85;
-  at(ball(0.7, 0x4f8650, { flat: true }, 6, 4), 0.45, 2.35, 0.3, g);
+  foliage(g, rng, 0, 1.95, 0, 1.1, LEMON, 5, 0.85);
   for (let k = 0; k < 9; k++) {
     const a = rng() * Math.PI * 2;
     const p = 0.6 + rng() * 1.6;
-    at(ball(0.12, 0xf2d24a, {}, 5, 4), Math.cos(a) * Math.sin(p) * 1.1, 1.95 + Math.cos(p) * 0.9, Math.sin(a) * Math.sin(p) * 1.1, g);
+    at(ball(0.13, 0xf2d24a, {}, 5, 4), Math.cos(a) * Math.sin(p) * 1.2, 1.95 + Math.cos(p) * 0.95, Math.sin(a) * Math.sin(p) * 1.2, g);
   }
   return g;
 }
 
-/** Holm oak: stout trunk under a dense, dark, rounded crown. */
+/** Holm oak: stout trunk under a dense, dark, rounded crown heaped up in billows. */
 function holmOak(rng) {
   const g = new THREE.Group();
   const H = 2.2 + rng() * 1.2;
   at(cyl(0.24, 0.38, H, BARK, 6), 0, H / 2, 0, g).rotation.z = (rng() - 0.5) * 0.15;
+  at(cyl(0.4, 0.52, 0.4, DARK_BARK, 6, { flat: true }), 0, 0.15, 0, g);
   for (const s of [-1, 1]) at(cyl(0.1, 0.18, 1.6, BARK, 5), s * 0.5, H + 0.4, 0, g).rotation.z = -s * 0.7;
-  foliage(g, rng, 0, H + 1.7, 0, 2.1 + rng() * 0.5, OAK, 5, 0.78);
+  const R = 2.0 + rng() * 0.5;
+  foliage(g, rng, 0, H + 1.6, 0, R, OAK, 6, 0.78);
+  foliage(g, rng, (rng() - 0.5) * 0.8, H + 2.5, (rng() - 0.5) * 0.8, R * 0.62, [OAK[1], OAK[2], OAK[2]], 3, 0.75);
+  return g;
+}
+
+/**
+ * Almond tree of the old orchards: a cloud of pink and white blossom in spring, green in
+ * summer, gold in autumn, bare black boughs in the dead of winter.
+ */
+function almondTree(rng) {
+  const g = new THREE.Group();
+  const H = 1.3 + rng() * 0.5;
+  at(cyl(0.13, 0.22, H, DARK_BARK, 5, { flat: true }), 0, H / 2, 0, g).rotation.z = (rng() - 0.5) * 0.2;
+  for (let k = 0; k < 4; k++) {
+    const a = (k / 4) * Math.PI * 2 + rng();
+    const reach = 0.9 + rng() * 0.4;
+    const limb = new THREE.Group();
+    limb.position.set(0, H - 0.1, 0);
+    limb.rotation.set(Math.sin(a) * 0.75, 0, -Math.cos(a) * 0.75);
+    at(cyl(0.05, 0.1, reach * 1.7, DARK_BARK, 4), 0, reach * 0.85, 0, limb);
+    g.add(limb);
+    foliage(g, rng, Math.cos(a) * reach, H + 0.9 + rng() * 0.3, Math.sin(a) * reach, 0.75 + rng() * 0.2, ORCHARD, 3, 0.8, BLOSSOM);
+  }
+  foliage(g, rng, 0, H + 1.5, 0, 0.9, ORCHARD, 4, 0.8, BLOSSOM);
+  return g;
+}
+
+/** Date palm of the Riviera sea fronts: a rough leaning stem and a fountain of arching fronds. */
+function palm(rng) {
+  const g = new THREE.Group();
+  const H = 4 + rng() * 2.5;
+  const lean = (rng() - 0.5) * 0.3;
+  const rings = 7;
+  for (let k = 0; k < rings; k++) {
+    const t = k / rings;
+    at(cyl(0.2 - t * 0.03, 0.26 - t * 0.03, H / rings + 0.06, k % 2 ? BARK : 0x8d6a55, 6, { flat: true }), Math.sin(lean) * H * t * t, (H * (k + 0.5)) / rings, 0, g);
+  }
+  const tx = Math.sin(lean) * H;
+  at(ball(0.42, 0x8d6a55, { flat: true }, 6, 4), tx, H, 0, g);
+  // Each frond rises from the crown, arches out and droops at its tip.
+  for (let k = 0; k < 11; k++) {
+    const frond = new THREE.Group();
+    frond.position.set(tx, H + 0.1, 0);
+    frond.rotation.y = (k / 11) * Math.PI * 2 + rng() * 0.3;
+    const rise = 0.25 + (k % 3) * 0.3;
+    const inner = solid(new THREE.ConeGeometry(0.34, 1.9, 4).translate(0, 0.95, 0), paint(PALM[k % 3], LEAF));
+    inner.scale.z = 0.3;
+    inner.rotation.z = -(Math.PI / 2 - rise);
+    frond.add(inner);
+    const outer = solid(new THREE.ConeGeometry(0.3, 1.7, 4).translate(0, 0.85, 0), paint(PALM[(k + 1) % 3], LEAF));
+    outer.scale.z = 0.3;
+    outer.position.set(Math.cos(rise) * 1.5, Math.sin(rise) * 1.5, 0);
+    outer.rotation.z = -(Math.PI / 2 + 0.35 + rng() * 0.3);
+    frond.add(outer);
+    g.add(frond);
+  }
+  for (let k = 0; k < 3; k++) at(ball(0.16, 0xd98a3a, {}, 4, 3), tx + Math.cos(k * 2.1) * 0.4, H - 0.25, Math.sin(k * 2.1) * 0.4, g);
   return g;
 }
 
 /** Maquis: lentisk and myrtle growing as low dense cushions. */
 function maquis(rng) {
   const g = new THREE.Group();
-  const colors = pick(rng, [[0x4a6c44, 0x587a4c, 0x3f6040], [0x62804e, 0x70905a, 0x56744a], [0x6f8a66, 0x7d9870, 0x61805c]]);
-  foliage(g, rng, 0, 0.45, 0, 0.8 + rng() * 0.4, colors, 4, 0.7);
+  const colors = pick(rng, [[0x47694a, 0x587c50, 0x6c9058], [0x587a52, 0x6b8e5a, 0x83a468], [0x65836a, 0x7a9876, 0x92ac86]]);
+  foliage(g, rng, 0, 0.45, 0, 0.8 + rng() * 0.4, colors, 5, 0.7);
   return g;
 }
 
 /** Broom in flower: green switches dusted with yellow. */
 function broom(rng) {
   const g = new THREE.Group();
-  at(ball(0.7, 0x6f8a4a, { flat: true }, 6, 4), 0, 0.5, 0, g).scale.y = 0.85;
-  for (let k = 0; k < 7; k++) {
+  at(ball(0.7, 0x6f8e52, LEAF, 6, 4), 0, 0.5, 0, g).scale.y = 0.85;
+  for (let k = 0; k < 8; k++) {
     const a = rng() * Math.PI * 2;
     const p = rng() * 1.2;
-    at(ball(0.22 + rng() * 0.1, 0xf0c93a, { flat: true }, 5, 3), Math.cos(a) * Math.sin(p) * 0.65, 0.55 + Math.cos(p) * 0.6, Math.sin(a) * Math.sin(p) * 0.65, g);
+    at(ball(0.2 + rng() * 0.1, k % 3 ? 0xf0c93a : 0xf7de6a, { flat: true }, 5, 3), Math.cos(a) * Math.sin(p) * 0.65, 0.55 + Math.cos(p) * 0.6, Math.sin(a) * Math.sin(p) * 0.65, g);
+  }
+  return g;
+}
+
+/** Oleander: the tall flowering hedge of every Italian roadside, in pink, white or red. */
+function oleander(rng) {
+  const g = new THREE.Group();
+  foliage(g, rng, 0, 0.9, 0, 1.0 + rng() * 0.3, [0x3f7050, 0x4f845a, 0x66986a], 4, 0.95);
+  const flower = pick(rng, [[0xf08aa8, 0xf7b0c4], [0xf7efe6, 0xffffff], [0xe2586a, 0xf08a8a], [0xf08aa8, 0xf7efe6]]);
+  for (let k = 0; k < 11; k++) {
+    const a = rng() * Math.PI * 2;
+    const p = rng() * 1.4;
+    at(ball(0.17 + rng() * 0.08, flower[k % 2], { flat: true }, 5, 3), Math.cos(a) * Math.sin(p) * 1.05, 0.95 + Math.cos(p) * 0.95, Math.sin(a) * Math.sin(p) * 1.05, g);
+  }
+  return g;
+}
+
+/** Lavender: a grey-green cushion bristling with violet spikes. */
+function lavender(rng) {
+  const g = new THREE.Group();
+  at(ball(0.42, 0x8a9e86, LEAF, 6, 4), 0, 0.22, 0, g).scale.y = 0.7;
+  for (let k = 0; k < 9; k++) {
+    const a = (k / 9) * Math.PI * 2 + rng();
+    const d = rng() * 0.34;
+    const spike = at(cone(0.07, 0.5 + rng() * 0.2, k % 3 ? 0x8f78c8 : 0xa890d8, 4, { flat: true }), Math.cos(a) * d, 0.62, Math.sin(a) * d, g);
+    spike.rotation.set(Math.sin(a) * d * 0.9, 0, -Math.cos(a) * d * 0.9);
   }
   return g;
 }
@@ -180,15 +288,16 @@ function pricklyPear(rng) {
 
 // ---------------------------------------------------------------- Rock
 
-/** A limestone outcrop: a few angular blocks leaning on each other. */
+/** A limestone outcrop: a few angular blocks leaning on each other, a tuft of grass in a crack. */
 function outcrop(rng) {
   const g = new THREE.Group();
-  for (let k = 0; k < 4; k++) {
-    const r = 0.7 + rng() * 0.9;
-    const rock = at(solid(new THREE.DodecahedronGeometry(r, 0), paint(pick(rng, ROCK), { flat: true })), (rng() - 0.5) * 1.8, r * 0.35, (rng() - 0.5) * 1.8, g);
-    rock.scale.set(1 + rng() * 0.5, 0.6 + rng() * 0.5, 1 + rng() * 0.3);
+  for (let k = 0; k < 5; k++) {
+    const r = 0.6 + rng() * 1.0;
+    const rock = at(solid(new THREE.DodecahedronGeometry(r, 0), paint(pick(rng, ROCK), { flat: true })), (rng() - 0.5) * 2.0, r * 0.35, (rng() - 0.5) * 2.0, g);
+    rock.scale.set(1 + rng() * 0.5, 0.6 + rng() * 0.6, 1 + rng() * 0.3);
     rock.rotation.set(rng() * 0.4, rng() * 3, rng() * 0.4);
   }
+  at(ball(0.4, 0x6f9658, LEAF, 5, 3), (rng() - 0.5) * 1.2, 0.5, (rng() - 0.5) * 1.2, g).scale.y = 0.6;
   return g;
 }
 
@@ -231,12 +340,14 @@ function grow(scene, rng, build, { count, variants = 3, maxR = 112, margin = 0, 
   const p = new THREE.Vector3();
   const q = new THREE.Quaternion();
   const s = new THREE.Vector3();
-  for (let i = 0, n = 0; i < count * 15 && n < count; i++) {
+  for (let i = 0, n = 0; i < count * 20 && n < count; i++) {
     randomSpot(rng, p, maxR);
-    if (!isWild(p.x, p.z, margin) || slopeAt(p.x, p.z) > maxSlope || !where(p.x, p.z)) continue;
+    const slope = slopeAt(p.x, p.z);
+    if (!isWild(p.x, p.z, margin) || slope > maxSlope || !where(p.x, p.z)) continue;
     q.setFromAxisAngle(UP, rng() * Math.PI * 2);
     s.setScalar(size[0] + rng() * (size[1] - size[0]));
-    p.y -= sink;
+    // On a slope the foot of the plant is buried on the uphill side.
+    p.y -= sink + slope * 0.7;
     placements[Math.floor(rng() * variants)].push(new THREE.Matrix4().compose(p, q, s));
     n++;
   }
@@ -256,7 +367,7 @@ export function buildNature(scene, rng) {
   const on = (...regions) => (x, z) => regions.includes(region(x, z));
   buildBeach(scene, rng);
 
-  // Ground cover: grass tufts swaying in the wind.
+  // Ground cover: grass tufts bowing as the wind runs through them.
   const blades = [];
   for (let k = 0; k < 5; k++) {
     const b = new THREE.ConeGeometry(0.1, 0.8 + (k % 3) * 0.25, 3);
@@ -265,15 +376,15 @@ export function buildNature(scene, rng) {
     b.rotateY((k / 5) * Math.PI);
     blades.push(b);
   }
-  scatterInstanced(scene, rng, mergeGeometries(blades), paint(0xffffff, { sway: true }), 5000, (r, p, s, c) => {
-    randomSpot(r, p, 125);
-    if (!isWild(p.x, p.z, -1.5) || slopeAt(p.x, p.z) > 0.5) return false;
+  scatterInstanced(scene, rng, mergeGeometries(blades), paint(0xffffff, { sway: true }), 7000, (r, p, s, c) => {
+    randomSpot(r, p, 135);
+    if (!isWild(p.x, p.z, -1.5) || slopeAt(p.x, p.z) > 0.8) return false;
     if (p.y < WATER_LEVEL + 1.3) return false; // keep the beach clean
     const lush = fbm(p.x * 0.05 + 3, p.z * 0.05 - 8, 3);
-    if (lush < 0.5 && r() < 0.85) return false;
+    if (lush < 0.5 && r() < 0.8) return false;
     s.setScalar(0.7 + r() * 0.8);
-    // Summer: green where it stays damp, straw-coloured everywhere else.
-    c.setHex(lush > 0.55 ? pick(r, [PAL.grass, PAL.grassDeep, PAL.moss]) : pick(r, [0xc9c07a, 0xd8c880, PAL.grass]));
+    // Green where it stays damp, straw-coloured where the sun dries it.
+    c.setHex(lush > 0.55 ? pick(r, [PAL.grass, PAL.grassDeep, PAL.moss, 0xa9cb62]) : pick(r, [0xc9c07a, 0xd8c880, PAL.grass]));
     return true;
   });
 
@@ -283,14 +394,16 @@ export function buildNature(scene, rng) {
     const a = (k / 5) * Math.PI * 2;
     petals.push(new THREE.IcosahedronGeometry(0.09, 0).scale(1.4, 0.5, 1).translate(Math.cos(a) * 0.11, 0.64, Math.sin(a) * 0.11));
   }
-  scatterInstanced(scene, rng, mergeGeometries(petals), paint(0xffffff, { sway: true }), 2600, (r, p, s, c) => {
-    randomSpot(r, p, 125);
-    if (!isWild(p.x, p.z, -1) || slopeAt(p.x, p.z) > 0.4) return false;
+  scatterInstanced(scene, rng, mergeGeometries(petals), paint(0xffffff, { sway: true }), 3400, (r, p, s, c) => {
+    randomSpot(r, p, 135);
+    if (!isWild(p.x, p.z, -1) || slopeAt(p.x, p.z) > 0.6) return false;
     if (p.y < WATER_LEVEL + 1.3) return false;
-    if (fbm(p.x * 0.06 - 4, p.z * 0.06 + 9, 2) < 0.5) return false;
+    // Each drift of flowers is mostly one kind: poppies, buttercups, daisies or wild lavender.
+    const drift = fbm(p.x * 0.06 - 4, p.z * 0.06 + 9, 2);
+    if (drift < 0.5) return false;
     s.setScalar(0.8 + r() * 0.7);
-    // Poppies, broom, daisies and wild lavender.
-    c.setHex(pick(r, [PAL.red, PAL.red, PAL.saffron, PAL.ivory, 0x9a86c8]));
+    const kinds = [PAL.red, PAL.saffron, PAL.ivory, 0x9a86c8, 0xf2a6c1];
+    c.setHex(r() < 0.7 ? kinds[Math.floor(fbm(p.x * 0.03 + 20, p.z * 0.03, 2) * 9.99) % kinds.length] : pick(r, kinds));
     return true;
   });
 
@@ -303,31 +416,51 @@ export function buildNature(scene, rng) {
     return true;
   });
 
-  // Boulders.
-  scatterInstanced(scene, rng, new THREE.DodecahedronGeometry(1, 0), paint(0xffffff, { flat: true }), 70, (r, p, s, c) => {
-    randomSpot(r, p, 125);
+  // Boulders, thickest on the wild flanks where they have rolled down from the crags.
+  scatterInstanced(scene, rng, new THREE.DodecahedronGeometry(1, 0), paint(0xffffff, { flat: true }), 150, (r, p, s, c) => {
+    randomSpot(r, p, 140);
     if (!isWild(p.x, p.z)) return false;
+    if (region(p.x, p.z) !== 'mountain' ? r() < 0.6 : worked(p.x, p.z) > 0.5) return false;
     s.set(0.6 + r() * 1.4, 0.5 + r() * 1.5, 0.6 + r() * 1.4);
     p.y += s.y * 0.3;
     c.setHex(pick(r, ROCK));
     return true;
   });
 
-  // Trees.
-  grow(scene, rng, stonePine, { count: 46, variants: 4, maxR: 135, margin: 1.5, maxSlope: 0.5 });
-  grow(scene, rng, cypress, { count: 54, variants: 3, maxR: 135, margin: 1, maxSlope: 0.6, size: [0.8, 1.3] });
-  grow(scene, rng, oliveTree, { count: 70, variants: 4, maxR: 135, margin: 1, maxSlope: 0.35, where: on('plain', 'mountain') });
-  grow(scene, rng, holmOak, { count: 30, variants: 3, margin: 1.5, maxSlope: 0.4, where: on('plain', 'shore') });
-  grow(scene, rng, lemonTree, { count: 34, variants: 3, maxR: 135, maxSlope: 0.4, where: on('mountain', 'plain') });
+  // Rocks standing in the shallows, with the swell breaking white around them.
+  scatterInstanced(scene, rng, new THREE.DodecahedronGeometry(1, 0), paint(0xffffff, { flat: true }), 46, (r, p, s, c) => {
+    randomSpot(r, p, 140);
+    const u = toU(p.x, p.z);
+    const v = toV(p.x, p.z);
+    // Off the rocky shores only: the beach and the harbour stay clear.
+    if (!inSquare(p.x, p.z, 2) || p.y > WATER_LEVEL - 0.3 || p.y < WATER_LEVEL - 2.6 || (v > -32 && v < 52) || v < -60 || u > coastU(v) + 4) return false;
+    s.set(0.8 + r() * 1.6, 0.9 + r() * 1.4, 0.8 + r() * 1.6);
+    p.y = WATER_LEVEL - 0.3;
+    c.setHex(pick(r, [0x8f8678, 0x9d9484, 0x7f7a70]));
+    return true;
+  });
+
+  // Trees. On the wild flanks pines and oaks close into groves; olive, lemon and almond keep
+  // to the worked land; cypresses stand about the plain; palms line the sea front.
+  const tame = (x, z) => region(x, z) !== 'mountain' || worked(x, z) > 0.4;
+  grow(scene, rng, stonePine, { count: 80, variants: 4, maxR: 140, margin: 1.5, maxSlope: 0.75, where: (x, z) => region(x, z) !== 'mountain' || wood(x, z) > 0.44 });
+  grow(scene, rng, holmOak, { count: 110, variants: 4, maxR: 140, margin: 1.5, maxSlope: 0.75, where: (x, z) => wood(x, z) > (region(x, z) === 'mountain' ? 0.5 : 0.56) });
+  grow(scene, rng, cypress, { count: 54, variants: 3, maxR: 135, margin: 1, maxSlope: 0.6, where: tame, size: [0.8, 1.3] });
+  grow(scene, rng, oliveTree, { count: 80, variants: 4, maxR: 135, margin: 1, maxSlope: 0.4, where: (x, z) => region(x, z) !== 'shore' && tame(x, z) });
+  grow(scene, rng, lemonTree, { count: 30, variants: 3, maxR: 135, maxSlope: 0.4, where: (x, z) => region(x, z) !== 'shore' && tame(x, z) });
+  grow(scene, rng, almondTree, { count: 46, variants: 4, maxR: 135, margin: 1, maxSlope: 0.45, where: (x, z) => region(x, z) !== 'shore' && tame(x, z), size: [0.9, 1.35] });
+  grow(scene, rng, palm, { count: 14, variants: 3, maxR: 125, margin: 1.5, maxSlope: 0.3, where: (x, z) => region(x, z) === 'shore' && groundAt(x, z) < 1.5 && toV(x, z) < 60, size: [0.85, 1.2] });
 
   // Shrubs: the maquis clings even to the steep slopes.
-  grow(scene, rng, maquis, { count: 260, variants: 5, maxR: 140, margin: -1, maxSlope: 1.4, size: [0.7, 1.5] });
-  grow(scene, rng, broom, { count: 70, variants: 3, maxR: 140, maxSlope: 1.0, where: on('mountain', 'shore'), size: [0.8, 1.3] });
-  grow(scene, rng, agave, { count: 60, variants: 3, maxR: 130, maxSlope: 0.7, where: on('shore', 'mountain'), size: [0.7, 1.2] });
-  grow(scene, rng, pricklyPear, { count: 45, variants: 3, maxR: 130, maxSlope: 0.6, where: on('shore', 'plain') });
+  grow(scene, rng, maquis, { count: 420, variants: 6, maxR: 145, margin: -1, maxSlope: 1.4, size: [0.7, 1.5] });
+  grow(scene, rng, broom, { count: 110, variants: 3, maxR: 145, maxSlope: 1.1, where: on('mountain', 'shore'), size: [0.8, 1.3] });
+  grow(scene, rng, oleander, { count: 46, variants: 4, maxR: 120, margin: 0.5, maxSlope: 0.4, where: on('plain', 'shore'), size: [0.8, 1.25] });
+  grow(scene, rng, lavender, { count: 220, variants: 3, maxR: 140, maxSlope: 0.7, where: (x, z) => fbm(x * 0.07 + 30, z * 0.07 - 11, 2) > 0.56, size: [0.8, 1.4], sink: 0.02 });
+  grow(scene, rng, agave, { count: 60, variants: 3, maxR: 130, maxSlope: 0.8, where: on('shore', 'mountain'), size: [0.7, 1.2] });
+  grow(scene, rng, pricklyPear, { count: 45, variants: 3, maxR: 130, maxSlope: 0.7, where: on('shore', 'plain') });
 
-  // Limestone outcrops.
-  grow(scene, rng, outcrop, { count: 34, variants: 4, maxR: 135, margin: 1, maxSlope: 1.2, size: [0.7, 1.5], sink: 0.25 });
+  // Limestone outcrops on the wild ground.
+  grow(scene, rng, outcrop, { count: 60, variants: 4, maxR: 140, margin: 1, maxSlope: 1.3, where: (x, z) => worked(x, z) < 0.5, size: [0.7, 1.6], sink: 0.25 });
 
   // Lanterns along the footpaths, baked together.
   const lamps = new THREE.Group();
