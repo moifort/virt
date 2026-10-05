@@ -11,7 +11,7 @@ const clamp = THREE.MathUtils.clamp;
 const renderer = new THREE.WebGLRenderer({ antialias: false });
 renderer.shadowMap.enabled = true;
 document.body.prepend(renderer.domElement);
-const pixels = new PixelRenderer(renderer, 3);
+const pixels = new PixelRenderer(renderer, 2);
 const view = new PixelCamera();
 
 const scene = new THREE.Scene();
@@ -67,7 +67,7 @@ addEventListener('pointermove', (e) => {
   yawTarget -= e.movementX * 0.006;
   view.pitch = clamp(view.pitch + e.movementY * 0.004, 0.35, 1.2);
 });
-addEventListener('wheel', (e) => (view.viewHeight = clamp(view.viewHeight * (1 + Math.sign(e.deltaY) * 0.1), 22, 90)), {
+addEventListener('wheel', (e) => (view.viewHeight = clamp(view.viewHeight * (1 + Math.sign(e.deltaY) * 0.1), 24, 140)), {
   passive: true,
 });
 

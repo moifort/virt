@@ -7,50 +7,62 @@ import { fbm, mulberry32, pick, smoothstep } from './noise.js';
 import { GLOBALS, PAL, PATH_COUNT, WATER_LEVEL, paint, solid } from './style.js';
 
 export { WATER_LEVEL };
-export const WORLD_RADIUS = 92;
+export const WORLD_RADIUS = 110;
 export const SUN_DIR = new THREE.Vector3(-0.25, 0.58, 1).normalize();
 
-const WORLD_SIZE = 260;
-const SEGMENTS = 260;
+const WORLD_SIZE = 300;
+const SEGMENTS = 300;
 const CELL = WORLD_SIZE / SEGMENTS;
 const HALF = WORLD_SIZE / 2;
 const UP = new THREE.Vector3(0, 1, 0);
 
+// Coastal frame: u climbs from the sea toward the mountain (away from the default camera),
+// v runs along the shore (left to right on screen).
+const toX = (u, v) => (-u + v) / Math.SQRT2;
+const toZ = (u, v) => (-u - v) / Math.SQRT2;
+const toU = (x, z) => (-x - z) / Math.SQRT2;
+const toV = (x, z) => (x - z) / Math.SQRT2;
+const coastU = (v) => -40 + (fbm(v * 0.02, 3.1, 3) - 0.5) * 26;
+const footU = (v) => 50 + (fbm(v * 0.025, 7.7, 3) - 0.5) * 18;
+
+const placeZone = (id, name, hint, u, v, r) => ({ id, name, hint, u, v, r, x: toX(u, v), z: toZ(u, v) });
 export const ZONES = [
-  { id: 'agora', name: 'Agora', hint: "l'Arbre-Mère", x: 0, z: 0, r: 12 },
-  { id: 'library', name: 'La Bibliothèque', hint: 'bureau de Bob', x: -36, z: -24, r: 13 },
-  { id: 'moot', name: 'Salle du Moot', hint: 'réunions', x: 36, z: -28, r: 15 },
-  { id: 'pub', name: 'Le Pub', hint: 'après le travail', x: -38, z: 30, r: 12 },
-  { id: 'pods', name: 'Bulles focus', hint: 'concentration', x: 38, z: 32, r: 13 },
-  { id: 'atelier', name: "L'Atelier", hint: 'prototypes', x: 2, z: 56, r: 12 },
-  { id: 'pond', name: 'Le Bassin', hint: 'pause', x: 0, z: -56, r: 12 },
+  placeZone('agora', 'Agora', "l'Arbre-Mère", 0, 0, 12),
+  placeZone('library', 'La Bibliothèque', 'bureau de Bob', 34, -34, 13),
+  placeZone('moot', 'Salle du Moot', 'réunions', 30, 36, 15),
+  placeZone('pub', 'Le Pub', 'après le travail', -22, -40, 12),
+  placeZone('pods', 'Bulles focus', 'concentration', 0, 60, 13),
+  placeZone('atelier', "L'Atelier", 'prototypes', 6, -70, 12),
+  placeZone('port', 'Le Port', 'pause au bord de l\'eau', -42, 10, 12),
 ];
 const zone = (id) => ZONES.find((z) => z.id === id);
 
 const PATHS = [
   ...ZONES.slice(1).map((z) => [0, 0, z.x, z.z]),
-  [zone('pond').x, zone('pond').z, zone('library').x, zone('library').z],
-  [zone('pond').x, zone('pond').z, zone('moot').x, zone('moot').z],
+  [zone('pub').x, zone('pub').z, zone('port').x, zone('port').z],
+  [zone('port').x, zone('port').z, zone('pods').x, zone('pods').z],
 ];
 
 // ---------------------------------------------------------------- Ground
 
 function heightAt(x, z) {
-  const r = Math.hypot(x, z);
+  const u = toU(x, z);
+  const v = toV(x, z);
   let h = 0.7 + (fbm(x * 0.03, z * 0.03, 3) - 0.5) * 2.2;
-  const edge = r + (fbm(x * 0.02 + 5, z * 0.02 - 3, 3) - 0.5) * 46;
-  h += smoothstep(82, 104, edge) * (8 + fbm(x * 0.012, z * 0.012, 3) * 30);
-  const pond = zone('pond');
-  h -= smoothstep(13, 4, Math.hypot(x - pond.x, z - pond.z + 2)) * 4.5;
-  // Terraces: shelves and short cliffs, the stepped look of the mesas.
-  const step = 2;
+  // The mountain: steep terraced slopes, like the Ligurian coast.
+  const foot = footU(v);
+  h += smoothstep(foot, foot + 95, u) * (62 + (fbm(x * 0.015, z * 0.015, 3) - 0.5) * 30);
+  h += Math.max(0, u - foot) * 0.08;
+  // The sea: rocky cliffs in places, coves in others.
+  const coast = coastU(v);
+  const sheer = 4 + fbm(v * 0.04 + 11, 2.3, 2) * 14;
+  h -= smoothstep(coast + 2, coast - sheer, u) * 9;
+  // Terraces: shelves and short dry-stone walls.
+  const step = 2.4;
   const shelf = Math.floor(h / step) * step;
   h = shelf + smoothstep(0.72, 1, (h - shelf) / step) * step;
   // Work areas sit on level pads.
-  for (const zn of ZONES) {
-    if (zn.id === 'pond') continue;
-    h += (0 - h) * smoothstep(zn.r + 7, zn.r + 1, Math.hypot(x - zn.x, z - zn.z));
-  }
+  for (const zn of ZONES) h += (0 - h) * smoothstep(zn.r + 7, zn.r + 1, Math.hypot(x - zn.x, z - zn.z));
   return h;
 }
 
@@ -109,7 +121,7 @@ function buildTerrain() {
 }
 
 function buildWater() {
-  const water = new THREE.Mesh(new THREE.PlaneGeometry(WORLD_SIZE, WORLD_SIZE), paint(0xffffff, { water: true }));
+  const water = new THREE.Mesh(new THREE.PlaneGeometry(WORLD_SIZE * 3, WORLD_SIZE * 3), paint(0xffffff, { water: true }));
   water.rotation.x = -Math.PI / 2;
   water.position.y = WATER_LEVEL;
   water.receiveShadow = true;
@@ -627,38 +639,74 @@ function buildAtelier(g, rng, animated) {
   for (const [x, z] of [[-11, 6], [-12, -3], [12, 7]]) at(turbine(rng, animated), x, groundAt(g.position.x + x, g.position.z + z), z, g);
 }
 
-function buildPond(g, rng, animated) {
-  const surface = WATER_LEVEL - g.position.y;
-  for (let i = 0; i < 18; i++) {
-    const a = rng() * Math.PI * 2;
-    const r = 2 + rng() * 6;
-    const x = Math.cos(a) * r;
-    const z = Math.sin(a) * r - 2;
-    if (groundAt(g.position.x + x, g.position.z + z) > WATER_LEVEL - 0.3) continue;
-    const pad = at(cyl(0.55 + rng() * 0.3, 0.55, 0.05, PAL.grassDeep, 10), x, surface + 0.04, z, g);
-    if (rng() < 0.4) at(cone(0.18, 0.2, PAL.pink, 5), 0.1, 0.12, 0, pad);
+/** Small wooden fishing boat (gozzo). */
+function gozzo(rng, sail = false) {
+  const g = new THREE.Group();
+  const color = pick(rng, [PAL.blue, PAL.red, PAL.saffron, PAL.teal, PAL.coral, PAL.ivory]);
+  const hull = at(solid(new THREE.SphereGeometry(1, 14, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), paint(color, { doubleSide: true })), 0, 0.35, 0, g);
+  hull.scale.set(0.9, 0.7, 2.3);
+  at(box(1.75, 0.08, 0.25, PAL.ivory), 0, 0.37, 0, g);
+  at(box(1.5, 0.06, 3.6, PAL.wood), 0, 0.3, 0, g);
+  at(box(1.5, 0.12, 0.3, PAL.wood), 0, 0.45, -0.6, g);
+  if (sail) {
+    at(cyl(0.05, 0.06, 3.4, PAL.wood, 5), 0, 2, 0.3, g);
+    const canvas = solid(new THREE.ConeGeometry(1.1, 2.8, 3), paint(PAL.ivory));
+    canvas.scale.z = 0.08;
+    at(canvas, 0.55, 2.1, 0.3, g);
   }
-  // A little pier for coffee breaks by the water.
-  const pier = at(new THREE.Group(), 5, surface + 0.3, 4, g);
-  pier.rotation.y = -0.6;
-  for (let i = 0; i < 9; i++) at(box(2.2, 0.15, 0.55, PAL.wood), 0, 0, -i * 0.62, pier);
-  for (const z of [0, -2.5, -5]) for (const x of [-1, 1]) at(cyl(0.1, 0.1, 2, DARK_WOOD, 6), x, -0.8, z, pier);
-  at(box(1.8, 0.12, 0.5, PAL.coral), 0, 0.5, -2.2, pier);
-  for (const x of [-0.75, 0.75]) at(box(0.12, 0.45, 0.4, INK), x, 0.25, -2.2, pier);
-  lantern(pier, 1, 0.07, -5.2);
-  for (let i = 0; i < 3; i++) {
-    const duck = at(new THREE.Group(), 0, surface + 0.15, 0, g);
-    at(ball(0.3, i === 0 ? 0x5a9a6a : PAL.ivory, {}, 8, 6), 0, 0, 0, duck).scale.set(1, 0.7, 1.4);
-    at(ball(0.17, i === 0 ? 0x2f6f4a : PAL.ivory, {}, 8, 6), 0, 0.28, 0.32, duck);
-    at(cone(0.06, 0.18, PAL.saffron, 4), 0, 0.26, 0.52, duck).rotation.x = Math.PI / 2;
-    const phase = i * 2.1;
+  return g;
+}
+
+function lighthouse(parent, x, y, z) {
+  const g = at(new THREE.Group(), x, y, z, parent);
+  at(cyl(1.6, 1.9, 1.4, STONE, 12, { flat: true }), 0, 0.7, 0, g);
+  for (let i = 0; i < 4; i++) at(cyl(0.95 - i * 0.07, 1.02 - i * 0.07, 1.6, i % 2 ? PAL.red : PAL.ivory, 12), 0, 2.2 + i * 1.6, 0, g);
+  at(box(1.0, 0.9, 1.0, PAL.saffron, { glow: true }), 0, 8.2, 0, g);
+  at(cone(0.95, 1, PAL.red, 8), 0, 9.15, 0, g);
+  at(cyl(1.15, 1.15, 0.12, INK, 12), 0, 7.7, 0, g);
+}
+
+function buildPort(g, rng, animated) {
+  // Local +z points to the open sea, local x runs along the shore.
+  g.rotation.y = Math.PI / 4;
+  const surface = WATER_LEVEL;
+  at(box(26, 4.2, 2.2, STONE, { flat: true }), 0, -2.1, 13, g);
+  at(box(26, 0.25, 2.4, PAL.cream), 0, 0.1, 13, g);
+  for (let x = -11; x <= 11; x += 4.4) at(cyl(0.2, 0.25, 0.6, INK, 6), x, 0.4, 13.7, g);
+
+  // Breakwater and lighthouse.
+  for (let z = 15; z < 34; z += 1.9) {
+    const block = at(solid(new THREE.BoxGeometry(2.6, 2.6, 2.6), paint(pick(rng, [STONE, PAL.lilac, 0xd9cbb5]), { flat: true })), 10 + (rng() - 0.5) * 0.6, surface + 0.3, z, g);
+    block.rotation.set(rng() * 0.5, rng() * 3, rng() * 0.5);
+  }
+  lighthouse(g, 10, surface + 1, 35.5);
+
+  // Wooden pier.
+  for (let i = 0; i < 18; i++) at(box(2.4, 0.15, 0.55, PAL.wood), -4, 0.05, 14.6 + i * 0.62, g);
+  for (let z = 15; z < 26; z += 2.6) for (const x of [-5.1, -2.9]) at(cyl(0.12, 0.12, 3.4, DARK_WOOD, 6), x, -1.6, z, g);
+  lantern(g, -2.6, 0.1, 25.2);
+
+  // Moored boats, bobbing.
+  [[-7.5, 18, 0.1], [-0.6, 17.5, -0.1], [-0.4, 23, 0.05], [-7.8, 23.5, -0.08], [4.5, 20, 0.3]].forEach(([x, z, yaw], i) => {
+    const boat = at(gozzo(rng, i === 4), x, surface, z, g);
+    boat.rotation.y = yaw;
     animated.push((t) => {
-      const a = t * 0.12 + phase;
-      duck.position.x = Math.cos(a) * 4;
-      duck.position.z = Math.sin(a) * 3 - 3;
-      duck.rotation.y = -a;
-      duck.position.y = surface + 0.15 + Math.sin(t * 2 + phase) * 0.03;
+      boat.position.y = surface + Math.sin(t * 1.3 + i) * 0.08;
+      boat.rotation.z = Math.sin(t * 1.1 + i * 2) * 0.05;
     });
+  });
+  // Boats pulled up on the quay, crates and a café terrace.
+  for (const [x, z, yaw] of [[-10, 8, 0.4], [-8, 6.5, 0.2]]) {
+    const boat = at(gozzo(rng), x, 0.15, z, g);
+    boat.rotation.set(0, yaw, 0.12);
+  }
+  for (let i = 0; i < 5; i++) at(box(0.9, 0.7, 0.9, pick(rng, [PAL.wood, PAL.ochre, PAL.teal])), 6 + (i % 3) * 1, 0.35 + Math.floor(i / 3) * 0.7, 9 + (i % 2) * 0.4, g).rotation.y = rng();
+  for (const [x, z, color] of [[2, 6, PAL.coral], [6, 4, PAL.teal], [-3, 4, PAL.saffron]]) {
+    at(cyl(0.7, 0.7, 0.08, PAL.ivory, 12), x, 1.05, z, g);
+    at(cyl(0.07, 0.07, 3, INK, 6), x, 1.5, z, g);
+    const parasol = at(cone(2, 0.8, color, 8), x, 3.2, z, g);
+    parasol.rotation.y = rng();
+    for (let k = 0; k < 2; k++) at(chair(PAL.ivory, 0.9), x + (k ? 1.2 : -1.2), 0, z, g).rotation.y = k ? -Math.PI / 2 : Math.PI / 2;
   }
 }
 
@@ -744,7 +792,7 @@ function tree(rng) {
       const crown = at(ball(2.2 - k * 0.6 + rng() * 0.6, k ? PAL.grass : color, { flat: true }, 8, 5), 0, H + k * 0.55, 0, g);
       crown.scale.y = 0.35;
     }
-  } else if (kind < 0.75) {
+  } else if (kind < 0.6) {
     const H = 2.5 + rng() * 2;
     at(cyl(0.15, 0.26, H, PAL.ivory, 6), 0, H / 2, 0, g);
     at(ball(1.3 + rng() * 0.6, pick(rng, [PAL.pink, PAL.teal, PAL.grass, PAL.saffron, PAL.lilac]), { flat: true }, 8, 6), 0, H + 0.8, 0, g);
@@ -834,26 +882,11 @@ function buildNature(scene, rng) {
     n++;
   }
   for (let i = 0, n = 0; i < 300 && n < 10; i++) {
-    const p = randomSpot(rng, new THREE.Vector3(), 112);
-    if (Math.hypot(p.x, p.z) < 70 || !isWild(p.x, p.z) || slopeAt(p.x, p.z) > 0.3) continue;
+    const p = randomSpot(rng, new THREE.Vector3(), 140);
+    if (toU(p.x, p.z) < footU(toV(p.x, p.z)) + 30 || !isWild(p.x, p.z) || slopeAt(p.x, p.z) > 0.3) continue;
     scene.add(at(mushroom(rng), p.x, p.y - 0.2, p.z));
     n++;
   }
-
-  // Reeds around the pond.
-  const pond = zone('pond');
-  const reedGeo = new THREE.CylinderGeometry(0.04, 0.06, 1.8, 3).translate(0, 0.9, 0);
-  scatterInstanced(scene, rng, reedGeo, paint(0xffffff, { sway: true }), 260, (r, p, s, c) => {
-    const a = r() * Math.PI * 2;
-    const d = 6 + r() * 7;
-    p.set(pond.x + Math.cos(a) * d, 0, pond.z - 2 + Math.sin(a) * d);
-    const y = groundAt(p.x, p.z);
-    if (y < WATER_LEVEL - 0.6 || y > WATER_LEVEL + 1.2) return false;
-    p.y = y;
-    s.set(1, 0.6 + r() * 0.8, 1);
-    c.setHex(pick(r, [PAL.grassDeep, 0x8f9f5a, PAL.ochre]));
-    return true;
-  });
 
   // Lanterns along the footpaths.
   for (const [ax, az, bx, bz] of PATHS.slice(0, 6)) {
@@ -914,7 +947,9 @@ function buildLife(scene, rng, animated) {
     const orbit = { r: 40 + rng() * 40, speed: 0.015 + rng() * 0.015, phase: rng() * 6, alt: 22 + rng() * 8 };
     animated.push((t) => {
       const a = t * orbit.speed + orbit.phase;
-      g.position.set(Math.cos(a) * orbit.r, orbit.alt + Math.sin(t * 0.6 + orbit.phase) * 1.2, Math.sin(a) * orbit.r);
+      const x = Math.cos(a) * orbit.r;
+      const z = Math.sin(a) * orbit.r;
+      g.position.set(x, Math.max(groundAt(x, z), WATER_LEVEL) + orbit.alt + Math.sin(t * 0.6 + orbit.phase) * 1.2, z);
       strands.forEach((p, k) => {
         p.rotation.x = Math.sin(t * 1.3 + k) * 0.25;
         p.rotation.z = Math.cos(t * 1.1 + k * 1.7) * 0.25;
@@ -922,18 +957,156 @@ function buildLife(scene, rng, animated) {
     });
   }
 
-  // Floating islands at the valley rim.
-  for (let i = 0; i < 4; i++) {
-    const a = (i / 4) * Math.PI * 2 + 0.5;
+  // Floating islands above the mountain.
+  for (let i = 0; i < 3; i++) {
+    const v = -70 + i * 70;
+    const u = footU(v) + 50 + rng() * 20;
     const g = new THREE.Group();
     const R = 2.5 + rng() * 2;
     at(cyl(R, R * 0.9, 1, PAL.grass, 9, { flat: true }), 0, 0, 0, g);
     at(cone(R * 0.9, R * 2, PAL.rose, 9, { flat: true }), 0, -0.5 - R, 0, g).rotation.x = Math.PI;
     at(tree(rng), 0, 0.5, 0, g);
-    const baseY = 16 + rng() * 8;
-    scene.add(at(g, Math.cos(a) * 84, baseY, Math.sin(a) * 84));
+    const x = toX(u, v);
+    const z = toZ(u, v);
+    const baseY = groundAt(x, z) + 16 + rng() * 6;
+    scene.add(at(g, x, baseY, z));
     animated.push((t) => (g.position.y = baseY + Math.sin(t * 0.4 + i) * 0.8));
   }
+
+  // Sailboats crossing the bay.
+  for (let i = 0; i < 3; i++) {
+    const boat = gozzo(rng, true);
+    scene.add(boat);
+    const u = -70 - i * 14;
+    const speed = (0.012 + rng() * 0.01) * (i % 2 ? 1 : -1);
+    const phase = rng() * 6;
+    animated.push((t) => {
+      const v = Math.sin(t * speed + phase) * 110;
+      boat.position.set(toX(u, v), WATER_LEVEL + Math.sin(t * 1.2 + i) * 0.1, toZ(u, v));
+      const heading = Math.cos(t * speed + phase) * speed > 0 ? (3 * Math.PI) / 4 : -Math.PI / 4;
+      boat.rotation.set(0, heading, Math.sin(t * 0.9 + i) * 0.06);
+    });
+  }
+}
+
+// ---------------------------------------------------------------- Cinque Terre villages
+
+/** Tall narrow pastel houses stacked on the terraces, drawn with a handful of instanced meshes. */
+function buildVillages(scene, rng) {
+  const walls = [];
+  const roofs = [];
+  const windows = [];
+  const shutters = [];
+  const placed = [];
+  const facing = new THREE.Quaternion().setFromAxisAngle(UP, Math.PI / 4);
+  const house = new THREE.Matrix4();
+  const local = new THREE.Matrix4();
+  const one = new THREE.Vector3(1, 1, 1);
+
+  const addOpenings = (w, d, floors, base) => {
+    for (let f = 0; f < floors; f++) {
+      const y = base + 1.3 + f * 1.7;
+      // Sea-facing front (+z) and both sides (±x).
+      const faces = [
+        { n: Math.max(1, Math.floor(w / 1.5)), span: w, place: (o) => [o, y, d / 2 + 0.04], rot: 0 },
+        { n: Math.max(1, Math.floor(d / 1.6)), span: d, place: (o) => [w / 2 + 0.04, y, -o], rot: Math.PI / 2 },
+        { n: Math.max(1, Math.floor(d / 1.6)), span: d, place: (o) => [-w / 2 - 0.04, y, o], rot: -Math.PI / 2 },
+      ];
+      for (const face of faces) {
+        for (let k = 0; k < face.n; k++) {
+          if (rng() < 0.12) continue;
+          const o = -face.span / 2 + (face.span * (k + 0.5)) / face.n;
+          const q = new THREE.Quaternion().setFromAxisAngle(UP, face.rot);
+          const [x, yy, z] = face.place(o);
+          windows.push(house.clone().multiply(local.compose(new THREE.Vector3(x, yy, z), q, new THREE.Vector3(0.42, 0.7, 0.06))));
+          for (const s of [-1, 1]) {
+            const off = new THREE.Vector3(s * 0.33, 0, 0).applyQuaternion(q);
+            shutters.push(house.clone().multiply(local.compose(new THREE.Vector3(x + off.x, yy, z + off.z), q, new THREE.Vector3(0.22, 0.72, 0.08))));
+          }
+        }
+      }
+    }
+  };
+
+  for (const center of [-72, -8, 62]) {
+    for (let tries = 0, n = 0; tries < 400 && n < 26; tries++) {
+      const v = center + (rng() - 0.5) * 34;
+      const u = footU(v) + 2 + rng() * 34;
+      const x = toX(u, v);
+      const z = toZ(u, v);
+      if (!isWild(x, z, -1) || slopeAt(x, z) > 1.1) continue;
+      if (placed.some((p) => Math.hypot(p[0] - x, p[1] - z) < 3.6)) continue;
+      placed.push([x, z]);
+      const w = 2.6 + rng() * 1.4;
+      const d = 2.6 + rng() * 1.2;
+      const floors = 2 + Math.floor(rng() * 3);
+      const base = groundAt(x, z) - 1.2;
+      const H = 1.4 + floors * 1.7;
+      house.compose(new THREE.Vector3(x, base, z), facing, one);
+      walls.push({ m: house.clone().multiply(local.compose(new THREE.Vector3(0, H / 2, 0), new THREE.Quaternion(), new THREE.Vector3(w, H, d))), c: pick(rng, [PAL.ochre, PAL.rose, PAL.coral, PAL.saffron, PAL.peach, 0xf2c79a, 0xe58f6b, PAL.pink, 0xf5e1b8]) });
+      const slate = rng() < 0.65;
+      roofs.push({ m: house.clone().multiply(local.compose(new THREE.Vector3(0, H + 0.45, 0), new THREE.Quaternion().setFromAxisAngle(UP, Math.PI / 4), new THREE.Vector3(w * 1.5, 0.9, d * 1.5))), c: slate ? 0x8a86a0 : 0xc8643c });
+      addOpenings(w, d, floors, 0);
+      n++;
+    }
+  }
+
+  const instanced = (geo, items, colorOf) => {
+    const mesh = new THREE.InstancedMesh(geo, paint(0xffffff), items.length);
+    const c = new THREE.Color();
+    items.forEach((it, i) => {
+      mesh.setMatrixAt(i, it.m ?? it);
+      mesh.setColorAt(i, c.setHex(colorOf(it)));
+    });
+    mesh.castShadow = mesh.receiveShadow = true;
+    scene.add(mesh);
+  };
+  instanced(new THREE.BoxGeometry(1, 1, 1), walls, (it) => it.c);
+  instanced(new THREE.ConeGeometry(Math.SQRT1_2, 1, 4), roofs, (it) => it.c);
+  instanced(new THREE.BoxGeometry(1, 1, 1), windows, () => 0x3b3346);
+  instanced(new THREE.BoxGeometry(1, 1, 1), shutters, () => pick(rng, [0x3f8f5a, 0x4a9a6a, 0x3f7f8f]));
+
+  // A campanile in each village.
+  for (const v of [-72, -8, 62]) {
+    const u = footU(v) + 6;
+    const x = toX(u, v);
+    const z = toZ(u, v);
+    if (!isWild(x, z, -2)) continue;
+    const g = at(new THREE.Group(), x, groundAt(x, z) - 0.5, z);
+    g.rotation.y = Math.PI / 4;
+    at(box(2.4, 13, 2.4, pick(rng, [PAL.cream, PAL.peach, PAL.ochre])), 0, 6.5, 0, g);
+    for (const r of [0, Math.PI / 2]) {
+      const arch = at(box(0.9, 1.6, 2.5, 0x3b3346), 0, 11.3, 0, g);
+      arch.rotation.y = r;
+    }
+    at(cone(1.95, 2.6, 0x8a86a0, 4), 0, 14.3, 0, g).rotation.y = Math.PI / 4;
+    at(box(0.9, 0.9, 0.1, PAL.ivory), 0, 9.5, 1.23, g);
+    scene.add(g);
+  }
+
+  // Vineyards: rows of vines following the terraces.
+  const vines = new THREE.IcosahedronGeometry(0.5, 0);
+  const rows = [];
+  for (let v = -110; v < 110; v += 1.1) {
+    for (let u = 40; u < 140; u += 1.7) {
+      const x = toX(u, v);
+      const z = toZ(u, v);
+      if (u < footU(v) + 1 || fbm(v * 0.03 + 5, u * 0.03, 2) < 0.48) continue;
+      if (slopeAt(x, z) > 0.3 || !isWild(x, z, -1)) continue;
+      if (placed.some((p) => Math.hypot(p[0] - x, p[1] - z) < 3)) continue;
+      rows.push([x, groundAt(x, z), z]);
+    }
+  }
+  const vm = new THREE.InstancedMesh(vines, paint(0xffffff, { flat: true, sway: true }), rows.length);
+  const m = new THREE.Matrix4();
+  const c = new THREE.Color();
+  rows.forEach(([x, y, z], i) => {
+    m.compose(new THREE.Vector3(x, y + 0.45, z), new THREE.Quaternion().setFromAxisAngle(UP, rng() * 6), new THREE.Vector3(0.9, 1.1 + rng() * 0.4, 0.9));
+    vm.setMatrixAt(i, m);
+    vm.setColorAt(i, c.setHex(pick(rng, [PAL.grassDeep, 0x5f9c6a, PAL.grass, 0x7fae5a])));
+  });
+  vm.castShadow = vm.receiveShadow = true;
+  scene.add(vm);
 }
 
 // ---------------------------------------------------------------- World
@@ -944,6 +1117,14 @@ export function createWorld(scene) {
   PATHS.forEach((p, i) => GLOBALS.uPaths.value[i].set(...p));
   for (let i = PATHS.length; i < PATH_COUNT; i++) GLOBALS.uPaths.value[i].set(1e4, 1e4, 1e4, 1e4);
 
+  const halfs = new Uint16Array(GRID.length);
+  for (let i = 0; i < GRID.length; i++) halfs[i] = THREE.DataUtils.toHalfFloat(GRID[i]);
+  const heightTex = new THREE.DataTexture(halfs, SEGMENTS + 1, SEGMENTS + 1, THREE.RedFormat, THREE.HalfFloatType);
+  heightTex.minFilter = heightTex.magFilter = THREE.LinearFilter;
+  heightTex.needsUpdate = true;
+  GLOBALS.uHeight.value = heightTex;
+  GLOBALS.uHeightMap.value.set(HALF, WORLD_SIZE, SEGMENTS + 1);
+
   scene.add(buildTerrain(), buildWater());
   const builders = {
     agora: buildAgora,
@@ -952,14 +1133,15 @@ export function createWorld(scene) {
     pub: buildPub,
     pods: buildPods,
     atelier: buildAtelier,
-    pond: buildPond,
+    port: buildPort,
   };
   for (const zn of ZONES) {
     const g = new THREE.Group();
-    g.position.set(zn.x, zn.id === 'pond' ? groundAt(zn.x, zn.z) : 0, zn.z);
+    g.position.set(zn.x, 0, zn.z);
     scene.add(g);
     builders[zn.id](g, rng, animated);
   }
+  buildVillages(scene, rng);
   buildNature(scene, rng);
   buildLife(scene, rng, animated);
 

@@ -177,7 +177,7 @@ export class PixelCamera {
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 600);
     this.yaw = Math.PI / 4;
     this.pitch = 0.62;
-    this.viewHeight = 46;
+    this.viewHeight = 60;
     this.distance = 220;
     this.texelWorld = 0.1;
     this._right = new THREE.Vector3();

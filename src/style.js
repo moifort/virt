@@ -42,6 +42,9 @@ export const GLOBALS = {
   uGlow: { value: 0 },
   uCloud: { value: new THREE.Vector2() },
   uPaths: { value: Array.from({ length: PATH_COUNT }, () => new THREE.Vector4()) },
+  // Terrain heightmap, so water knows its depth: (half size, size, texels per side).
+  uHeight: { value: null },
+  uHeightMap: { value: new THREE.Vector3(1, 2, 2) },
 };
 
 // Hex (sRGB) → linear GLSL literal.
@@ -109,7 +112,8 @@ float pxFbm(vec2 p) {
 }
 
 #ifdef TERRAIN
-const vec3 STRATA[6] = vec3[6](${[PAL.peach, PAL.rose, PAL.cream, PAL.ochre, PAL.lilac, PAL.coral].map(lin).join(', ')});
+// Dry-stone terrace walls: warm, muted, a touch of Mœbius rose and lilac.
+const vec3 STRATA[6] = vec3[6](${[0xe8cfa6, 0xdcb9a6, 0xf0dfbd, 0xdcc394, 0xcbbccf, 0xe2ad92].map(lin).join(', ')});
 
 float pxSegment(vec2 p, vec4 s) {
   vec2 pa = p - s.xy;
@@ -127,10 +131,12 @@ vec3 terrainColor(vec3 w, vec3 n) {
   // Flats: meadows and sand in organic patches, with a fine speckle.
   float patchN = pxFbm(w.xz * 0.045);
   float speck = pxHash(floor(w.xz * 3.0));
-  vec3 flat_ = patchN > 0.5
+  // Higher up the mountain, the shelves are cultivated: greener.
+  float green = patchN > mix(0.5, 0.3, smoothstep(4.0, 14.0, w.y)) ? 1.0 : 0.0;
+  vec3 flat_ = green > 0.5
     ? (pxNoise(w.xz * 0.35) > 0.55 ? ${lin(PAL.grassDeep)} : ${lin(PAL.grass)})
     : (pxNoise(w.xz * 0.3) > 0.62 ? ${lin(PAL.sandDeep)} : ${lin(PAL.sand)});
-  if (speck > 0.93) flat_ *= patchN > 0.5 ? 0.88 : 1.06;
+  if (speck > 0.93) flat_ *= green > 0.5 ? 0.88 : 1.06;
 
   // Footpaths between the work areas.
   float path = 1e3;
@@ -146,9 +152,21 @@ vec3 terrainColor(vec3 w, vec3 n) {
 #endif
 
 #ifdef WATER
+uniform sampler2D uHeight;
+uniform vec3 uHeightMap;
 vec3 waterColor(vec3 w) {
+  vec2 uv = ((w.xz + uHeightMap.x) / uHeightMap.y * (uHeightMap.z - 1.0) + 0.5) / uHeightMap.z;
+  float depth = ${WATER_LEVEL.toFixed(2)} - texture2D(uHeight, uv).r;
+  // Mediterranean ramp: turquoise shallows to deep blue.
+  vec3 col = depth < 1.0 ? ${lin(0xa6ecdc)}
+    : depth < 2.6 ? ${lin(PAL.water)}
+    : depth < 5.0 ? ${lin(0x3fa3c4)}
+    : ${lin(0x2f78b3)};
   float ripple = pxNoise(w.xz * vec2(0.22, 0.5) + vec2(uTime * 0.25, uTime * 0.1));
-  vec3 col = ripple > 0.64 ? ${lin(PAL.waterLight)} : ${lin(PAL.water)};
+  if (ripple > 0.68) col = mix(col, vec3(1.0), 0.22);
+  // Foam lapping on the shore.
+  float lap = 0.35 + 0.25 * sin(uTime * 1.3 + pxNoise(w.xz * 0.25) * 6.0);
+  if (depth < lap) col = ${lin(0xf7fbf2)};
   float sparkle = pxHash(floor(w.xz * 2.0) + floor(uTime * 3.0) * vec2(7.0, 3.0));
   if (sparkle > 0.993) col = vec3(1.0);
   return col;
