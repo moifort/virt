@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { PixelCamera, PixelRenderer } from './pixel.js';
 import { Player } from './player.js';
 import { GLOBALS } from './style.js';
-import { SUN_DIR, ZONES, createWorld, groundAt } from './world.js';
+import { SUN_DIR, createWorld, groundAt } from './world.js';
 
 const clamp = THREE.MathUtils.clamp;
 
@@ -81,34 +81,6 @@ function readInput() {
   };
 }
 
-// ---------------------------------------------------------------- Zone labels
-
-const labelLayer = document.getElementById('labels');
-const labels = ZONES.map((zn) => {
-  const el = document.createElement('div');
-  el.className = 'label';
-  el.innerHTML = `${zn.name}<small>${zn.hint}</small>`;
-  labelLayer.append(el);
-  return { el, anchor: new THREE.Vector3(zn.x, groundAt(zn.x, zn.z) + (zn.id === 'agora' ? 15 : 10), zn.z), zn };
-});
-const projected = new THREE.Vector3();
-
-function updateLabels() {
-  for (const { el, anchor, zn } of labels) {
-    const d = Math.hypot(player.position.x - zn.x, player.position.z - zn.z);
-    const alpha = 1 - THREE.MathUtils.smoothstep(d, zn.r + 8, zn.r + 30);
-    projected.copy(anchor).project(view.camera);
-    const visible = alpha > 0.01 && Math.abs(projected.x) < 1.1 && Math.abs(projected.y) < 1.1;
-    el.style.opacity = visible ? alpha : 0;
-    if (!visible) continue;
-    // Snap to the art-pixel grid so labels don't shimmer against the pixel scene.
-    const px = pixels.pixelSize;
-    const x = Math.round(((projected.x + 1) / 2) * innerWidth / px) * px;
-    const y = Math.round(((1 - projected.y) / 2) * innerHeight / px) * px;
-    el.style.transform = `translate(${x}px, ${y}px) translate(-50%, -100%)`;
-  }
-}
-
 // ---------------------------------------------------------------- Loop
 
 const clock = new THREE.Clock();
@@ -135,5 +107,4 @@ renderer.setAnimationLoop(() => {
   sun.position.copy(player.position).addScaledVector(SUN_DIR, 120);
 
   pixels.render(scene, view.camera, { skyTop: SKY_TOP, skyHorizon: SKY_HORIZON, texelWorld: view.texelWorld });
-  updateLabels();
 });
