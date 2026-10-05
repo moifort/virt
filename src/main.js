@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { PixelCamera, PixelRenderer } from './pixel.js';
 import { Player } from './player.js';
 import { GLOBALS } from './style.js';
-import { SUN_DIR, createWorld, groundAt } from './world.js';
+import { Climate } from './climate.js';
+import { createWorld, groundAt } from './world.js';
 
 const clamp = THREE.MathUtils.clamp;
 
@@ -17,13 +18,8 @@ const view = new PixelCamera();
 const scene = new THREE.Scene();
 scene.fog = new THREE.Fog(0xffffff, 1, 2);
 
-// A summer sunset over the Ligurian sea: low golden sun, long blue-violet shadows, lamps lit.
-const SKY_TOP = new THREE.Color(0x6f7fc4);
-const SKY_HORIZON = new THREE.Color(0xffb680);
-GLOBALS.uSunTint.value.set(0xffd9a6);
-GLOBALS.uShadowTint.value.set(0x8a8ab4);
-GLOBALS.uGlow.value = 0.9;
-scene.fog.color.copy(SKY_HORIZON);
+// Hour, season and weather are the real ones where the player is: see climate.js.
+const climate = new Climate();
 
 const sun = new THREE.DirectionalLight(0xffffff, 1);
 sun.castShadow = true;
@@ -54,11 +50,15 @@ addEventListener('keydown', (e) => {
   keys.add(e.code);
   tapped.add(e.code);
   if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
+  if (!e.repeat) climate.key(e.code, true);
   // A / E on AZERTY (KeyQ / KeyE codes) turn the view to the next isometric corner.
   if (e.code === 'KeyQ') yawTarget = snapYaw(yawTarget) + Math.PI / 2;
   if (e.code === 'KeyE') yawTarget = snapYaw(yawTarget) - Math.PI / 2;
 });
-addEventListener('keyup', (e) => keys.delete(e.code));
+addEventListener('keyup', (e) => {
+  keys.delete(e.code);
+  climate.key(e.code, false);
+});
 addEventListener('blur', () => keys.clear());
 
 // Isometric-style view: the pitch is fixed and the yaw rests on one of the four corners of the
@@ -104,17 +104,19 @@ renderer.setAnimationLoop(() => {
   view.yaw += (yawTarget - view.yaw) * (1 - Math.exp(-dt * 8));
   player.update(dt, t, readInput(!player.step), snapYaw(view.yaw));
   world.update(t, dt);
+  climate.update(dt);
 
   GLOBALS.uTime.value = t;
   GLOBALS.uCloud.value.set(t * 0.035, t * 0.012);
 
   focus.copy(player.position).y += 1.4;
   view.update(focus, pixels.lowRes, pixels.offset);
-  scene.fog.near = view.distance + 60;
-  scene.fog.far = view.distance + 520;
+  scene.fog.color.copy(climate.skyHorizon);
+  scene.fog.near = view.distance + 60 - 240 * (1 - climate.visibility);
+  scene.fog.far = view.distance + 520 * climate.visibility;
 
   sun.target.position.copy(player.position);
-  sun.position.copy(player.position).addScaledVector(SUN_DIR, 120);
+  sun.position.copy(player.position).addScaledVector(climate.lightDir, 120);
 
-  pixels.render(scene, view.camera, { skyTop: SKY_TOP, skyHorizon: SKY_HORIZON, texelWorld: view.texelWorld });
+  pixels.render(scene, view.camera, { skyTop: climate.skyTop, skyHorizon: climate.skyHorizon, texelWorld: view.texelWorld, time: t, weather: climate.screen });
 });

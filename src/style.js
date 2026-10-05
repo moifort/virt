@@ -40,6 +40,11 @@ export const GLOBALS = {
   uSunTint: { value: new THREE.Color(1, 1, 1) },
   uShadowTint: { value: new THREE.Color(0.6, 0.55, 0.85) },
   uGlow: { value: 0 },
+  uNight: { value: 0 },
+  // Cloud shadows: the share of the ground left in the sun.
+  uCloudGap: { value: 0.72 },
+  // Seasons: (autumn, winter, spring, snow cover), each 0 to 1.
+  uSeason: { value: new THREE.Vector4() },
   uCloud: { value: new THREE.Vector2() },
   uPaths: { value: Array.from({ length: PATH_COUNT }, () => new THREE.Vector4()) },
   // Terrain heightmap, so water knows its depth: (half size, size, texels per side).
@@ -92,6 +97,9 @@ uniform float uTime;
 uniform vec3 uSunTint;
 uniform vec3 uShadowTint;
 uniform float uGlow;
+uniform float uNight;
+uniform float uCloudGap;
+uniform vec4 uSeason;
 uniform vec2 uCloud;
 uniform vec4 uPaths[${PATH_COUNT}];
 varying vec3 vWorld;
@@ -190,6 +198,25 @@ vec3 pxAlb = diffuseColor.rgb;
   pxAlb = waterColor(vWorld);
 #endif
 
+#ifndef WATER
+  // Vegetation turns with the seasons: patches of gold and russet in autumn, dull and bare in
+  // winter, fresh in spring.
+  if (pxAlb.g > pxAlb.r * 1.08 && pxAlb.g > pxAlb.b * 1.15) {
+    float pxPatch = pxHash(floor(vWorld.xz / 2.5));
+    float pxLum = dot(pxAlb, vec3(0.3, 0.6, 0.1));
+    vec3 pxFall = (pxPatch < 0.14 ? vec3(1.9, 0.75, 0.2) : pxPatch < 0.3 ? vec3(2.0, 1.25, 0.25) : vec3(1.3, 1.05, 0.5)) * pxLum;
+    // Most of the maquis is evergreen: only some plants turn.
+    pxAlb = mix(pxAlb, pxFall, uSeason.x * 0.85 * step(pxPatch, 0.42));
+    pxAlb = mix(pxAlb, vec3(pxLum) * vec3(1.05, 0.98, 0.8), uSeason.y * (0.35 + 0.4 * step(0.5, pxPatch)));
+    pxAlb = mix(pxAlb, pxAlb * vec3(0.92, 1.14, 0.8) + vec3(0.0, 0.02, 0.0), uSeason.z);
+  }
+  // Snow settles on whatever faces the sky, from the peaks down as it deepens.
+  if (uSeason.w > 0.001) {
+    float pxSnowLine = mix(48.0, -6.0, uSeason.w) + (pxNoise(vWorld.xz * 0.3) - 0.5) * 5.0;
+    if (inverseTransformDirection(normal, viewMatrix).y > 0.55 && vWorld.y > pxSnowLine) pxAlb = vec3(0.86, 0.9, 0.97);
+  }
+#endif
+
 float pxLit = 0.0;
 float pxNdl = 0.0;
 #if NUM_DIR_LIGHTS > 0
@@ -197,7 +224,7 @@ float pxNdl = 0.0;
   pxLit = step(0.5, dot(reflectedLight.directDiffuse / max(diffuseColor.rgb, vec3(0.002)), vec3(0.3333)) * PI);
 #endif
 // Cloud shadows drifting over the land.
-pxLit *= step(pxFbm(vWorld.xz * 0.04 + uCloud), 0.72);
+pxLit *= step(pxFbm(vWorld.xz * 0.04 + uCloud), uCloudGap);
 
 vec3 pxCol;
 if (pxLit > 0.5) {
@@ -210,6 +237,10 @@ if (pxLit > 0.5) {
 #ifdef GLOW
   pxCol = mix(pxCol, pxAlb * 1.5 + 0.06, uGlow);
 #endif
+// After dark, lamps come on behind a good half of the window panes.
+if (uNight > 0.0 && max(max(abs(pxAlb.r - 0.040), abs(pxAlb.g - 0.032)), abs(pxAlb.b - 0.056)) < 0.009) {
+  if (pxHash(floor(vWorld.xz * 0.9) + floor(vWorld.y * 0.7) * 13.0) > 0.45) pxCol = mix(pxCol, vec3(1.0, 0.72, 0.32), uNight);
+}
 outgoingLight = pxCol;
 gNormal = vec4(normal * 0.5 + 0.5, 1.0);
 #include <opaque_fragment>

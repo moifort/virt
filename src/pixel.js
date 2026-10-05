@@ -22,7 +22,22 @@ uniform float uDepthThreshold;
 uniform vec3 uSkyTop;
 uniform vec3 uSkyHorizon;
 uniform vec3 uInk;
+uniform float uTime;
+uniform float uCloud;
+uniform float uRain;
+uniform float uSnow;
+uniform float uNight;
+uniform vec3 uCloudTint;
 varying vec2 vUv;
+
+float hash1(float n) { return fract(sin(n * 12.9898) * 43758.5453); }
+float hash2(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float noise2(vec2 p) {
+  vec2 i = floor(p);
+  vec2 f = fract(p);
+  vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(hash2(i), hash2(i + vec2(1, 0)), u.x), mix(hash2(i + vec2(0, 1)), hash2(i + vec2(1, 1)), u.x), u.y);
+}
 
 float depthAt(vec2 o) { return texture2D(tDepth, vUv + o / uRes).r * uDepthRange; }
 vec3 normalAt(vec2 o) { return texture2D(tNormal, vUv + o / uRes).rgb * 2.0 - 1.0; }
@@ -45,6 +60,15 @@ void main() {
 
   if (raw >= 0.99999) {
     col = mix(uSkyHorizon, uSkyTop, smoothstep(0.2, 1.0, vUv.y));
+    vec2 sp = floor(vUv * uRes);
+    // Stars come out with the night.
+    float star = hash2(sp);
+    if (star > 0.9965 && vUv.y > 0.3) col += uNight * (0.5 + 0.5 * sin(uTime * 2.0 + star * 600.0)) * vec3(0.9, 0.9, 0.8);
+    // Long flat clouds drifting across, more and lower as the weather closes in.
+    float bank = noise2(vec2(sp.x * 0.012 + uTime * 0.012, sp.y * 0.05)) * 0.65 + noise2(vec2(sp.x * 0.03 - uTime * 0.02, sp.y * 0.11)) * 0.35;
+    float gap = mix(0.7, 0.3, uCloud) + (1.0 - vUv.y) * 0.12;
+    if (bank > gap) col = mix(col, uCloudTint, 0.55);
+    if (bank > gap + 0.07) col = mix(col, uCloudTint * 1.12, 0.6);
   } else {
     vec3 n = normalAt(vec2(0.0));
     vec2 taps[4] = vec2[4](vec2(1, 0), vec2(-1, 0), vec2(0, 1), vec2(0, -1));
@@ -66,6 +90,25 @@ void main() {
       col = mix(col * 0.38, uInk, 0.3);
     } else if (creases > 0.12) {
       col = col * 1.32 + vec3(0.035, 0.028, 0.012);
+    }
+  }
+
+  // Weather falls across the whole picture, pixel by pixel.
+  vec2 fp = gl_FragCoord.xy;
+  if (uRain > 0.01) {
+    float column = floor(fp.x + fp.y * 0.3);
+    float h = hash1(column);
+    float fall = fract((fp.y + uTime * (90.0 + h * 70.0)) / (40.0 + h * 50.0) + h * 7.0);
+    if (h < uRain * 0.6 && fall < 0.13) col = mix(col, vec3(0.6, 0.68, 0.85), 0.45);
+  }
+  if (uSnow > 0.01) {
+    for (int layer = 0; layer < 2; layer++) {
+      float size = 7.0 + 4.0 * float(layer);
+      vec2 q = fp + vec2(sin(uTime * 0.7 + fp.y * 0.04 + float(layer)) * 3.0, uTime * (12.0 + 9.0 * float(layer)));
+      vec2 cell = floor(q / size);
+      vec2 flake = vec2(hash2(cell * 1.7 + float(layer)), hash2(cell * 2.3 + 5.0)) * (size - 2.0) + 1.0;
+      vec2 d = abs(q - cell * size - flake);
+      if (hash2(cell + 31.0 * float(layer)) < uSnow * 0.7 && max(d.x, d.y) < 0.8) col = vec3(0.92, 0.95, 1.0);
     }
   }
 
@@ -119,6 +162,12 @@ export class PixelRenderer {
         uSkyTop: { value: new THREE.Color() },
         uSkyHorizon: { value: new THREE.Color() },
         uInk: { value: new THREE.Color(0x2a1f3d) },
+        uTime: { value: 0 },
+        uCloud: { value: 0 },
+        uRain: { value: 0 },
+        uSnow: { value: 0 },
+        uNight: { value: 0 },
+        uCloudTint: { value: new THREE.Color() },
       },
       vertexShader: FULLSCREEN_VERTEX,
       fragmentShader: COMPOSITE_FRAGMENT,
@@ -152,13 +201,21 @@ export class PixelRenderer {
     this.upscale.uniforms.uScale.value = scale;
   }
 
-  render(scene, camera, { skyTop, skyHorizon, texelWorld }) {
+  render(scene, camera, { skyTop, skyHorizon, texelWorld, time = 0, weather }) {
     const r = this.renderer;
     const u = this.composite.uniforms;
     u.uDepthRange.value = camera.far - camera.near;
     u.uDepthThreshold.value = texelWorld * 4;
     u.uSkyTop.value.copy(skyTop);
     u.uSkyHorizon.value.copy(skyHorizon);
+    u.uTime.value = time;
+    if (weather) {
+      u.uCloud.value = weather.cloud;
+      u.uRain.value = weather.rain;
+      u.uSnow.value = weather.snow;
+      u.uNight.value = weather.night;
+      u.uCloudTint.value.copy(weather.cloudTint);
+    }
 
     r.setRenderTarget(this.gbuffer);
     r.setClearColor(0x000000, 0);
