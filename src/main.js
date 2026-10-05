@@ -48,8 +48,11 @@ resize();
 // KeyboardEvent.code is layout-independent: WASD on QWERTY is ZQSD on AZERTY.
 
 const keys = new Set();
+// Keys pressed since the last frame: a quick tap still moves one tile, as in Gather.
+const tapped = new Set();
 addEventListener('keydown', (e) => {
   keys.add(e.code);
+  tapped.add(e.code);
   if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
   // A / E on AZERTY (KeyQ / KeyE codes) turn the view by an eighth of a turn.
   if (e.code === 'KeyQ') yawTarget += Math.PI / 4;
@@ -71,14 +74,17 @@ addEventListener('wheel', (e) => (view.viewHeight = clamp(view.viewHeight * (1 +
   passive: true,
 });
 
-function readInput() {
-  const k = (code) => (keys.has(code) ? 1 : 0);
-  return {
+/** @param {boolean} consume forget taps once the avatar is free to take them */
+function readInput(consume) {
+  const k = (code) => (keys.has(code) || tapped.has(code) ? 1 : 0);
+  const input = {
     forward: k('KeyW') + k('ArrowUp') - k('KeyS') - k('ArrowDown'),
     right: k('KeyD') + k('ArrowRight') - k('KeyA') - k('ArrowLeft'),
     run: keys.has('ShiftLeft') || keys.has('ShiftRight'),
-    jump: keys.has('Space'),
+    jump: k('Space') > 0,
   };
+  if (consume) tapped.clear();
+  return input;
 }
 
 // ---------------------------------------------------------------- Loop
@@ -92,7 +98,7 @@ renderer.setAnimationLoop(() => {
   t += dt;
 
   view.yaw += (yawTarget - view.yaw) * (1 - Math.exp(-dt * 8));
-  player.update(dt, t, readInput(), view.yaw);
+  player.update(dt, t, readInput(!player.step), view.yaw);
   world.update(t, dt);
 
   GLOBALS.uTime.value = t;
