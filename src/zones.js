@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { mulberry32, pick } from './noise.js';
 import { PAL, WATER_LEVEL, paint, solid } from './style.js';
-import { DARK_WOOD, INK, SCREEN, STONE, WARM_LIGHT, at, ball, box, cone, cyl, lantern, live, plant, screen } from './kit.js';
+import { DARK_WOOD, INK, SCREEN, STONE, WARM_LIGHT, aerocar, at, ball, box, cone, cyl, lantern, live, plant, ring, screen } from './kit.js';
 import { SUN_DIR, ZONES, groundAt } from './terrain.js';
 
 /** Shelves of books along a wall. axis 'x' runs along x facing +z; axis 'z' runs along z facing +x. */
@@ -206,6 +206,7 @@ export function buildLibrary(g, rng, animated) {
   plant(g, W / 2 - 1.4, F, -D / 2 + 1.5, rng);
   plant(g, -W / 2 + 1.6, F, D / 2 - 1.2, rng);
   plant(g, 6.2, F, 4.8, rng);
+  furnishLibrary(g, rng, animated);
 }
 
 export function buildMoot(g, rng, animated) {
@@ -264,6 +265,7 @@ export function buildMoot(g, rng, animated) {
   screen(4.2, 2.4, g, -10.6, F + 3.3, 0, Math.PI / 2, animated, rng);
   lantern(g, W / 2 - 0.6, 0.35, D / 2 + 0.6);
   lantern(g, -W / 2 + 0.6, 0.35, D / 2 + 0.6);
+  furnishMoot(g, rng);
 }
 
 export function buildPub(g, rng, animated) {
@@ -356,6 +358,7 @@ export function buildPub(g, rng, animated) {
   const sign = at(solid(new THREE.BoxGeometry(2.6, 1, 0.1), paint(0xffffff, { map: tex })), W / 2 + 0.6, 3.1, D / 2 - 1, g);
   sign.rotation.y = Math.PI / 4;
   animated.push((t) => (sign.rotation.z = Math.sin(t * 0.8) * 0.04));
+  furnishPub(g, rng);
 }
 
 export function buildPods(g, rng, animated) {
@@ -379,6 +382,7 @@ export function buildPods(g, rng, animated) {
     plant(pod, 1.6, 0.4, -1.6, rng);
   });
   lantern(g, 0, 0, 0, SCREEN);
+  furnishPods(g, rng);
 }
 
 export function buildTower(g, rng, H) {
@@ -467,6 +471,7 @@ export function buildAtelier(g, rng, animated) {
   for (let i = 0; i < 4; i++) at(box(0.9, 0.9, 0.9, pick(rng, [PAL.wood, PAL.ochre])), 6.5 - (i % 2), 0.75 + Math.floor(i / 2) * 0.9, 5 - (i % 2) * 0.3, g).rotation.y = rng();
   for (let i = 0; i < 12; i++) at(sunFlower(rng), 9 + (i % 4) * 1.9, 0, -8 + Math.floor(i / 4) * 1.9, g);
   for (const [x, z] of [[-11, 6], [-12, -3], [12, 7]]) at(turbine(rng, animated), x, groundAt(g.position.x + x, g.position.z + z), z, g);
+  furnishAtelier(g, rng, animated);
 }
 
 /** Small wooden fishing boat (gozzo). */
@@ -538,6 +543,7 @@ export function buildPort(g, rng, animated) {
     parasol.rotation.y = rng();
     for (let k = 0; k < 2; k++) at(chair(PAL.ivory, 0.9), x + (k ? 1.2 : -1.2), 0, z, g).rotation.y = k ? -Math.PI / 2 : Math.PI / 2;
   }
+  furnishPort(g, rng);
 }
 
 export function buildAgora(g, rng) {
@@ -574,5 +580,236 @@ export function buildAgora(g, rng) {
     s.scale.y = 1.6 + rs();
     s.rotation.y = rs() * 3;
   }
+  furnishAgora(g, rng);
 }
 
+
+// ---------------------------------------------------------------- Second pass: props and furnishings
+
+function bookPile(parent, x, y, z, rng, n = 4) {
+  for (let i = 0; i < n; i++) {
+    const b = at(box(0.7 - i * 0.05, 0.16, 0.5, pick(rng, [PAL.red, PAL.teal, PAL.saffron, PAL.plum, PAL.blue])), x, y + 0.08 + i * 0.16, z, parent);
+    b.rotation.y = (rng() - 0.5) * 0.6;
+  }
+}
+
+function amphora(parent, x, y, z, color = 0xc8643c) {
+  const body = at(ball(0.42, color, {}, 10, 8), x, y + 0.55, z, parent);
+  body.scale.y = 1.35;
+  at(cyl(0.14, 0.2, 0.4, color, 8), x, y + 1.2, z, parent);
+  at(ring(0.17, 0.04, color, Math.PI * 2, 10), x, y + 1.4, z, parent).rotation.x = Math.PI / 2;
+  for (const s of [-1, 1]) at(ring(0.18, 0.04, color, Math.PI, 8), x + s * 0.22, y + 1.05, z, parent).rotation.z = s * Math.PI / 2;
+}
+
+function lemonPot(parent, x, y, z, rng) {
+  at(cyl(0.5, 0.38, 0.8, 0xc8643c, 10), x, y + 0.4, z, parent);
+  at(ring(0.5, 0.05, PAL.cream, Math.PI * 2, 14), x, y + 0.8, z, parent).rotation.x = Math.PI / 2;
+  at(cyl(0.07, 0.09, 1.1, DARK_WOOD, 5), x, y + 1.3, z, parent);
+  at(ball(0.8, 0x5f9c6a, { flat: true }, 8, 6), x, y + 2.1, z, parent);
+  for (let k = 0; k < 6; k++) {
+    const a = rng() * Math.PI * 2;
+    at(ball(0.11, PAL.saffron, {}, 5, 4), x + Math.cos(a) * 0.72, y + 2.0 + (rng() - 0.5) * 0.6, z + Math.sin(a) * 0.72, parent);
+  }
+}
+
+function furnishLibrary(g, rng, animated) {
+  const F = 0.4;
+  // Globe on a stand.
+  at(cyl(0.35, 0.45, 0.1, DARK_WOOD, 10), 5.4, F + 0.05, 2.6, g);
+  at(cyl(0.05, 0.05, 1.1, DARK_WOOD, 6), 5.4, F + 0.6, 2.6, g);
+  const meridian = at(ring(0.62, 0.04, PAL.saffron, Math.PI * 2, 18), 5.4, F + 1.5, 2.6, g);
+  meridian.rotation.y = 0.6;
+  at(ball(0.55, PAL.teal, {}, 14, 10), 5.4, F + 1.5, 2.6, g);
+  for (let k = 0; k < 4; k++) at(ball(0.2, PAL.ochre, { flat: true }, 5, 4), 5.4 + Math.cos(k * 1.7) * 0.42, F + 1.5 + Math.sin(k * 2.3) * 0.3, 2.6 + Math.sin(k * 1.7) * 0.42, g);
+  // Telescope aimed at the tall windows.
+  for (let k = 0; k < 3; k++) {
+    const leg = at(cyl(0.03, 0.04, 1.6, DARK_WOOD, 4), -5.4 + Math.cos(k * 2.1) * 0.3, F + 0.75, -3.2 + Math.sin(k * 2.1) * 0.3, g);
+    leg.rotation.set(Math.sin(k * 2.1) * 0.3, 0, -Math.cos(k * 2.1) * 0.3);
+  }
+  const tube = at(cyl(0.12, 0.18, 1.6, PAL.saffron, 10), -5.6, F + 1.75, -3.0, g);
+  tube.rotation.set(0.5, 0, 0.9);
+  // Library ladder against the shelves.
+  const ladder = at(new THREE.Group(), -4.6, F, -4.9, g);
+  ladder.rotation.x = -0.18;
+  for (const x of [-0.35, 0.35]) at(box(0.08, 5.4, 0.08, PAL.wood), x, 2.7, 0, ladder);
+  for (let k = 0; k < 9; k++) at(box(0.7, 0.06, 0.08, PAL.wood), 0, 0.4 + k * 0.6, 0, ladder);
+  // Piles of books, a reading lamp on the desk.
+  bookPile(g, 3.2, F, 3.8, rng, 5);
+  bookPile(g, -2.8, F, -4.3, rng, 3);
+  bookPile(g, -5.6, F + 1.17, 3.4, rng, 2);
+  at(cyl(0.15, 0.18, 0.06, PAL.saffron, 8), -3.4, F + 1.2, 3.4, g);
+  at(cyl(0.03, 0.03, 0.5, PAL.saffron, 4), -3.4, F + 1.45, 3.4, g);
+  at(cyl(0.12, 0.28, 0.2, 0x3f8f5a, 8, { glow: true }), -3.4, F + 1.72, 3.5, g);
+  // The Incal: a luminous pyramid hovering over its pedestal.
+  at(cyl(0.35, 0.45, 1.2, PAL.ivory, 8), -1.6, F + 0.6, 3.8, g);
+  at(ring(0.38, 0.05, PAL.saffron, Math.PI * 2, 10), -1.6, F + 1.2, 3.8, g).rotation.x = Math.PI / 2;
+  const incal = at(live(new THREE.Group()), -1.6, F + 1.9, 3.8, g);
+  at(cone(0.34, 0.5, 0xfff6d8, 4, { glow: true, flat: true }), 0, 0.25, 0, incal);
+  at(cone(0.34, 0.5, PAL.saffron, 4, { glow: true, flat: true }), 0, -0.25, 0, incal).rotation.x = Math.PI;
+  animated.push((t) => {
+    incal.rotation.y = t * 0.9;
+    incal.position.y = F + 1.9 + Math.sin(t * 1.6) * 0.12;
+  });
+}
+
+function furnishMoot(g, rng) {
+  const F = 0.4;
+  // Lanterns hanging from the pergola.
+  for (let x = -7.5; x <= 7.5; x += 3) {
+    at(cyl(0.015, 0.015, 1.3, INK, 3), x, F + 5.85, 0, g);
+    at(cone(0.22, 0.2, INK, 6), x, F + 5.2, 0, g);
+    at(ball(0.24, WARM_LIGHT, { glow: true }, 8, 6), x, F + 4.98, 0, g);
+  }
+  // Sideboard with amphorae and a feast.
+  at(box(6, 1.0, 0.8, DARK_WOOD), 3, F + 0.5, -5.2, g);
+  at(box(6.2, 0.1, 0.95, PAL.wood), 3, F + 1.05, -5.2, g);
+  for (const x of [0.6, 5.4]) amphora(g, x, F + 1.1, -5.2, pick(rng, [0xc8643c, PAL.teal, PAL.ochre]));
+  for (let k = 0; k < 4; k++) at(ball(0.18, pick(rng, [PAL.saffron, PAL.red, PAL.grass]), {}, 6, 5), 2 + k * 0.5, F + 1.25, -5.1, g);
+  at(cyl(0.45, 0.45, 0.06, PAL.ivory, 12), 3.4, F + 1.12, -5.2, g);
+  // Big jars and lemon trees at the corners.
+  for (const [x, z] of [[-10.3, 5.6], [10.3, 5.6], [-10.3, -5.6], [10.3, -5.6]]) amphora(g, x, 0.35, z, pick(rng, [0xc8643c, PAL.ochre]));
+  for (const [x, z] of [[-12, 7.5], [12, 7.5]]) lemonPot(g, x, 0, z, rng);
+  // Mosaic: a border of coloured tiles around the table.
+  for (let x = -9; x <= 9; x += 0.9) {
+    for (const z of [-4.2, 4.2]) at(box(0.7, 0.03, 0.7, pick(rng, [PAL.teal, PAL.coral, PAL.saffron, PAL.ivory])), x, 0.39, z, g);
+  }
+}
+
+function furnishPub(g, rng) {
+  const F = 0.4;
+  // Jukebox.
+  at(box(1.2, 1.7, 0.8, PAL.coral), 6.4, F + 0.85, 2.4, g);
+  at(cyl(0.6, 0.6, 0.8, PAL.coral, 12, {}), 6.4, F + 1.7, 2.4, g).rotation.x = Math.PI / 2;
+  at(box(0.9, 0.8, 0.05, PAL.saffron, { glow: true }), 6.4, F + 1.05, 2.82, g);
+  for (let k = 0; k < 3; k++) at(box(0.9, 0.05, 0.06, SCREEN, { glow: true }), 6.4, F + 0.4 + k * 0.12, 2.82, g);
+  // Chalkboard menu on an easel at the entrance.
+  const easel = at(new THREE.Group(), 6.2, F, 5.2, g);
+  easel.rotation.y = -0.6;
+  at(box(1.2, 1.5, 0.08, INK), 0, 1.0, 0, easel).rotation.x = -0.15;
+  for (let k = 0; k < 4; k++) at(box(0.7 - (k % 2) * 0.2, 0.06, 0.02, PAL.ivory), -0.1, 1.45 - k * 0.25, 0.08 - k * 0.04, easel);
+  for (const x of [-0.5, 0.5]) at(box(0.06, 1.6, 0.06, PAL.wood), x, 0.75, -0.2, easel).rotation.x = 0.25;
+  // Dartboard on the bottle wall.
+  const board = at(new THREE.Group(), 4.6, F + 2.6, -5.65, g);
+  [[0.45, INK], [0.36, PAL.red], [0.26, PAL.cream], [0.16, PAL.grassDeep], [0.06, PAL.red]].forEach(([r, color], i) => {
+    at(cyl(r, r, 0.04, color, 16), 0, 0, 0.02 * i, board).rotation.x = Math.PI / 2;
+  });
+  // Flowering barrels at the corners of the terrace.
+  for (const [x, z] of [[-6.8, 5.4], [6.8, -5.4]]) {
+    at(cyl(0.6, 0.55, 0.9, PAL.wood, 10), x, F + 0.45, z, g);
+    for (const y of [0.2, 0.7]) at(ring(0.6, 0.04, INK, Math.PI * 2, 12), x, F + y, z, g).rotation.x = Math.PI / 2;
+    for (let k = 0; k < 6; k++) at(ball(0.22, pick(rng, [PAL.pink, PAL.red, PAL.saffron, PAL.grassDeep]), {}, 5, 4), x + Math.cos(k) * 0.35, F + 1.05 + (k % 2) * 0.15, z + Math.sin(k) * 0.35, g);
+  }
+}
+
+function furnishPods(g, rng) {
+  [[-5, -5], [5, -5], [-5, 5], [5, 5]].forEach(([x, z], i) => {
+    const pod = at(new THREE.Group(), x, 0, z, g);
+    at(cyl(1.4, 1.4, 0.04, [PAL.coral, PAL.teal, PAL.saffron, PAL.lilac][(i + 1) % 4], 16), 0.2, 0.42, 0.2, pod);
+    // Low shelf with a few books, a hanging lamp, an antenna on the shell.
+    const shelf = at(new THREE.Group(), 1.4, 0.4, -1.2, pod);
+    shelf.rotation.y = -Math.PI / 4;
+    at(box(1.2, 0.8, 0.4, PAL.wood), 0, 0.4, 0, shelf);
+    for (let k = 0; k < 5; k++) at(box(0.14, 0.4, 0.3, pick(rng, [PAL.red, PAL.teal, PAL.saffron, PAL.blue])), -0.4 + k * 0.18, 0.95, 0, shelf);
+    at(cyl(0.01, 0.01, 0.9, INK, 3), -0.4, 3.0, -0.4, pod);
+    at(cone(0.25, 0.25, PAL.ivory, 8), -0.4, 2.5, -0.4, pod);
+    at(ball(0.13, WARM_LIGHT, { glow: true }, 6, 4), -0.4, 2.35, -0.4, pod);
+    at(cyl(0.04, 0.04, 1.4, INK, 4), -1.5, 3.4, -1.5, pod);
+    at(ball(0.12, PAL.red, { glow: true }, 4, 3), -1.5, 4.15, -1.5, pod);
+  });
+}
+
+function furnishAtelier(g, rng, animated) {
+  // The tower gets a balcony, portholes, pipes and a dish.
+  const tower = new THREE.Vector3(-5, 0, -4);
+  const H = 15;
+  at(ring(2.6, 0.12, PAL.ivory, Math.PI * 2, 24), tower.x, H * 0.55, tower.z, g).rotation.x = Math.PI / 2;
+  at(cyl(2.6, 2.6, 0.14, PAL.cream, 20), tower.x, H * 0.55 - 0.65, tower.z, g);
+  for (let k = 0; k < 12; k++) {
+    const a = (k / 12) * Math.PI * 2;
+    at(cyl(0.04, 0.04, 0.6, PAL.ivory, 4), tower.x + Math.cos(a) * 2.6, H * 0.55 - 0.3, tower.z + Math.sin(a) * 2.6, g);
+  }
+  for (let k = 0; k < 6; k++) {
+    const a = Math.PI * 0.1 + (k % 3) * 0.5;
+    const y = 3 + Math.floor(k / 3) * 7;
+    const r = 2.2 * (1.15 - (0.4 * y) / H) + 0.02;
+    const port = at(cyl(0.32, 0.32, 0.1, 0x3b3346, 10), tower.x + Math.cos(a) * r, y, tower.z + Math.sin(a) * r, g);
+    port.rotation.set(Math.PI / 2, 0, -a + Math.PI / 2);
+    port.lookAt(tower.x + Math.cos(a) * 10, y, tower.z + Math.sin(a) * 10);
+    port.rotateX(Math.PI / 2);
+  }
+  at(cyl(0.18, 0.18, H, PAL.coral, 8), tower.x + 2.3, H / 2, tower.z + 0.6, g);
+  for (const y of [2, 6, 10, 14]) at(ring(0.24, 0.05, INK, Math.PI * 2, 8), tower.x + 2.3, y, tower.z + 0.6, g).rotation.x = Math.PI / 2;
+  const dish = at(solid(new THREE.SphereGeometry(1.1, 14, 6, 0, Math.PI * 2, 0, Math.PI / 2.5), paint(PAL.ivory, { doubleSide: true })), tower.x + 2.4, H + 2.2, tower.z, g);
+  dish.rotation.set(-0.9, 0, 0.5);
+  // Landing pad with a parked aerotaxi.
+  at(cyl(3.2, 3.4, 0.25, PAL.ivory, 24), 2, 0.12, 11, g);
+  at(ring(2.5, 0.12, PAL.saffron, Math.PI * 2, 24), 2, 0.27, 11, g).rotation.x = Math.PI / 2;
+  for (let k = 0; k < 4; k++) at(ball(0.12, SCREEN, { glow: true }, 4, 3), 2 + Math.cos(k * Math.PI / 2) * 3, 0.3, 11 + Math.sin(k * Math.PI / 2) * 3, g);
+  const car = at(live(aerocar(PAL.teal)), 2, 1.1, 11, g);
+  car.rotation.y = 0.7;
+  animated.push((t) => (car.position.y = 1.1 + Math.sin(t * 2) * 0.06));
+}
+
+function furnishPort(g, rng) {
+  // Fisherman's shed.
+  const shed = at(new THREE.Group(), -11, 0, 3, g);
+  at(box(3.2, 2.4, 2.6, PAL.sky), 0, 1.2, 0, shed);
+  at(box(3.6, 0.15, 3.0, PAL.ivory), 0, 2.45, 0, shed);
+  const roof = at(cone(2.4, 1.0, 0xc8643c, 4, { flat: true }), 0, 3.0, 0, shed);
+  roof.rotation.y = Math.PI / 4;
+  roof.scale.set(1, 1, 0.85);
+  at(box(0.8, 1.5, 0.05, PAL.wood), 0.6, 0.75, 1.32, shed);
+  at(box(0.6, 0.5, 0.05, 0x3b3346), -0.8, 1.4, 1.32, shed);
+  // Nets drying on poles.
+  for (const x of [0, 3.6]) at(cyl(0.06, 0.06, 2.4, PAL.wood, 4), x, 1.2, 10.8, g);
+  for (let k = 0; k < 6; k++) at(box(3.6, 0.03, 0.03, 0x6d8f8a), 1.8, 0.9 + k * 0.25, 10.8, g);
+  for (let k = 0; k < 9; k++) at(box(0.03, 1.4, 0.03, 0x6d8f8a), 0.2 + k * 0.4, 1.5, 10.8, g);
+  // Buoys, rope coils, lobster pots, an anchor.
+  for (let k = 0; k < 5; k++) {
+    at(ball(0.24, k % 2 ? PAL.red : PAL.ivory, {}, 8, 6), 4.5 + k * 0.45, 0.3, 11.7 - (k % 2) * 0.4, g);
+  }
+  for (const [x, z] of [[-6, 11.4], [-5.2, 11.6]]) at(ring(0.35, 0.09, PAL.cream, Math.PI * 2, 12), x, 0.18, z, g).rotation.x = Math.PI / 2;
+  for (const [x, z] of [[-2, 11.2], [-1.2, 11.5], [-1.6, 10.6]]) {
+    at(cyl(0.4, 0.4, 0.55, 0x5a6a7a, 8), x, 0.28, z, g);
+    at(ring(0.4, 0.03, PAL.saffron, Math.PI * 2, 10), x, 0.55, z, g).rotation.x = Math.PI / 2;
+  }
+  const anchor = at(new THREE.Group(), 8, 0.2, 12, g);
+  anchor.rotation.set(-Math.PI / 2, 0, 0.4);
+  at(cyl(0.08, 0.08, 1.6, INK, 6), 0, 0, 0, anchor);
+  at(ring(0.55, 0.08, INK, Math.PI, 10), 0, -0.6, 0, anchor).rotation.z = Math.PI;
+  at(ring(0.18, 0.05, INK, Math.PI * 2, 8), 0, 0.9, 0, anchor);
+  // Mooring buoys out in the harbour.
+  for (const [x, z] of [[-12, 20], [2, 27], [-6, 29]]) {
+    at(ball(0.35, PAL.coral, {}, 8, 6), x, WATER_LEVEL + 0.1, z, g);
+    at(cyl(0.04, 0.04, 0.5, INK, 4), x, WATER_LEVEL + 0.55, z, g);
+  }
+}
+
+function furnishAgora(g, rng) {
+  // Roots of the Mother Tree spreading over the ground.
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2 + 0.3;
+    const root = at(cyl(0.18, 0.5, 2.6, PAL.ivory, 6), Math.cos(a) * 1.6, 0.35, Math.sin(a) * 1.6, g);
+    root.rotation.set(Math.sin(a) * 1.2, 0, -Math.cos(a) * 1.2);
+  }
+  for (const y of [1.5, 3.5, 5.5]) at(ring(1.25 - y * 0.06, 0.08, PAL.saffron, Math.PI * 2, 14), 0, y, 0, g).rotation.x = Math.PI / 2;
+  // Lanterns hanging from the branches.
+  for (let k = 0; k < 6; k++) {
+    const a = (k / 6) * Math.PI * 2 + 0.5;
+    const x = Math.cos(a) * 4.2;
+    const z = -Math.sin(a) * 4.2;
+    at(cyl(0.015, 0.015, 1.4, INK, 3), x, 9.2, z, g);
+    at(ball(0.22, k % 2 ? WARM_LIGHT : PAL.pink, { glow: true }, 6, 5), x, 8.4, z, g);
+  }
+  // A fountain.
+  const f = at(new THREE.Group(), -5, 0, -5, g);
+  at(cyl(2, 2.1, 0.6, STONE, 18), 0, 0.3, 0, f);
+  at(cyl(1.75, 1.75, 0.05, 0x9fe3d6, 18, { glow: true }), 0, 0.58, 0, f);
+  at(cyl(0.25, 0.35, 1.6, STONE, 8), 0, 1.1, 0, f);
+  at(cyl(0.8, 0.3, 0.3, STONE, 12), 0, 1.95, 0, f);
+  at(ball(0.3, PAL.teal, {}, 8, 6), 0, 2.35, 0, f);
+  for (let k = 0; k < 4; k++) {
+    const jet = at(cyl(0.04, 0.02, 0.9, 0xbff0e8, 4, { glow: true }), Math.cos(k * Math.PI / 2) * 0.55, 1.6, Math.sin(k * Math.PI / 2) * 0.55, f);
+    jet.rotation.set(Math.sin(k * Math.PI / 2) * 0.7, 0, -Math.cos(k * Math.PI / 2) * 0.7);
+  }
+}

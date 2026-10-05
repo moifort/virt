@@ -2,7 +2,7 @@
 import * as THREE from 'three';
 import { pick } from './noise.js';
 import { PAL, WATER_LEVEL, paint, solid } from './style.js';
-import { at, ball, cone, cyl } from './kit.js';
+import { aerocar, at, ball, cone, cyl } from './kit.js';
 import { tree } from './nature.js';
 import { gozzo } from './zones.js';
 import { footU, groundAt, isWild, randomSpot, toX, toZ } from './terrain.js';
@@ -93,5 +93,24 @@ export function buildLife(scene, rng, animated) {
       boat.rotation.set(0, heading, Math.sin(t * 0.9 + i) * 0.06);
     });
   }
+
+  // Incal aerotaxis cruising in lanes over the bay, banking into their turns.
+  [PAL.saffron, PAL.coral, PAL.teal, PAL.lilac].forEach((color, i) => {
+    const car = aerocar(color);
+    scene.add(car);
+    const lane = { rx: 60 + i * 14, rz: 34 + i * 9, alt: 17 + i * 3.5, speed: (0.05 + i * 0.012) * (i % 2 ? 1 : -1), phase: i * 1.7 };
+    const next = new THREE.Vector3();
+    const place = (t, out) => {
+      const a = t * lane.speed + lane.phase;
+      const u = Math.cos(a) * lane.rz - 10;
+      const v = Math.sin(a) * lane.rx;
+      return out.set(toX(u, v), lane.alt + Math.sin(t * 0.7 + i) * 1.5, toZ(u, v));
+    };
+    animated.push((t) => {
+      place(t, car.position);
+      car.lookAt(place(t + 0.4, next));
+      car.rotateZ(-Math.sign(lane.speed) * 0.3);
+    });
+  });
 }
 
