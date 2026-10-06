@@ -185,10 +185,10 @@ function house(parts, rng, w, d, floors, { plinth = 0, terrace = false, door = 0
     parts.lights.push({ p: parts.world(doorX + side * 0.72, 1.9, d / 2 + 1), reach: 3.8 * parts.scale });
   }
 
-  // Windows on the three visible faces, floor by floor.
+  // Windows on every face, floor by floor: a house with its back to the sea looks at it too.
   for (let f = 0; f < floors; f++) {
     const y = 1.2 + f * 1.7 + 0.75;
-    for (const face of [0, 1, 2]) {
+    for (const face of [0, 1, 2, 3]) {
       const span = face === 0 ? w : d;
       const n = Math.max(1, Math.floor(span / 1.35));
       for (let k = 0; k < n; k++) {
