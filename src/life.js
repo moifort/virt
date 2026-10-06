@@ -1,10 +1,10 @@
 // Things that move: butterflies over the meadows, gulls over the bay, sailboats crossing it,
-// whales and dolphins passing now and then far out,
+// whales and dolphins passing now and then far out, a few sheep on the mountain,
 // fishing boats that light their lamps at dusk, and fireflies on summer nights.
 import * as THREE from 'three';
 import { hash, pick } from './noise.js';
 import { PAL, WATER_LEVEL, paint, solid } from './style.js';
-import { INK, WARM_LIGHT, at, ball, cyl, lamplight, live } from './kit.js';
+import { INK, WARM_LIGHT, at, ball, box, cyl, lamplight, live } from './kit.js';
 import { gozzo } from './zones.js';
 import { UP, VILLAGES, coastU, groundAt, isWild, randomSpot, toX, toZ } from './terrain.js';
 
@@ -162,6 +162,70 @@ function buildDolphins(scene, animated) {
   });
 }
 
+/** A sheep: a woolly body on four dark legs, a dark face with ears, a stub of a tail. The head nods as it grazes. */
+function sheep(rng, black = false) {
+  const WOOL = black ? 0x3a3238 : pick(rng, [0xf1ece0, 0xe9e2d2, 0xf5f0e6]);
+  const DARK = black ? 0x2a2428 : 0x3a3034;
+  const g = live(new THREE.Group());
+  at(ball(0.5, WOOL, { flat: true }, 8, 6), 0, 0.72, 0, g).scale.set(0.9, 0.8, 1.35);
+  at(ball(0.3, WOOL, { flat: true }, 6, 4), 0, 0.95, 0.1, g).scale.set(0.8, 0.5, 0.9);
+  for (const [x, z] of [[-0.2, 0.42], [0.2, 0.42], [-0.2, -0.42], [0.2, -0.42]]) at(box(0.12, 0.5, 0.12, DARK), x, 0.25, z, g);
+  at(box(0.1, 0.12, 0.18, WOOL), 0, 0.85, -0.68, g);
+  const head = at(new THREE.Group(), 0, 0.9, 0.62, g);
+  at(ball(0.2, DARK, { flat: true }, 6, 5), 0, 0, 0.1, head).scale.set(0.85, 0.9, 1.25);
+  at(ball(0.16, WOOL, { flat: true }, 5, 4), 0, 0.14, -0.05, head);
+  for (const s of [-1, 1]) at(box(0.16, 0.06, 0.1, DARK), s * 0.2, 0.08, 0, head).rotation.z = s * 0.3;
+  return { g, head };
+}
+
+/**
+ * A small flock grazing a bench of the mountain to the right of the summit: each sheep ambles
+ * to a spot of its own choosing, head up, then stands and crops the grass a while, head down,
+ * one of them black and one a lamb that keeps close to the others.
+ */
+function buildSheep(scene, rng, animated) {
+  const PASTURE = { u: 145, v: 100, r: 9 };
+  const spot = () => {
+    const a = rng() * Math.PI * 2;
+    const d = Math.sqrt(rng()) * PASTURE.r;
+    return new THREE.Vector3(toX(PASTURE.u + Math.cos(a) * d, PASTURE.v + Math.sin(a) * d), 0, toZ(PASTURE.u + Math.cos(a) * d, PASTURE.v + Math.sin(a) * d));
+  };
+  for (let i = 0; i < 9; i++) {
+    const { g, head } = sheep(rng, i === 4);
+    const scale = i === 8 ? 0.55 : 0.9 + rng() * 0.2;
+    g.scale.setScalar(scale);
+    g.position.copy(spot());
+    g.position.y = groundAt(g.position.x, g.position.z);
+    scene.add(g);
+    let target = spot();
+    let yaw = rng() * Math.PI * 2;
+    let grazing = rng() * 8;
+    const phase = rng() * 10;
+    animated.push((t, dt) => {
+      if (grazing > 0) {
+        grazing -= dt;
+        head.rotation.x = 0.9 + Math.sin(t * 3 + phase) * 0.12;
+        if (grazing <= 0) target = spot();
+        return;
+      }
+      const dx = target.x - g.position.x;
+      const dz = target.z - g.position.z;
+      if (Math.hypot(dx, dz) < 0.4) {
+        grazing = 4 + rng() * 10;
+        return;
+      }
+      const want = Math.atan2(dx, dz);
+      yaw += Math.atan2(Math.sin(want - yaw), Math.cos(want - yaw)) * Math.min(1, dt * 3);
+      const step = 0.7 * dt * scale;
+      g.position.x += Math.sin(yaw) * step;
+      g.position.z += Math.cos(yaw) * step;
+      g.position.y = groundAt(g.position.x, g.position.z) + Math.abs(Math.sin(t * 9 + phase)) * 0.04;
+      g.rotation.y = yaw;
+      head.rotation.x = 0.15 + Math.sin(t * 9 + phase) * 0.05;
+    });
+  }
+}
+
 export function buildLife(scene, rng, animated) {
   // Butterflies fluttering over the meadows, by day.
   for (let i = 0; i < 36; i++) {
@@ -261,6 +325,7 @@ export function buildLife(scene, rng, animated) {
 
   buildWhales(scene, animated);
   buildDolphins(scene, animated);
+  buildSheep(scene, rng, animated);
 
   // Swallows: a flock wheeling over the roofs of the main village, tightest toward evening.
   const FLOCK = 16;
