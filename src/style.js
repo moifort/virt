@@ -515,8 +515,9 @@ float pxNdl = 0.0;
   // On foliage the edge of the light is ragged, leaf by leaf, never a clean curve.
   if (pxNdl < 0.36 && pxBit < (0.36 - pxNdl) * 1.5) pxLit = 0.0;
 #endif
-// Cloud shadows drifting over the land.
-pxLit *= step(pxFbm(vWorld.xz * 0.04 + uCloud), uCloudGap);
+// The shadows of the clouds, when there are clouds: broad and slow, so they read as weather
+// passing over and never as the shadows of things shifting.
+pxLit *= step(pxFbm(vWorld.xz * 0.012 + uCloud), uCloudGap);
 
 vec3 pxCol;
 if (pxLit > 0.5) {

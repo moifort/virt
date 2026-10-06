@@ -262,7 +262,8 @@ export class Climate {
     GLOBALS.uShadowTint.value.copy(this._shade);
     GLOBALS.uGlow.value = Math.max(a.glow + (b.glow - a.glow) * k, overcast * 0.5);
     GLOBALS.uNight.value = this.night;
-    GLOBALS.uCloudGap.value = 0.76 - cloud * 0.48;
+    // Under a clear sky nothing shades the ground; as the cover thickens, cloud shadows cross it.
+    GLOBALS.uCloudGap.value = 1.02 - cloud * 0.6;
     GLOBALS.uSeason.value.set(autumn, winter, spring, snowCover);
     GLOBALS.uWet.value.set(this.wetness, this.puddles, rain, this.runoff);
     GLOBALS.uWind.value.set(this.wind.x, this.wind.y, wind);
