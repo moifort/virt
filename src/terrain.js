@@ -45,6 +45,40 @@ const HARBOUR_U = 68;
 // A white sand beach along the middle of the bay.
 const beachBand = (v) => smoothstep(-30, -18, v) * smoothstep(64, 50, v);
 
+// ---------------------------------------------------------------- Built ground
+
+// The ground under the buildings, marked by whoever builds them, a cell to a metre: 2 under
+// the walls, 1 in a band around them. Nothing wild grows on it, and no tree right against a wall.
+const BUILT = new Uint8Array(SEGMENTS * SEGMENTS);
+const BUILT_BAND = 1.5;
+/**
+ * Marks as built the rectangle centred on (x, z), turned by `yaw`, reaching `hw` either side
+ * along its local x and `hd` along its local z.
+ */
+export function occupy(x, z, yaw, hw, hd) {
+  const ax = Math.cos(yaw);
+  const az = -Math.sin(yaw);
+  const reach = Math.hypot(hw, hd) + BUILT_BAND;
+  const lo = (c) => Math.max(0, Math.floor((c - reach + HALF) / CELL));
+  const hi = (c) => Math.min(SEGMENTS - 1, Math.floor((c + reach + HALF) / CELL));
+  for (let iz = lo(z); iz <= hi(z); iz++) {
+    for (let ix = lo(x); ix <= hi(x); ix++) {
+      const px = (ix + 0.5) * CELL - HALF - x;
+      const pz = (iz + 0.5) * CELL - HALF - z;
+      const out = Math.max(Math.abs(px * ax + pz * az) - hw, Math.abs(-px * az + pz * ax) - hd);
+      const i = iz * SEGMENTS + ix;
+      if (out < CELL / 2) BUILT[i] = 2;
+      else if (out < BUILT_BAND) BUILT[i] = Math.max(BUILT[i], 1);
+    }
+  }
+}
+/** How built the ground is at (x, z): 0 free, 1 beside a building, 2 under one. */
+function builtAt(x, z) {
+  const ix = Math.floor((x + HALF) / CELL);
+  const iz = Math.floor((z + HALF) / CELL);
+  return ix < 0 || iz < 0 || ix >= SEGMENTS || iz >= SEGMENTS ? 0 : BUILT[iz * SEGMENTS + ix];
+}
+
 export const placeZone = (id, name, hint, u, v, r) => ({ id, name, hint, u, v, r, x: toX(u, v), z: toZ(u, v) });
 export const ZONES = [
   placeZone('agora', 'Agora', "l'Arbre-Mère", 0, 0, 12),
@@ -90,11 +124,11 @@ export const VILLAGES = [
       // zigzags from the top lane to the church, on a terrace cut into the brow of the hill.
       { stair: true, width: 2.0, points: [sh(78, 9.5), sh(82, 20.5)] },
       { stair: true, width: 2.0, points: [sh(75, 23.5), sh(84, 27)] },
-      { stair: true, width: 2.0, points: [sh(63, 33.5), sh(74.5, 33.5)] },
+      { stair: true, width: 2.0, points: [sh(63, 33.5), sh(76.8, 34.6)] },
       { stair: true, width: 2.0, points: [sh(61, 43.5), sh(72, 46)] },
       { stair: true, width: 2.0, points: [sh(76.5, 36), sh(88, 37)] },
       { stair: true, width: 2.0, points: [sh(72, 50), sh(83, 47.5)] },
-      { stair: true, width: 2.2, points: [sh(99, 21), sh(102, 24), sh(103, 30), sh(101, 37)] },
+      { stair: true, width: 2.2, points: [sh(99, 21), sh(102, 24), sh(103, 30), sh(101, 38.5)] },
       { stair: true, width: 2.0, points: [sh(60, 56), sh(71, 60)] },
       { stair: true, width: 2.0, points: [sh(72, 66), sh(83, 68)] },
       { stair: true, width: 2.0, points: [sh(82, 60), sh(93, 58)] },
@@ -114,9 +148,10 @@ export const VILLAGES = [
     lanes: [
       { width: 2.8, points: [[-58, 82], [-50, 83], [-42, 83.5], [-34, 83]] },
       { width: 2.6, points: [[-54, 92], [-46, 92], [-38, 91.5]] },
-      { stair: true, width: 2.0, points: [[-50, 74], [-44, 83.5], [-38, 92]] },
+      { stair: true, width: 2.0, points: [[-52, 72.5], [-44, 83.5], [-38, 92]] },
     ],
-    piazzas: [],
+    // The stair comes down below the houses to a little lookout over the cliff.
+    piazzas: [{ u: -54, v: 70.5, r: 3.5, belvedere: true }],
   },
 ];
 
@@ -273,14 +308,15 @@ export const PATHS = [...ZONES.slice(1, -1).map((z) => [0, 0, z.x, z.z]), [zone(
 export const ESTATE = { u: 84, v: 12, r: 30 };
 export const estateWeight = (u, v) => smoothstep(ESTATE.r + 8, ESTATE.r - 4, Math.hypot(u - ESTATE.u, v - ESTATE.v));
 /** Built sites kept clear of wild growth ({ x, z, r }); builders add their own. */
-export const CLEARINGS = [{ x: OBSERVATORY.x, z: OBSERVATORY.z, r: OBSERVATORY.r + 4 }, { x: OBSERVATORY.x + OBSERVATORY.lower.dx, z: OBSERVATORY.z + OBSERVATORY.lower.dz, r: OBSERVATORY.lower.r + 3 }, { x: ISLET.x, z: ISLET.z, r: 5.5 }];
+export const CLEARINGS = [{ x: OBSERVATORY.x, z: OBSERVATORY.z, r: OBSERVATORY.r + 4 }, { x: OBSERVATORY.x + OBSERVATORY.lower.dx, z: OBSERVATORY.z + OBSERVATORY.lower.dz, r: OBSERVATORY.lower.r + 3 }, { x: ISLET.x, z: ISLET.z, r: 8 }];
 
 // The railway crosses the angle between the mountain (a) and the right-hand ridge (b) at a
 // constant level, high enough that its station stands out on the flank, a little way from the
 // first tunnel, on a shelf banked up against the slope:
 // `s` runs along the line from a, `l` across it (negative uphill).
 export const RAIL = { a: { u: 129, v: 25 }, b: { u: 45, v: 106 }, level: 56 };
-export const STATION = { s0: 24, s1: 49, yard: { s0: 24, s1: 43, l0: -13, l1: -3.5 } };
+// The yard runs deep enough behind the line for a passenger building at the avatar's scale.
+export const STATION = { s0: 24, s1: 49, yard: { s0: 24, s1: 43, l0: -15.5, l1: -3.5 } };
 const railStart = { x: toX(RAIL.a.u, RAIL.a.v), z: toZ(RAIL.a.u, RAIL.a.v) };
 const railEnd = { x: toX(RAIL.b.u, RAIL.b.v), z: toZ(RAIL.b.u, RAIL.b.v) };
 const railLength = Math.hypot(railEnd.x - railStart.x, railEnd.z - railStart.z);
@@ -312,7 +348,7 @@ for (const [s, r] of [[-15, 9], [-5, 7], [6, 6], [16, 6]]) CLEARINGS.push({ ...r
 // packed earth, wide enough for one walker.
 const TRAIL = (() => {
   const from = { x: OBSERVATORY.x + OBSERVATORY.lower.dx, z: OBSERVATORY.z + OBSERVATORY.lower.dz + OBSERVATORY.lower.r + 1.5 };
-  const to = railPoint(STATION.s0 + 12, -15);
+  const to = railPoint(STATION.s0 + 12, -15.5);
   const dx = to.x - from.x;
   const dz = to.z - from.z;
   const len = Math.hypot(dx, dz);
@@ -502,6 +538,14 @@ for (let iz = 0; iz <= SEGMENTS; iz++) {
 }
 shelveShores();
 
+// The railway, wherever it runs at or within a tree's height over the ground: nothing grows
+// up through the line or the deck of the viaduct.
+for (let s = CUTTING.s0 - 4; s < railLength; s += 2) {
+  const p = railPoint(s, 0);
+  const ground = groundAt(p.x, p.z);
+  if (ground > RAIL.level - 13 && ground < RAIL.level + 2) occupy(p.x, p.z, Math.atan2(-railDir.z, railDir.x), 1.2, 3.5);
+}
+
 /**
  * Off every shore the sea bed shelves away gently, so the water stays turquoise a long way out
  * along the beach and around the harbour, and only darkens to blue in the offing. Under the
@@ -599,6 +643,8 @@ export function isWild(x, z, margin = 0, floor = WATER_LEVEL + 0.4) {
   for (const t of TRAILS) if (segmentDistance(x, z, t) < 1.1 + Math.max(0, margin)) return false;
   for (const t of TRACKS) if (segmentDistance(x, z, t) < 0.6 + Math.max(0, margin)) return false;
   for (const c of CLEARINGS) if (Math.hypot(x - c.x, z - c.z) < c.r + margin) return false;
+  const built = builtAt(x, z);
+  if (built === 2 || (built === 1 && margin >= 0)) return false;
   const streets = villagePlan();
   if (streets) {
     for (const lane of streets.lanes) if (laneAt(lane, x, z).d < lane.half + (lane.quay ?? 0) + 0.8 + Math.max(0, margin)) return false;

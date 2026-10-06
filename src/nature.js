@@ -8,7 +8,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { fbm, pick } from './noise.js';
 import { PAL, WATER_LEVEL, paint, solid } from './style.js';
 import { at, bake, ball, box, cone, cyl, lantern } from './kit.js';
-import { PATHS, UP, ZONES, anywhere, coastU, cultivated, footU, groundAt, isWild, scatterInstanced, slopeAt, toU, toV, toX, toZ } from './terrain.js';
+import { PATHS, UP, ZONES, anywhere, coastU, cultivated, footU, groundAt, isWild, occupy, scatterInstanced, slopeAt, toU, toV, toX, toZ } from './terrain.js';
 
 const BARK = 0x7d5a48;
 const DARK_BARK = 0x5e463c;
@@ -319,6 +319,7 @@ function buildBeach(scene, rng) {
     const towel = at(box(1.0, 0.04, 1.9, pick(rng, [PAL.ivory, PAL.saffron, PAL.coral, PAL.teal])), x + 1.3, y + 0.03, z + 0.4, g);
     towel.rotation.y = Math.PI / 4 + (rng() - 0.5) * 0.4;
     if (rng() < 0.4) at(ball(0.3, pick(rng, [PAL.red, PAL.saffron]), {}, 8, 6), x - 1.2, y + 0.3, z + 1.1, g);
+    occupy(x + 0.6, z + 0.2, 0, 2.1, 2.1);
   }
   scene.add(bake(g));
 }
@@ -358,6 +359,7 @@ function grow(scene, rng, build, { count, variants = 3, margin = 0, maxSlope = 0
       const inst = new THREE.InstancedMesh(m.geometry, m.material, list.length);
       list.forEach((matrix, i) => inst.setMatrixAt(i, matrix));
       inst.castShadow = inst.receiveShadow = true;
+      inst.userData.plant = build.name;
       scene.add(inst);
     }
   });
@@ -426,6 +428,8 @@ export function buildNature(scene, rng) {
     s.set(0.6 + r() * 1.4, 0.5 + r() * 1.5, 0.6 + r() * 1.4);
     p.y += s.y * 0.3;
     c.setHex(pick(r, ROCK));
+    // No tree grows out of the middle of a boulder.
+    occupy(p.x, p.z, 0, Math.max(s.x, s.z), Math.max(s.x, s.z));
     return true;
   });
 
@@ -475,7 +479,7 @@ export function buildNature(scene, rng) {
     for (let d = 15, side = 1; d < len - 14; d += 9, side = -side) {
       const x = ax + ((bx - ax) * d) / len + nx * 2.4 * side;
       const z = az + ((bz - az) * d) / len + nz * 2.4 * side;
-      lantern(lamps, x, groundAt(x, z), z);
+      lantern(lamps, x, groundAt(x, z), z, { toward: [x - nx * 2.4 * side, z - nz * 2.4 * side] });
     }
   }
   scene.add(bake(lamps));

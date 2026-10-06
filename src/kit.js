@@ -103,9 +103,14 @@ export function plant(parent, x, y, z, rng) {
   at(leaves, x, y + 1.1, z, parent);
 }
 
-/** Old Italian street lamp: fluted cast-iron post, scrolled bracket, four-sided glass lantern. */
-export function lantern(parent, x, y, z, color = WARM_LIGHT) {
+/**
+ * Old Italian street lamp: fluted cast-iron post, scrolled bracket, four-sided glass lantern.
+ * `toward` is a point of `parent` ([x, z]) the bracket reaches out to, so that the lantern
+ * hangs over the way it lights rather than over the verge.
+ */
+export function lantern(parent, x, y, z, { color = WARM_LIGHT, toward = null } = {}) {
   const g = at(new THREE.Group(), x, y, z, parent);
+  if (toward) g.rotation.y = Math.atan2(-(toward[1] - z), toward[0] - x);
   at(cyl(0.16, 0.24, 0.5, INK, 6), 0, 0.25, 0, g);
   at(cyl(0.06, 0.09, 2.7, INK, 6), 0, 1.6, 0, g);
   at(cyl(0.11, 0.11, 0.1, INK, 6), 0, 0.9, 0, g);

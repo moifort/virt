@@ -13,7 +13,7 @@ import { pick, smoothstep } from './noise.js';
 import { PAL, WATER_LEVEL, paint } from './style.js';
 import { at, bake, lamplight, lantern, seat } from './kit.js';
 import { festoon, gozzo } from './zones.js';
-import { PATHS, SQUARE, VILLAGES, ZONES, cultivated, estateWeight, footU, groundAt, inSquare, isWild, laneAt, lanePoint, segmentDistance, slopeAt, toU, toV, toX, toZ, UP, villagePlan } from './terrain.js';
+import { CLEARINGS, PATHS, SQUARE, VILLAGES, ZONES, cultivated, estateWeight, footU, groundAt, inSquare, isWild, laneAt, lanePoint, occupy, segmentDistance, slopeAt, toU, toV, toX, toZ, UP, villagePlan } from './terrain.js';
 
 const ballShape = new THREE.SphereGeometry(0.5, 8, 6);
 const boxShape = new THREE.BoxGeometry(1, 1, 1);
@@ -79,12 +79,19 @@ class Parts {
   at(position, yaw, scale = 1) {
     this.frame.compose(position, new THREE.Quaternion().setFromAxisAngle(UP, yaw), new THREE.Vector3(scale, scale, scale));
     this.scale = scale;
+    this.yaw = yaw;
   }
 
   add(kind, x, y, z, sx, sy, sz, color, rx = 0, ry = 0, rz = 0) {
     this._q.setFromEuler(this._e.set(rx, ry, rz));
     this._local.compose(new THREE.Vector3(x, y, z), this._q, new THREE.Vector3(sx, sy, sz));
     this.lists.get(kind).push({ m: this.frame.clone().multiply(this._local), c: color });
+    // Whatever is the size of a room or more takes up its ground: nothing grows there.
+    const s = this.scale ?? 1;
+    if (kind === 'box' && sx * s >= 1.5 && sz * s >= 1.5 && sy * s >= 1) {
+      const c = this.world(x, y, z);
+      occupy(c.x, c.z, this.yaw + ry, (sx * s) / 2, (sz * s) / 2);
+    }
   }
 
   /** Adds a part on a face: `face` 0 = front (+z), 1 = right (+x), 2 = left (-x), 3 = back (-z). */
@@ -457,6 +464,7 @@ function siteFits(foot, lane, lanes, piazzas, placed, level, uphill, { waterfron
     for (const zn of ZONES) if (Math.hypot(p.x - zn.x, p.z - zn.z) < zn.r + clearance) return null;
     for (const path of PATHS) if (segmentDistance(p.x, p.z, path) < 2.2) return null;
     for (const pz of piazzas) if (Math.hypot(p.x - pz.x, p.z - pz.z) < pz.r + 0.4) return null;
+    for (const c of CLEARINGS) if (Math.hypot(p.x - c.x, p.z - c.z) < c.r + 0.5) return null;
   }
   for (const other of placed) if (overlap(foot, other, slack)) return null;
   let cap;
@@ -516,22 +524,30 @@ function paveLane(parts, rng, lane, piazzas) {
   }
 }
 
-/** A few steps climbing into the hill up an alley between two houses. */
+/**
+ * A few steps climbing into the hill up an alley between two houses, out to the terrace behind
+ * them. If the way up runs into a wall of rock or out over a drop, the alley is left without
+ * steps rather than given a stair that leads nowhere.
+ */
 function alleySteps(parts, rng, lane, s, side, width) {
   const p = lanePoint(lane, s);
   const nx = -p.tz * side;
   const nz = p.tx * side;
   let prev = groundAt(p.x + nx * lane.half, p.z + nz * lane.half);
+  const treads = [];
   for (let k = 0; k < 9; k++) {
     const out = lane.half + 0.4 + k * TREAD;
     const x = p.x + nx * out;
     const z = p.z + nz * out;
     const g = groundAt(x, z);
-    if (g > prev + 1.3 || g < prev - 0.6) break;
+    if (g > prev + 1.3 || g < prev - 0.6) return;
     const top = Math.max(g, prev) + 0.1;
-    parts.at(new THREE.Vector3(x, 0, z), Math.atan2(nx, nz), 1);
-    parts.add('box', 0, (top + prev - 0.2) / 2, 0, width, top - prev + 0.2, TREAD + 0.05, pick(rng, PAVING));
+    treads.push([x, z, top, prev]);
     prev = top - 0.1;
+  }
+  for (const [x, z, top, below] of treads) {
+    parts.at(new THREE.Vector3(x, 0, z), Math.atan2(nx, nz), 1);
+    parts.add('box', 0, (top + below - 0.2) / 2, 0, width, top - below + 0.2, TREAD + 0.05, pick(rng, PAVING));
   }
 }
 
@@ -667,7 +683,7 @@ function laneEdges(parts, rng, lane, covered, furniture) {
     if (s > nextLamp && !lane.quay) {
       const side = lane.quay ? -lane.seaSide : rng() < 0.5 ? -1 : 1;
       const out = lane.half - 0.35;
-      lantern(furniture, p.x - p.tz * side * out, here + 0.1, p.z + p.tx * side * out);
+      lantern(furniture, p.x - p.tz * side * out, here + 0.1, p.z + p.tx * side * out, { toward: [p.x, p.z] });
       nextLamp = s + 9 + rng() * 5;
     }
     if (s > nextString && isCovered(-1, s) && isCovered(1, s)) {
@@ -675,6 +691,28 @@ function laneEdges(parts, rng, lane, covered, furniture) {
       festoon(furniture, p.x - p.tz * out, here + 4.6, p.z + p.tx * out, p.x + p.tz * out, here + 4.6, p.z - p.tx * out, 0.5);
       nextString = s + 8 + rng() * 6;
     }
+  }
+}
+
+/**
+ * Where a lane stops short over a drop, with no stair or square going on from its end, a
+ * parapet closes it, so that it ends at a wall to lean on rather than at the edge of a ledge.
+ */
+function laneEnds(parts, rng, lane, lanes, piazzas) {
+  if (lane.stair || lane.quay) return;
+  for (const [s, dir] of [[0, -1], [lane.length, 1]]) {
+    const p = lanePoint(lane, s);
+    const ahead = (d) => ({ x: p.x + p.tx * dir * d, z: p.z + p.tz * dir * d });
+    const next = ahead(2.5);
+    if (lanes.some((o) => o !== lane && laneAt(o, next.x, next.z).d < o.half + 0.3)) continue;
+    if (piazzas.some((pz) => Math.hypot(next.x - pz.x, next.z - pz.z) < pz.r + 0.5)) continue;
+    const far = ahead(3);
+    const level = groundAt(p.x, p.z);
+    if (groundAt(far.x, far.z) > level - 0.9) continue;
+    const wall = ahead(0.2);
+    parts.at(new THREE.Vector3(wall.x, 0, wall.z), Math.atan2(p.tx, p.tz), 1);
+    parts.add('box', 0, level + 0.4, 0, lane.width + 0.7, 0.95, 0.36, WALL_STONE);
+    parts.add('box', 0, level + 0.92, 0, lane.width + 0.8, 0.1, 0.46, pick(rng, PLINTH));
   }
 }
 
@@ -701,7 +739,7 @@ function quayWall(parts, rng, lane, furniture) {
     }
     if (s > nextLamp) {
       const q = parts.world(sea * 1.3, here + 0.1, 0);
-      lantern(furniture, q.x, q.y, q.z);
+      lantern(furniture, q.x, q.y, q.z, { toward: [p.x, p.z] });
       nextLamp = s + 9 + rng() * 5;
     }
   }
@@ -779,7 +817,7 @@ function buildPiazza(parts, rng, pz, furniture, SCALE) {
   }
   for (const a of pz.church ? [0.7, -0.7, 2.4, -2.4] : [0.9, -2.3]) {
     const l = spot(Math.cos(a) * (pz.r - 0.9), Math.sin(a) * (pz.r - 0.9));
-    lantern(furniture, l.x, y + 0.14, l.z);
+    lantern(furniture, l.x, y + 0.14, l.z, { toward: [pz.x, pz.z] });
   }
 }
 
@@ -873,6 +911,7 @@ export function buildVillages(scene, rng, animated) {
     for (const lane of streets) covered.set(lane, houseRows(parts, rng, lane, streets, squares, placed, village, SCALE));
     for (const lane of streets) {
       laneEdges(parts, rng, lane, covered.get(lane), furniture);
+      laneEnds(parts, rng, lane, streets, squares);
       if (lane.quay) quayWall(parts, rng, lane, furniture);
     }
     for (const pz of squares) buildPiazza(parts, rng, pz, furniture, SCALE);

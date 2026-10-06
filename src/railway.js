@@ -141,6 +141,8 @@ function groundBeside(s, l) {
 /**
  * A small Ligurian station: a stone platform carried on a retaining wall, a two-storey passenger
  * building in faded red with stone trim and a tile roof, an iron awning, name boards and lamps.
+ * The building is drawn in its own units and set down `SIZE` times larger, so that its doors
+ * stand a head taller than the avatar, as the village's do.
  */
 function buildStation(line) {
   const P0 = STATION.s0;
@@ -165,12 +167,14 @@ function buildStation(line) {
   at(box(P1 - P0, 0.03, 0.2, TRIM), (P0 + P1) / 2, TOP + 0.01, EDGE - 0.06, line);
 
   // Passenger building, facing the track.
+  const SIZE = 1.6;
   const W = 12;
   const D = 5.2;
   const FLOOR = 2.6;
   const H = FLOOR * 2 + 0.4;
-  const cx = P0 + 10.5;
-  const house = at(new THREE.Group(), cx, TOP, BACK - D / 2, line);
+  const cx = P0 + 1.6 + (W / 2) * SIZE;
+  const house = at(new THREE.Group(), cx, TOP, BACK - (D / 2) * SIZE, line);
+  house.scale.setScalar(SIZE);
   at(box(W, H, D, WALL), 0, H / 2, 0, house);
   at(box(W + 0.14, 0.6, D + 0.14, STONE), 0, 0.3, 0, house);
   at(box(W + 0.12, 0.16, D + 0.12, TRIM), 0, FLOOR + 0.25, 0, house);
@@ -221,39 +225,36 @@ function buildStation(line) {
     const strut = at(box(0.07, 0.07, 1.5, IRON), x, FLOOR - 0.55, front + 0.65, house);
     strut.rotation.x = -0.6;
   }
-  // A low annex for the goods office, and a water tank on the roof side.
-  at(box(4.4, 2.8, 4.2, 0xe6b98a), W / 2 + 2.2, 1.4, -0.4, house);
-  at(box(4.8, 0.2, 4.6, ROOF), W / 2 + 2.2, 2.9, -0.4, house);
-  at(box(0.9, 1.7, 0.1, 0x5a4034), W / 2 + 2.2, 0.85, 1.72, house);
-  at(box(0.8, 0.8, 0.1, GLASS), W / 2 + 3.6, 1.6, 1.72, house);
-
-  // Platform furniture: benches, lamps, name boards on posts, flower tubs, a luggage barrow.
-  for (const x of [cx - 4.4, cx + 4.4]) {
+  // Platform furniture: benches between the doors, lamps, name boards on posts, flower tubs,
+  // a luggage barrow past the end of the building.
+  const doorStep = 2.2 * SIZE;
+  for (const x of [cx - doorStep * 1.5, cx + doorStep * 1.5]) {
     at(box(1.7, 0.1, 0.5, 0x8a5a41), x, TOP + 0.5, BACK + 0.45, line);
     at(box(1.7, 0.5, 0.08, 0x8a5a41), x, TOP + 0.85, BACK + 0.2, line);
     for (const dx of [-0.4, 0.4]) seat(line, x + dx, TOP + 0.57, BACK + 0.45);
     for (const dx of [-0.7, 0.7]) at(box(0.08, 0.5, 0.45, IRON), x + dx, TOP + 0.25, BACK + 0.45, line);
   }
-  for (const x of [P0 + 1.5, P1 - 8, P1 - 1.5]) lantern(line, x, TOP, BACK + 0.5);
-  for (const x of [P0 + 3, P1 - 3.5]) {
+  for (const x of [P0 + 0.6, cx, P1 - 0.6]) lantern(line, x, TOP, BACK + 0.5, { toward: [x, (EDGE + BACK) / 2] });
+  for (const x of [P1 - 2.6]) {
     for (const dx of [-0.9, 0.9]) at(cyl(0.05, 0.05, 2.3, IRON, 5), x + dx, TOP + 1.15, BACK + 0.3, line);
     at(box(2.2, 0.6, 0.08, 0x2f4f9a), x, TOP + 2.2, BACK + 0.3, line);
     at(box(1.6, 0.18, 0.1, TRIM), x, TOP + 2.2, BACK + 0.32, line);
   }
-  for (const x of [cx - 2.2, cx + 2.2, P1 - 6]) {
+  for (const x of [cx - doorStep * 0.5, cx + doorStep * 0.5]) {
     at(cyl(0.38, 0.3, 0.5, 0xb8623e, 8), x, TOP + 0.25, BACK + 0.5, line);
     at(ball(0.42, 0x4c7448, { flat: true }, 6, 4), x, TOP + 0.75, BACK + 0.5, line);
     for (const [dx, dz] of [[0.2, 0.15], [-0.2, 0.1], [0, -0.2]]) at(ball(0.13, PAL.red, {}, 4, 3), x + dx, TOP + 1.05, BACK + 0.5 + dz, line);
   }
-  const barrow = at(new THREE.Group(), P1 - 11, TOP, BACK + 1.2, line);
+  const barrow = at(new THREE.Group(), cx + (W / 2) * SIZE + 0.9, TOP, BACK + 1.2, line);
   at(box(1.5, 0.1, 0.8, 0x8a5a41), 0, 0.45, 0, barrow);
   for (const [x, c] of [[-0.35, 0x7a4a3a], [0.3, 0x4d6a4c]]) at(box(0.55, 0.4, 0.6, c), x, 0.7, 0, barrow);
   for (const z of [-0.42, 0.42]) at(cyl(0.22, 0.22, 0.06, IRON, 8), 0.35, 0.22, z, barrow).rotation.x = Math.PI / 2;
   // Railing along the open end of the platform, beyond the building.
-  for (let x = cx + W / 2 + 4.6; x <= P1; x += 1.2) at(box(0.07, 0.9, 0.07, IRON), x, TOP + 0.45, BACK + 0.05, line);
-  at(box(P1 - cx - W / 2 - 4.6, 0.07, 0.07, IRON), (P1 + cx + W / 2 + 4.6) / 2, TOP + 0.9, BACK + 0.05, line);
-  // Two cypresses and a stone pine's worth of shade behind, in the yard.
-  for (const [x, z] of [[P0 + 2.5, -8.5], [P0 + 3.5, -11]]) {
+  const open = cx + (W / 2) * SIZE + 0.4;
+  for (let x = open; x <= P1; x += 1.2) at(box(0.07, 0.9, 0.07, IRON), x, TOP + 0.45, BACK + 0.05, line);
+  at(box(P1 - open, 0.07, 0.07, IRON), (P1 + open) / 2, TOP + 0.9, BACK + 0.05, line);
+  // Two cypresses at the end of the building, by the way round to the yard.
+  for (const [x, z] of [[P0 + 0.4, BACK - 1.2], [P0 + 0.6, BACK - 5.5]]) {
     at(cyl(0.1, 0.14, 0.7, 0x7d5a48, 5), x, TOP + 0.3, z, line);
     const body = at(ball(0.6, 0x2f5840, { flat: true }, 7, 6), x, TOP + 2.6, z, line);
     body.scale.y = 2.4;

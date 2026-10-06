@@ -266,8 +266,8 @@ export function buildMoot(g, rng, animated) {
 
   // Presentation screen at the head of the table.
   screen(4.2, 2.4, g, -10.6, F + 3.3, 0, Math.PI / 2, animated, rng);
-  lantern(g, W / 2 - 0.6, 0.35, D / 2 + 0.6);
-  lantern(g, -W / 2 + 0.6, 0.35, D / 2 + 0.6);
+  lantern(g, W / 2 - 0.6, 0.35, D / 2 + 0.6, { toward: [0, D / 2 + 0.6] });
+  lantern(g, -W / 2 + 0.6, 0.35, D / 2 + 0.6, { toward: [0, D / 2 + 0.6] });
   furnishMoot(g, rng);
 }
 
@@ -291,7 +291,7 @@ export function buildPods(g, rng, animated) {
     at(ball(0.2, WARM_LIGHT, { glow: true }, 8, 6), -1.6, 2.15, -0.2, pod);
     plant(pod, 1.6, 0.4, -1.6, rng);
   });
-  lantern(g, 0, 0, 0, SCREEN);
+  lantern(g, 0, 0, 0, { color: SCREEN });
   furnishPods(g, rng);
 }
 
@@ -619,17 +619,27 @@ export function festoon(parent, ax, ay, az, bx, by, bz, sag = 0.7) {
   lamplight(parent, (ax + bx) / 2, (ay + by) / 2, (az + bz) / 2, 5.5);
 }
 
-/** Tall striped lighthouse on an octagonal base, with a gallery and a glowing lantern room. */
-export function lighthouse(parent, x, y, z) {
-  const g = at(new THREE.Group(), x, y, z, parent);
-  at(cyl(3.6, 4.0, 2.4, STONE, 8, { flat: true }), 0, 1.2, 0, g);
-  at(cyl(3.8, 3.8, 0.2, PAL.cream, 8), 0, 2.5, 0, g);
+/**
+ * Tall striped lighthouse on an octagonal base, with a gallery and a glowing lantern room. The
+ * tower is drawn `size` times its model, so that its door and windows are the avatar's own;
+ * the base stays the width of the rock it stands on. Returns the height of the base.
+ */
+export function lighthouse(parent, x, y, z, size = 1) {
+  const root = at(new THREE.Group(), x, y, z, parent);
+  const BASE = 3.2;
+  at(cyl(4.3, 4.7, BASE, STONE, 8, { flat: true }), 0, BASE / 2, 0, root);
+  at(cyl(4.5, 4.5, 0.2, PAL.cream, 8), 0, BASE + 0.1, 0, root);
+  // The model stands its tower on a base 2.6 high: it is lifted onto the real one and scaled.
+  const g = at(new THREE.Group(), 0, BASE + 0.2 - 2.6 * size, 0, root);
+  g.scale.setScalar(size);
+  at(box(0.95, 1.7, 0.1, DARK_WOOD), 0, 3.5, 1.86, g);
+  at(box(1.15, 0.16, 0.14, PAL.cream), 0, 4.42, 1.86, g);
   const stripes = 6;
   for (let i = 0; i < stripes; i++) {
     const r0 = 1.9 - i * 0.12;
     at(cyl(r0 - 0.12, r0, 2.4, i % 2 ? PAL.red : PAL.ivory, 14), 0, 3.8 + i * 2.4, 0, g);
   }
-  for (let i = 0; i < 4; i++) at(box(0.4, 0.7, 0.1, 0x3b3346), 0, 4.5 + i * 3.3, 1.85 - i * 0.18, g);
+  for (let i = 1; i < 4; i++) at(box(0.4, 0.7, 0.1, 0x3b3346), 0, 4.5 + i * 3.3, 1.85 - i * 0.18, g);
   const top = 2.6 + stripes * 2.4;
   at(cyl(1.75, 1.75, 0.3, INK, 14), 0, top + 0.15, 0, g);
   at(ring(1.65, 0.06, INK, Math.PI * 2, 18), 0, top + 0.95, 0, g).rotation.x = Math.PI / 2;
@@ -642,6 +652,7 @@ export function lighthouse(parent, x, y, z) {
   at(cyl(0.06, 0.06, 1.2, INK, 4), 0, top + 3.4, 0, g);
   at(ball(0.22, PAL.saffron, { glow: true }, 6, 4), 0, top + 4.0, 0, g);
   perchedGull(g, 1.2, top + 1.0, 1.15, 0.8);
+  return BASE;
 }
 
 /** A small fishmonger's stall: trestle table with ice and fish, striped awning, scales, sign. */
@@ -760,7 +771,7 @@ export function buildObservatory(scene, rng) {
     const a = 0.9 + (k / 7) * Math.PI * 1.5;
     at(box(0.6, 0.9, 0.1, 0x3b3346), Math.sin(a) * 3.7, 4.6, Math.cos(a) * 3.7, tower).rotation.y = a;
   }
-  lantern(tower, 1.4, 0.5, 3.9);
+  lantern(tower, 1.4, 0.5, 3.9, { toward: [2.8, 7.8] });
   at(cyl(0.04, 0.04, 1.2, INK, 5), 0, 10.8, 0, tower);
   at(box(0.7, 0.25, 0.03, PAL.red), 0.35, 11.2, 0, tower);
 
@@ -823,7 +834,7 @@ export function buildObservatory(scene, rng) {
     const eye = at(cyl(0.1, 0.14, 0.7, 0x8a8a96, 8), 0, 1.3, 0, stand);
     eye.rotation.set(Math.PI / 2 - 0.35, 0, -a + Math.PI / 2);
   }
-  lantern(lower, 2.6, 0.5, -3.2);
+  lantern(lower, 2.6, 0.5, -3.2, { toward: [0, 0] });
   const shed = at(new THREE.Group(), -2.8, 0.5, -2.6, lower);
   shed.rotation.y = 0.3;
   at(box(2.6, 2.0, 2.2, 0xe4d9c2), 0, 1.0, 0, shed);
@@ -851,12 +862,21 @@ export function buildLighthouseWalk(scene, rng, animated) {
   const BOULDER = [0x8f8678, 0x9d9484, 0xa99d8e];
   const TIMBER = [PAL.wood, 0xa8764f, 0x9a6a48];
 
-  lighthouse(g, 0, ground(0, 0) - 0.4, 0);
-  // Steps cut in the rock, down from the tower to the landing in its lee.
-  for (let z = 3.4; z < 9; z += 0.7) {
-    const y = ground(0, z);
-    if (y < WATER_LEVEL + 0.4) break;
-    at(box(1.7, 0.32, 0.72, STONE), 0, y + 0.1, z, g);
+  const foot = ground(0, 0) - 0.4;
+  const door = foot + lighthouse(g, 0, foot, 0, 1.7) + 0.2;
+  // A flight of stone steps down the face of the base from the door, then steps cut in the
+  // rock on down to the landing in its lee.
+  for (let z = 4.85, y = door; z < 9; ) {
+    const rock = ground(0, z);
+    if (y > rock + 0.3) {
+      at(box(1.7, y - rock + 0.5, 0.38, STONE), 0, (y + rock - 0.5) / 2, z, g);
+      y -= 0.3;
+      z += 0.36;
+      continue;
+    }
+    if (rock < WATER_LEVEL + 0.4) break;
+    at(box(1.7, 0.32, 0.72, STONE), 0, rock + 0.1, z, g);
+    z += 0.7;
   }
   // The jetty: blocks laid out from the landing, a parapet on the open side, mussels where
   // the tide washes them, a lantern and a bollard at the head.
@@ -870,7 +890,7 @@ export function buildLighthouseWalk(scene, rng, animated) {
     if (rng() < 0.6) mussels(g, rng, -1.52, z - 0.7 + rng() * 1.4, 0.12);
   }
   at(box(3.1, 0.1, 11.6, 0xd3c7b0), 0, QUAY + 0.05, 13.7, g);
-  lantern(g, -0.85, QUAY + 0.1, 18.6);
+  lantern(g, -0.85, QUAY + 0.1, 18.6, { toward: [0.5, 18.6] });
   at(cyl(0.14, 0.18, 0.7, INK, 6), 0.9, QUAY + 0.35, 18.4, g);
   at(ball(0.18, INK, {}, 6, 4), 0.9, QUAY + 0.72, 18.4, g);
   perchedGull(g, 0.9, QUAY + 0.86, 18.4, 2.6);
@@ -916,7 +936,7 @@ export function buildLighthouseWalk(scene, rng, animated) {
       }
     }
   }
-  lantern(stage, 22.2, DECK + 0.08, shore + 1.5);
+  lantern(stage, 22.2, DECK + 0.08, shore + 1.5, { toward: [21, shore + 1.5] });
   at(cyl(0.14, 0.18, 0.7, INK, 6), 19.9, DECK + 0.4, shore + 10.4, stage);
   perchedGull(stage, 19.9, DECK + 0.75, shore + 10.4, 0.4);
   scene.add(bake(stage));
@@ -944,31 +964,31 @@ export function buildPort(g, rng, animated) {
     for (let k = 0; k < n; k++) at(box(width, 0.3, 0.62, k % 2 ? 0xd8cdb7 : 0xcdc2ab), x, quayTop - 0.15 - k * 0.3, Q + 0.31 + k * 0.62, g);
   };
 
-  // A red seaplane rides at its buoy off the ends of the piers, its propeller idling.
-  const { plane, prop } = seaplane();
-  at(live(plane), 0, surface + 0.1, Q + 29, g).rotation.y = 0.5;
-  at(cyl(0.3, 0.2, 0.5, PAL.red, 8), 3.5, surface + 0.1, Q + 32.5, g);
-  animated.push((t, dt) => {
-    plane.position.y = surface + 0.1 + Math.sin(t * 1.0) * 0.07;
-    plane.rotation.z = Math.sin(t * 0.8) * 0.03;
-    prop.rotation.z += dt * 3;
-  });
-
-  // A straight wooden jetty at the plain end of the quay.
+  // A straight wooden jetty at the plain end of the quay, the pontoon farthest from the mole.
   const plank = (x, z, yaw, width) => {
     at(box(width, 0.14, 0.56, pick(rng, TIMBER)), x, 0.05, z, deck).rotation.y = yaw;
   };
   const pile = (x, z) => at(cyl(0.14, 0.16, 4.2, DARK_WOOD, 6), x, -1.7, z, deck);
   const JETTY = 19;
+  // A red seaplane moored at the head of it, nose out to sea, her tail just off the last
+  // planks and a line from her bow to the end pile, her propeller idling.
+  const { plane, prop } = seaplane();
+  at(live(plane), JETTY, surface + 0.1, Q + 25, g);
+  at(box(0.04, 0.04, 3.6, 0xe6dcc8), JETTY + 1.1, DECK - 0.1, Q + 22.6, g).rotation.x = 0.06;
+  animated.push((t, dt) => {
+    plane.position.y = surface + 0.1 + Math.sin(t * 1.0) * 0.07;
+    plane.rotation.z = Math.sin(t * 0.8) * 0.03;
+    prop.rotation.z += dt * 3;
+  });
   for (let z = Q + 0.4; z < Q + 21; z += 0.62) plank(JETTY, z + 0.31, 0, 3);
   for (let z = Q + 1.2; z < Q + 21; z += 3) for (const dx of [-1.4, 1.4]) pile(JETTY + dx, z);
-  lantern(deck, JETTY + 1, 0.13, Q + 20.4);
+  lantern(deck, JETTY + 1, 0.13, Q + 20.4, { toward: [JETTY, Q + 20.4] });
   steps(JETTY, 3);
   // Two wooden piers.
   for (const px of [-8, 6]) {
     for (let i = 0; i < 30; i++) at(box(2.6, 0.16, 0.56, PAL.wood), px, 0.05, Q + 0.4 + i * 0.62, deck);
     for (let z = Q + 1; z < Q + 19; z += 2.8) for (const dx of [-1.2, 1.2]) at(cyl(0.13, 0.13, 3.6, DARK_WOOD, 6), px + dx, -1.7, z, deck);
-    lantern(deck, px + 1.1, 0.13, Q + 18.6);
+    lantern(deck, px + 1.1, 0.13, Q + 18.6, { toward: [px, Q + 18.6] });
     steps(px, 2.6);
   }
   for (let z = Q + 2; z < Q + 19; z += 2.8) for (const px of [-8, 6]) for (const dx of [-1.2, 1.2]) mussels(deck, rng, px + dx, z, 0.14);
@@ -1015,7 +1035,7 @@ export function buildPort(g, rng, animated) {
       if (rng() < 0.6) perchedGull(deck, x - out * Math.cos(yaw) * 1.4, top + 0.86, z + out * Math.sin(yaw) * 1.4, rng() * Math.PI * 2);
     }
     if (i % 7 === 1) perchedGull(deck, x + out * Math.cos(yaw) * 1.6, top + 0.9, z - out * Math.sin(yaw) * 1.6, yaw + Math.PI / 2 + (rng() - 0.5));
-    if (i % 6 === 3) lantern(deck, x - out * Math.cos(yaw) * 0.6, top, z + out * Math.sin(yaw) * 0.6);
+    if (i % 6 === 3) lantern(deck, x - out * Math.cos(yaw) * 0.6, top, z + out * Math.sin(yaw) * 0.6, { toward: [x + out * Math.cos(yaw), z - out * Math.sin(yaw)] });
     for (let k = 0; k < 2; k++) {
       const off = 2.5 + rng() * 1.6;
       const along = (rng() - 0.5) * len;
@@ -1023,7 +1043,8 @@ export function buildPort(g, rng, animated) {
     }
     if (i === 5 || i === 11 || i === 16) moorings.push([x - out * Math.cos(yaw) * 3.1, z + out * Math.sin(yaw) * 3.1, yaw]);
   }
-  // Along the mole: a bench facing the open sea, nets hung to dry between two poles, lobster
+  // Along the mole: a bench with its back to the parapet, looking across the harbour at the
+  // boats and the village, nets hung to dry between two poles, lobster
   // pots stacked against the parapet, and at its root a little shrine to the Madonna of the
   // sea, with flowers at her feet and a candle that burns all night.
   const alongMole = (t, side) => {
@@ -1032,9 +1053,9 @@ export function buildPort(g, rng, animated) {
     const yaw = Math.atan2(nx - x, nz - z);
     return { x: x + out * Math.cos(yaw) * side, z: z - out * Math.sin(yaw) * side, yaw };
   };
-  const seatAt = alongMole(0.2, 0.9);
+  const seatAt = alongMole(0.2, 0.75);
   const bench = at(new THREE.Group(), seatAt.x, 0.45, seatAt.z, deck);
-  bench.rotation.y = seatAt.yaw + (out * Math.PI) / 2;
+  bench.rotation.y = seatAt.yaw - (out * Math.PI) / 2;
   at(box(2.0, 0.12, 0.5, PAL.wood), 0, 0.5, 0, bench);
   at(box(2.0, 0.45, 0.08, PAL.wood), 0, 0.85, -0.24, bench);
   for (const dx of [-0.8, 0.8]) at(box(0.12, 0.5, 0.48, INK), dx, 0.25, 0, bench);
@@ -1423,8 +1444,8 @@ function furnishAgora(g, rng) {
     at(cyl(0.015, 0.015, 1.4, INK, 3), x, 9.2, z, g);
     at(ball(0.22, WARM_LIGHT, { glow: true }, 6, 5), x, 8.4, z, g);
   }
-  // A fountain.
-  const f = at(new THREE.Group(), -5, 0, -5, g);
+  // A fountain, between the tree and the ring of benches, in the gap between two of them.
+  const f = at(new THREE.Group(), Math.cos((4 * Math.PI) / 3) * 4.8, 0, Math.sin((4 * Math.PI) / 3) * 4.8, g);
   at(cyl(2, 2.1, 0.6, STONE, 18), 0, 0.3, 0, f);
   at(cyl(1.75, 1.75, 0.05, 0x9fe3d6, 18, { glow: true }), 0, 0.58, 0, f);
   at(cyl(0.25, 0.35, 1.6, STONE, 8), 0, 1.1, 0, f);
