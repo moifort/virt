@@ -88,10 +88,11 @@ export const estateWeight = (u, v) => smoothstep(ESTATE.r + 8, ESTATE.r - 4, Mat
 export const CLEARINGS = [{ x: VILLA.x, z: VILLA.z, r: VILLA.r + 3 }, { x: OBSERVATORY.x, z: OBSERVATORY.z, r: OBSERVATORY.r + 4 }];
 
 // The railway crosses the angle between the mountain (a) and the right-hand ridge (b) at a
-// constant level. Its station stands on a shelf cut into the mountain by the first tunnel:
+// constant level. Its station stands on a shelf cut into the mountain by the first tunnel, and
+// the track runs up to it in a cutting (`cut`, only ever dug, never filled):
 // `s` runs along the line from a, `l` across it (negative uphill).
 export const RAIL = { a: { u: 115, v: 39 }, b: { u: 45, v: 106 }, level: 44 };
-export const STATION = { s0: 14, s1: 39, yard: { s0: 14, s1: 33, l0: -13, l1: -3.5 } };
+export const STATION = { s0: 4, s1: 29, yard: { s0: 4, s1: 23, l0: -13, l1: -3.5 }, cut: { s0: 2, s1: 29, l0: -3.5, l1: 2.5 } };
 const railStart = { x: toX(RAIL.a.u, RAIL.a.v), z: toZ(RAIL.a.u, RAIL.a.v) };
 const railEnd = { x: toX(RAIL.b.u, RAIL.b.v), z: toZ(RAIL.b.u, RAIL.b.v) };
 const railLength = Math.hypot(railEnd.x - railStart.x, railEnd.z - railStart.z);
@@ -99,13 +100,13 @@ const railDir = { x: (railEnd.x - railStart.x) / railLength, z: (railEnd.z - rai
 const RAIL_LINE = [railStart.x, railStart.z, railEnd.x, railEnd.z];
 /** World position of a point given along (s) and across (l) the line. */
 export const railPoint = (s, l = 0) => ({ x: railStart.x + railDir.x * s - railDir.z * l, z: railStart.z + railDir.z * s + railDir.x * l });
-function stationYard(x, z) {
+/** How much a point lies within an area of the station given along and across the line. */
+function stationArea(x, z, y) {
   const s = (x - railStart.x) * railDir.x + (z - railStart.z) * railDir.z;
   const l = -(x - railStart.x) * railDir.z + (z - railStart.z) * railDir.x;
-  const y = STATION.yard;
   return smoothstep(y.s0 - 2.5, y.s0, s) * smoothstep(y.s1 + 2.5, y.s1, s) * smoothstep(y.l0 - 2.5, y.l0, l) * smoothstep(y.l1 + 2, y.l1, l);
 }
-for (const s of [18, 25, 32]) CLEARINGS.push({ ...railPoint(s, -8), r: 8 });
+for (const s of [8, 15, 22]) CLEARINGS.push({ ...railPoint(s, -8), r: 8 });
 
 /**
  * The estate is a patchwork of plots with wandering outlines. Each plot sets its terraces at
@@ -201,7 +202,8 @@ function landAt(x, z) {
   h += (VILLA.y - h) * smoothstep(VILLA.r + 4, VILLA.r + 0.5, Math.hypot(x - VILLA.x, z - VILLA.z));
   const summit = summitLevel();
   if (summit > -Infinity) h += (summit - h) * smoothstep(OBSERVATORY.r + 6, OBSERVATORY.r + 1, Math.hypot(x - OBSERVATORY.x, z - OBSERVATORY.z));
-  h += (RAIL.level - 0.05 - h) * stationYard(x, z);
+  h += (RAIL.level - 0.05 - h) * stationArea(x, z, STATION.yard);
+  h += Math.min(0, RAIL.level - 0.05 - h) * stationArea(x, z, STATION.cut);
   // On the open sides the land has sunk under the sea before the bounds of the map.
   const brink = Math.min(u - SQUARE.u0, v - SQUARE.v0) + (fbm(x * 0.05 + 8, z * 0.05, 2) - 0.5) * 8;
   return h + (-12 - h) * smoothstep(11, 2, brink);
