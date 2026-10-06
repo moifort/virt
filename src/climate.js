@@ -92,6 +92,8 @@ export class Climate {
     this.night = 0;
     this.daylight = 1;
     this.season = { autumn: 0, winter: 0, spring: 0, summer: 1 };
+    this.year = 0; // turn of the year, 0 at the summer solstice (see update)
+    this.calendar = null; // a passage of days under way (see travelDays)
     this.wind = new THREE.Vector2(0.7, 0.7);
     this._sun = new THREE.Color();
     this._shade = new THREE.Color();
@@ -150,6 +152,7 @@ export class Climate {
       this.offset = 0;
       this.override = 0;
       this.trip = null;
+      this.calendar = null;
     }
   }
 
@@ -177,9 +180,26 @@ export class Climate {
    * goes through the sunset on its way to the night and through the dawn on its way back.
    */
   travel(hour, seconds = 3) {
+    this.settle();
     const now = sunAt(new Date(Date.now() + this.offset), this.place.lat, this.place.lon);
     const ahead = (((hour - now.solarHours) % 24) + 24) % 24;
     this.trip = { from: this.offset, to: this.offset + ahead * 3_600_000, time: 0, seconds };
+  }
+
+  /**
+   * Lets the calendar run forward through `days` whole days over `seconds`, the hour of day
+   * kept: the leaves turn and the snow comes rather than snapping, and the sun stays put.
+   */
+  travelDays(days, seconds = 2.5) {
+    this.settle();
+    this.calendar = { from: this.offset, days, time: 0, seconds };
+  }
+
+  /** Ends any passage of time under way at once, so two of them never fight over the clock. */
+  settle() {
+    if (this.trip) this.offset = this.trip.to;
+    if (this.calendar) this.offset = this.calendar.from + Math.round(this.calendar.days) * DAY;
+    this.trip = this.calendar = null;
   }
 
   /** Whether it is night now, or will be at the end of the passage of time under way. */
@@ -202,6 +222,12 @@ export class Climate {
       trip.time = Math.min(trip.seconds, trip.time + dt);
       this.offset = trip.from + (trip.to - trip.from) * smooth(0, trip.seconds, trip.time);
       if (trip.time >= trip.seconds) this.trip = null;
+    }
+    if (this.calendar) {
+      const calendar = this.calendar;
+      calendar.time = Math.min(calendar.seconds, calendar.time + dt);
+      this.offset = calendar.from + Math.round(calendar.days * smooth(0, calendar.seconds, calendar.time)) * DAY;
+      if (calendar.time >= calendar.seconds) this.calendar = null;
     }
     const date = new Date(Date.now() + this.offset);
     const sun = sunAt(date, this.place.lat, this.place.lon);
@@ -254,6 +280,7 @@ export class Climate {
 
     // Seasons, by the calendar and the hemisphere: 0 at the summer solstice.
     const year = ((sun.dayOfYear - 172) / 365.24 + (this.place.lat < 0 ? 0.5 : 0) + 1) % 1;
+    this.year = year;
     const autumn = clamp01(Math.sin(year * 2 * Math.PI) * 1.4 - 0.2);
     const winter = clamp01(-Math.cos(year * 2 * Math.PI) * 1.4 - 0.2);
     const spring = clamp01(-Math.sin(year * 2 * Math.PI) * 1.4 - 0.2);

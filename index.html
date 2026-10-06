@@ -160,7 +160,145 @@
           translate: -6px 0;
         }
       }
+
+      /* The season switch (see season.js): a tree beside the sky strip, turning with the year. */
+      .season {
+        position: fixed;
+        top: 12px;
+        left: calc(50% + 40px);
+        z-index: 10;
+        width: 34px;
+        height: 30px;
+        padding: 0;
+        border: 2px solid var(--ink);
+        border-radius: 15px;
+        overflow: hidden;
+        background: none;
+        box-shadow: 0 3px 0 var(--ink);
+        cursor: pointer;
+        transition: transform 0.12s, box-shadow 0.12s;
+      }
+      .season:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 0 var(--ink);
+      }
+      .season:active {
+        transform: translateY(2px);
+        box-shadow: 0 1px 0 var(--ink);
+      }
+      .season:focus-visible {
+        outline: 2px solid var(--paper);
+        outline-offset: 2px;
+      }
+      .season span,
+      .season i {
+        position: absolute;
+        display: block;
+      }
+      .season-sky {
+        inset: 0;
+        background: #8fd6f6;
+        transition: background 0.8s;
+      }
+      .is-autumn .season-sky {
+        background: #9fc8e8;
+      }
+      .is-winter .season-sky {
+        background: #c4d6e6;
+      }
+      .season-ground {
+        left: 0;
+        right: 0;
+        bottom: 0;
+        height: 5px;
+        background: #7cc45a;
+        transition: background 0.8s;
+      }
+      .is-summer .season-ground {
+        background: #c9b85a;
+      }
+      .is-autumn .season-ground {
+        background: #c08a3e;
+      }
+      .is-winter .season-ground {
+        background: #f4f7fa;
+      }
+      .season-tree {
+        left: 50%;
+        bottom: 5px;
+        width: 0;
+        height: 0;
+      }
+      .season .trunk {
+        left: -2px;
+        bottom: 0;
+        width: 4px;
+        height: 9px;
+        background: #6b4a2b;
+      }
+      .season .branches {
+        left: -1px;
+        bottom: 9px;
+        width: 2px;
+        height: 2px;
+        background: #6b4a2b;
+        box-shadow: -2px -2px 0 #6b4a2b, 2px -2px 0 #6b4a2b, -4px -4px 0 #6b4a2b, 4px -4px 0 #6b4a2b, 0 -4px 0 #6b4a2b, 0 -6px 0 #6b4a2b, -6px -6px 0 #6b4a2b, 6px -6px 0 #6b4a2b, -2px -8px 0 #6b4a2b, 2px -8px 0 #6b4a2b;
+        opacity: 0;
+        transition: opacity 0.6s;
+      }
+      .season .crown {
+        left: -8px;
+        bottom: 7px;
+        width: 16px;
+        height: 13px;
+        border-radius: 50% 50% 45% 45%;
+        background: #8fd36a;
+        box-shadow: inset -3px -3px 0 rgba(0, 0, 0, 0.14);
+        transition: background 0.8s, opacity 0.6s, transform 0.6s;
+      }
+      .is-summer .crown {
+        background: #3f8f3a;
+      }
+      .is-autumn .crown {
+        background: #e07a2a;
+      }
+      .is-winter .crown {
+        opacity: 0;
+        transform: scale(0.6);
+      }
+      .is-winter .branches {
+        opacity: 1;
+      }
+      .season .bloom {
+        left: -6px;
+        bottom: 12px;
+        width: 2px;
+        height: 2px;
+        background: #ffb3c7;
+        box-shadow: 5px -3px 0 #ffb3c7, 9px 1px 0 #ffb3c7, 3px 4px 0 #fff0f4, 10px -4px 0 #fff0f4;
+        opacity: 0;
+        transition: opacity 0.6s;
+      }
+      .is-spring .bloom {
+        opacity: 1;
+      }
+      .season .snowcap {
+        left: -7px;
+        bottom: 14px;
+        width: 14px;
+        height: 3px;
+        border-radius: 2px;
+        background: #ffffff;
+        box-shadow: -2px 4px 0 -1px #ffffff, 4px 3px 0 -1px #ffffff;
+        opacity: 0;
+        transition: opacity 0.6s;
+      }
+      .is-winter .snowcap {
+        opacity: 1;
+      }
       @media (prefers-reduced-motion: reduce) {
+        .season *,
+        .season,
         .daynight *,
         .daynight {
           animation: none !important;
