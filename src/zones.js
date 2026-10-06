@@ -511,21 +511,60 @@ export function sunFlower(rng) {
   return g;
 }
 
-/** Small wooden fishing boat (gozzo). */
+/**
+ * A gozzo, the little wooden boat of every Ligurian harbour: a round-bilged hull drawn out
+ * long, a stem and stern post standing up at the ends, a white rubbing strake all round, a
+ * planked deck with two thwarts, a pair of oars shipped along the gunwale, a rudder, a coil
+ * of rope and a buoy. Some carry a lateen sail on a long yard.
+ */
 export function gozzo(rng, sail = false) {
   const g = new THREE.Group();
-  const color = pick(rng, [PAL.blue, PAL.red, PAL.saffron, PAL.teal, PAL.coral, PAL.ivory]);
-  const hull = at(solid(new THREE.SphereGeometry(1, 14, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), paint(color, { doubleSide: true })), 0, 0.35, 0, g);
-  hull.scale.set(0.9, 0.7, 2.3);
-  at(box(1.75, 0.08, 0.25, PAL.ivory), 0, 0.37, 0, g);
-  at(box(1.5, 0.06, 3.6, PAL.wood), 0, 0.3, 0, g);
-  at(box(1.5, 0.12, 0.3, PAL.wood), 0, 0.45, -0.6, g);
+  const color = pick(rng, [PAL.blue, PAL.red, PAL.saffron, PAL.teal, PAL.coral, PAL.ivory, 0x2f6f8f, 0x4f9a50, 0xe8873a]);
+  const trim = color === PAL.ivory ? PAL.blue : PAL.ivory;
+  const hull = at(solid(new THREE.SphereGeometry(1, 14, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), paint(color, { doubleSide: true })), 0, 0.42, 0, g);
+  hull.scale.set(0.9, 0.8, 2.3);
+  // The strake at the gunwale and a darker boot-top at the waterline.
+  const strake = at(ring(1, 0.06, trim, Math.PI * 2, 28), 0, 0.42, 0, g);
+  strake.rotation.x = Math.PI / 2;
+  strake.scale.set(0.92, 2.32, 1);
+  const boot = at(ring(1, 0.04, 0x5a3a36, Math.PI * 2, 28), 0, 0.08, 0, g);
+  boot.rotation.x = Math.PI / 2;
+  boot.scale.set(0.83, 2.15, 1);
+  // Stem and stern posts, the bow the higher.
+  at(box(0.14, 0.55, 0.3, trim), 0, 0.6, 2.2, g).rotation.x = -0.35;
+  at(box(0.14, 0.4, 0.24, trim), 0, 0.52, -2.2, g).rotation.x = 0.3;
+  // Deck, thwarts, a rudder hung at the stern.
+  at(box(1.5, 0.06, 3.7, 0xb98a5a), 0, 0.3, 0, g);
+  for (const z of [-0.7, 0.6]) at(box(1.55, 0.1, 0.3, 0x9a6a48), 0, 0.44, z, g);
+  at(box(0.06, 0.6, 0.3, DARK_WOOD), 0, 0.15, -2.3, g);
+  // Oars shipped along the gunwale, a coil of rope in the bow, a buoy by the stern thwart.
+  for (const sx of [-0.56, 0.56]) {
+    at(cyl(0.03, 0.03, 2.9, 0xd9bb8a, 4), sx, 0.5, 0.3, g).rotation.x = Math.PI / 2;
+    at(box(0.1, 0.03, 0.5, 0xd9bb8a), sx, 0.5, -1.4, g);
+  }
+  at(ring(0.17, 0.05, PAL.cream, Math.PI * 2, 10), 0.28, 0.36, 1.4, g).rotation.x = Math.PI / 2;
+  at(ball(0.14, PAL.coral, {}, 6, 4), -0.42, 0.44, -1.1, g);
   if (sail) {
     at(cyl(0.05, 0.06, 3.4, PAL.wood, 5), 0, 2, 0.3, g);
+    const yard = at(cyl(0.03, 0.04, 4.2, PAL.wood, 4), 0.1, 2.9, 0.8, g);
+    yard.rotation.set(-0.95, 0, 0.05);
     const canvas = solid(new THREE.ConeGeometry(1.1, 2.8, 3), paint(PAL.ivory));
     canvas.scale.z = 0.08;
     at(canvas, 0.55, 2.1, 0.3, g);
   }
+  return g;
+}
+
+/** A gull at rest on a post or a rail, wings folded, looking out to sea. */
+export function perchedGull(parent, x, y, z, yaw = 0) {
+  const g = at(new THREE.Group(), x, y, z, parent);
+  g.rotation.y = yaw;
+  at(ball(0.26, 0xf4f2ee, { flat: true }, 6, 4), 0, 0.3, 0, g).scale.set(0.7, 0.65, 1.3);
+  at(box(0.42, 0.1, 0.56, 0xb9c0cc), 0, 0.42, -0.06, g);
+  at(box(0.14, 0.05, 0.26, INK), 0, 0.32, -0.5, g);
+  at(ball(0.15, 0xf4f2ee, { flat: true }, 5, 4), 0, 0.52, 0.3, g);
+  at(cone(0.045, 0.2, PAL.saffron, 4), 0, 0.5, 0.48, g).rotation.x = Math.PI / 2;
+  for (const s of [-1, 1]) at(cyl(0.02, 0.02, 0.2, PAL.saffron, 3), s * 0.07, 0.1, 0.05, g);
   return g;
 }
 
@@ -601,6 +640,7 @@ export function lighthouse(parent, x, y, z) {
   at(solid(new THREE.SphereGeometry(1.25, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), paint(PAL.red)), 0, top + 1.9, 0, g);
   at(cyl(0.06, 0.06, 1.2, INK, 4), 0, top + 3.4, 0, g);
   at(ball(0.22, PAL.saffron, { glow: true }, 6, 4), 0, top + 4.0, 0, g);
+  perchedGull(g, 1.2, top + 1.0, 1.15, 0.8);
 }
 
 /** A small fishmonger's stall: trestle table with ice and fish, striped awning, scales, sign. */
@@ -758,6 +798,8 @@ export function buildLighthouseWalk(scene, rng, animated) {
   lantern(g, -0.85, QUAY + 0.1, 18.6);
   at(cyl(0.14, 0.18, 0.7, INK, 6), 0.9, QUAY + 0.35, 18.4, g);
   at(ball(0.18, INK, {}, 6, 4), 0.9, QUAY + 0.72, 18.4, g);
+  perchedGull(g, 0.9, QUAY + 0.86, 18.4, 2.6);
+  perchedGull(g, -1.25, QUAY + 0.8, 12.4, -1.2);
   at(ring(0.3, 0.07, PAL.cream, Math.PI * 2, 10), 0.6, QUAY + 0.14, 11.6, g).rotation.x = Math.PI / 2;
   at(cyl(0.36, 0.36, 0.5, 0x5a6a7a, 8), -0.5, QUAY + 0.35, 10.6, g);
   at(ring(0.36, 0.03, PAL.saffron, Math.PI * 2, 10), -0.5, QUAY + 0.6, 10.6, g).rotation.x = Math.PI / 2;
@@ -801,6 +843,7 @@ export function buildLighthouseWalk(scene, rng, animated) {
   }
   lantern(stage, 22.2, DECK + 0.08, shore + 1.5);
   at(cyl(0.14, 0.18, 0.7, INK, 6), 19.9, DECK + 0.4, shore + 10.4, stage);
+  perchedGull(stage, 19.9, DECK + 0.75, shore + 10.4, 0.4);
   scene.add(bake(stage));
 }
 
@@ -905,7 +948,9 @@ export function buildPort(g, rng, animated) {
     if (i % 4 === 2) {
       at(cyl(0.14, 0.18, 0.7, INK, 6), x - Math.cos(yaw) * 1.4, top + 0.35, z + Math.sin(yaw) * 1.4, deck);
       at(ball(0.18, INK, {}, 6, 4), x - Math.cos(yaw) * 1.4, top + 0.72, z + Math.sin(yaw) * 1.4, deck);
+      if (rng() < 0.6) perchedGull(deck, x - Math.cos(yaw) * 1.4, top + 0.86, z + Math.sin(yaw) * 1.4, rng() * Math.PI * 2);
     }
+    if (i % 7 === 1) perchedGull(deck, x + Math.cos(yaw) * 1.6, top + 0.9, z - Math.sin(yaw) * 1.6, yaw + Math.PI / 2 + (rng() - 0.5));
     if (i % 6 === 3) lantern(deck, x - Math.cos(yaw) * 0.6, top, z + Math.sin(yaw) * 0.6);
     for (let k = 0; k < 2; k++) {
       const off = 2.5 + rng() * 1.6;
