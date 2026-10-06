@@ -63,8 +63,8 @@ export const zone = (id) => ZONES.find((z) => z.id === id);
 // far up the left-hand slopes (`up` stretches it uphill), and a hamlet on the right headland.
 // `bell` gives a village its campanile.
 export const VILLAGES = [
-  { u: HARBOUR_U + 10, v: leftShore(HARBOUR_U) + 26, r: 21, up: 1.5, bell: true, waterfront: true },
-  { u: -46, v: 84, r: 10 },
+  { u: HARBOUR_U + 10, v: leftShore(HARBOUR_U) + 26, r: 26, up: 1.5, bell: true, waterfront: true },
+  { u: -46, v: 84, r: 12 },
 ];
 const hub = { x: toX(VILLAGES[0].u, VILLAGES[0].v), z: toZ(VILLAGES[0].u, VILLAGES[0].v) };
 
@@ -296,7 +296,9 @@ function shelveShores() {
       const x = ix * CELL - HALF;
       const z = iz * CELL - HALF;
       if (!inSquare(x, z, -1.5)) continue;
-      const fall = 0.1 + headland(toV(x, z)) * 0.5 + (fbm(x * 0.03 + 17, z * 0.03 - 5, 2) - 0.5) * 0.04;
+      let fall = 0.1 + headland(toV(x, z)) * 0.5 + (fbm(x * 0.03 + 17, z * 0.03 - 5, 2) - 0.5) * 0.04;
+      // The harbour lies in the shallowest water of all: pale right out past the piers.
+      fall *= 1 - 0.55 * smoothstep(80, 30, Math.hypot(x - zone('port').x, z - zone('port').z));
       GRID[i] = Math.max(GRID[i], WATER_LEVEL - 0.5 - away[i] * fall);
     }
   }
