@@ -33,7 +33,8 @@ scene.add(sun, sun.target);
 
 const world = createWorld(scene);
 const player = new Player();
-player.position.set(2, groundAt(2, 20), 20);
+// He starts on the Agora, in front of the Arbre-Mère, clear of the groves around the square.
+player.position.set(2, groundAt(2, 8), 8);
 scene.add(player.root, player.fx);
 
 // Sitting down: the seat within reach, and the marker that points it out.
