@@ -4,6 +4,7 @@ import { mulberry32, pick } from './noise.js';
 import { PAL, WATER_LEVEL, paint, solid } from './style.js';
 import { DARK_WOOD, INK, SCREEN, STONE, WARM_LIGHT, at, bake, ball, box, cone, cyl, lamplight, lantern, live, plant, ring, screen, seat } from './kit.js';
 import { ISLET, OBSERVATORY, SUN_DIR, ZONES, groundAt, laneAt, lanePoint, toX, toZ, villagePlan } from './terrain.js';
+import { cypress, lemonTree } from './nature.js';
 
 /** Shelves of books along a wall. axis 'x' runs along x facing +z; axis 'z' runs along z facing +x. */
 export function bookshelf(parent, books, rng, { axis, from, to, at: fixed, y0, rows = 5, rowH = 1.18 }) {
@@ -692,69 +693,143 @@ function mussels(parent, rng, x, z, radius = 0.17) {
 }
 
 /**
- * The observatory on the summit: a whitewashed round tower under a copper dome gone green,
- * its slit open to the sky with the telescope looking out of it, on a flagged terrace with a
- * low parapet, a bench to sit on through the night and a lantern by the door.
+ * The observatory on the summit, grown over the years into a little compound, nothing about it
+ * symmetrical: the whitewashed round tower under its copper dome gone green, set to one side of
+ * a flagged upper terrace behind a dry-stone parapet, its slit open to the sky with the
+ * telescope looking out of it; the astronomers' house built on to the tower's side, two
+ * storeys under a flat roof with a pergola over one end and a small second dome on a drum over
+ * the other; and a lower terrace cut into the gentler slope a flight of steps down, with a
+ * bench for the night, a pair of telescopes on the parapet, a cistern, a tool shed and a lemon
+ * tree. The trail to the station leaves the lower terrace; a goat track leaves the upper one.
  */
 export function buildObservatory(scene, rng) {
   const g = new THREE.Group();
   const y = groundAt(OBSERVATORY.x, OBSERVATORY.z);
   g.position.set(OBSERVATORY.x, y, OBSERVATORY.z);
   const R = OBSERVATORY.r;
+  const L = OBSERVATORY.lower;
   const WHITE = 0xf3ebdd;
   const COPPER = 0x5f9a86;
-  // The terrace: flagstones in a ring, a parapet of dry stone, steps down to the path.
-  at(cyl(R, R + 0.4, 0.5, STONE, 20, { flat: true }), 0, 0.15, 0, g);
-  at(cyl(R + 0.5, R + 0.9, 0.7, 0xc9b99c, 20, { flat: true }), 0, -0.3, 0, g);
-  for (let k = 0; k < 20; k++) {
-    const a = (k / 20) * Math.PI * 2;
-    if (k === 5) continue; // the gap where the trail comes in
-    const wall = at(box(2.1, 0.7, 0.4, 0xd6c8ad), Math.cos(a) * (R - 0.2), 0.7, Math.sin(a) * (R - 0.2), g);
-    wall.rotation.y = -a;
-  }
-  // The tower and its dome.
-  at(cyl(3.1, 3.3, 5.2, WHITE, 16), 0, 3.0, 0, g);
-  at(cyl(3.5, 3.5, 0.3, 0xc9b99c, 16), 0, 0.55, 0, g);
-  at(cyl(3.4, 3.1, 0.3, WHITE, 16), 0, 5.6, 0, g);
-  at(ring(3.25, 0.12, COPPER, Math.PI * 2, 16), 0, 5.85, 0, g).rotation.x = Math.PI / 2;
-  const dome = at(ball(3.2, COPPER, { flat: true }, 16, 8), 0, 5.8, 0, g);
+  const DRY = 0xd6c8ad;
+  const stairAngle = Math.atan2(L.dz, L.dx);
+  const near = (a, b, tol) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b))) < tol;
+  /** A ring of dry-stone wall at `radius`, left open where `skip` says. */
+  const parapet = (parent, radius, count, skip) => {
+    for (let k = 0; k < count; k++) {
+      const a = (k / count) * Math.PI * 2;
+      if (skip(a)) continue;
+      const wall = at(box((2 * Math.PI * radius) / count + 0.12, 0.7, 0.4, DRY), Math.cos(a) * (radius - 0.2), 0.7, Math.sin(a) * (radius - 0.2), parent);
+      wall.rotation.y = Math.PI / 2 - a;
+    }
+  };
+
+  // The upper terrace: flagstones, a parapet with a gap for the steps down and one for the
+  // goat track, a cistern by the house and two cypresses at the back.
+  at(cyl(R, R + 0.4, 0.5, STONE, 28, { flat: true }), 0, 0.15, 0, g);
+  at(cyl(R + 0.5, R + 0.9, 0.7, 0xc9b99c, 28, { flat: true }), 0, -0.3, 0, g);
+  parapet(g, R, 28, (a) => near(a, stairAngle, 0.2) || near(a, -Math.PI / 4, 0.14));
+  at(cyl(1.3, 1.4, 1.3, 0xc9b99c, 12), 6.2, 0.65, 2.6, g);
+  at(cyl(1.35, 1.35, 0.12, DARK_WOOD, 12), 6.2, 1.36, 2.6, g);
+  for (const [x, z] of [[-6.2, -4.4], [-4.6, -5.8]]) at(cypress(rng), x, 0.3, z, g).scale.setScalar(0.9 + rng() * 0.2);
+
+  // The tower, to one side, and its dome.
+  const tower = at(new THREE.Group(), -2.6, 0, -1.8, g);
+  at(cyl(3.6, 3.8, 6.4, WHITE, 18), 0, 3.5, 0, tower);
+  at(cyl(4.0, 4.0, 0.3, 0xc9b99c, 18), 0, 0.55, 0, tower);
+  at(cyl(3.9, 3.6, 0.3, WHITE, 18), 0, 6.8, 0, tower);
+  at(ring(3.75, 0.12, COPPER, Math.PI * 2, 18), 0, 7.05, 0, tower).rotation.x = Math.PI / 2;
+  const dome = at(ball(3.7, COPPER, { flat: true }, 18, 9), 0, 7.0, 0, tower);
   dome.scale.y = 0.9;
   for (let k = 0; k < 8; k++) {
     const a = (k / 8) * Math.PI * 2;
-    at(box(0.12, 2.6, 0.12, 0x4d8070), Math.cos(a) * 2.2, 7.6, Math.sin(a) * 2.2, g).rotation.set(-Math.sin(a) * 0.7, 0, Math.cos(a) * 0.7);
+    at(box(0.12, 3.0, 0.12, 0x4d8070), Math.cos(a) * 2.5, 9.1, Math.sin(a) * 2.5, tower).rotation.set(-Math.sin(a) * 0.7, 0, Math.cos(a) * 0.7);
   }
   // The slit, open, with the telescope tilted out of it toward the night sky.
-  const slit = at(new THREE.Group(), 0, 5.8, 0, g);
+  const slit = at(new THREE.Group(), 0, 7.0, 0, tower);
   slit.rotation.y = -0.6;
-  at(box(0.9, 3.2, 1.2, INK), 0, 1.6, 2.4, slit).rotation.x = -0.4;
-  const scope = at(new THREE.Group(), 0, 1.0, 1.0, slit);
+  at(box(1.0, 3.6, 1.3, INK), 0, 1.8, 2.8, slit).rotation.x = -0.4;
+  const scope = at(new THREE.Group(), 0, 1.1, 1.2, slit);
   scope.rotation.x = -0.9;
-  at(cyl(0.28, 0.34, 3.4, 0x8a8a96, 10), 0, 1.4, 0, scope);
-  at(cyl(0.36, 0.36, 0.3, INK, 10), 0, 3.2, 0, scope);
-  at(ring(0.3, 0.05, PAL.saffron, Math.PI * 2, 10), 0, 3.35, 0, scope);
-  // Door, a window band, the lantern by the door, a weathervane on the dome.
-  at(box(1.1, 2.3, 0.2, DARK_WOOD), 0, 1.15, 3.2, g);
-  at(box(1.3, 0.2, 0.3, 0xc9b99c), 0, 2.35, 3.2, g);
-  for (let k = 0; k < 6; k++) {
-    const a = 0.7 + (k / 6) * Math.PI * 1.6;
-    at(box(0.6, 0.9, 0.1, 0x3b3346), Math.sin(a) * 3.2, 3.9, Math.cos(a) * 3.2, g).rotation.y = a;
+  at(cyl(0.3, 0.38, 3.8, 0x8a8a96, 10), 0, 1.6, 0, scope);
+  at(cyl(0.4, 0.4, 0.3, INK, 10), 0, 3.6, 0, scope);
+  at(ring(0.34, 0.05, PAL.saffron, Math.PI * 2, 10), 0, 3.75, 0, scope);
+  // A door at the foot of the tower, a band of windows, the lantern, a weathervane.
+  at(box(1.1, 2.3, 0.2, DARK_WOOD), 0, 1.15, 3.7, tower);
+  at(box(1.3, 0.2, 0.3, 0xc9b99c), 0, 2.35, 3.7, tower);
+  for (let k = 0; k < 7; k++) {
+    const a = 0.9 + (k / 7) * Math.PI * 1.5;
+    at(box(0.6, 0.9, 0.1, 0x3b3346), Math.sin(a) * 3.7, 4.6, Math.cos(a) * 3.7, tower).rotation.y = a;
   }
-  lantern(g, 1.2, 0.5, 3.4);
-  at(cyl(0.04, 0.04, 1.2, INK, 5), 0, 9.3, 0, g);
-  at(box(0.7, 0.25, 0.03, PAL.red), 0.35, 9.7, 0, g);
-  // A bench on the terrace, facing out over the bay, and a pair of telescopes on the parapet.
-  const bench = at(new THREE.Group(), -4.2, 0.5, 3.4, g);
-  bench.rotation.y = Math.PI * 0.75;
+  lantern(tower, 1.4, 0.5, 3.9);
+  at(cyl(0.04, 0.04, 1.2, INK, 5), 0, 10.8, 0, tower);
+  at(box(0.7, 0.25, 0.03, PAL.red), 0.35, 11.2, 0, tower);
+
+  // The astronomers' house, built on to the tower: whitewash and green shutters, a stone
+  // string course, a flat roof with its parapet, the pergola over one end, the little dome on
+  // its drum over the other, a chimney, and a stone stair up the back wall to the roof.
+  const house = at(new THREE.Group(), 3.4, 0, -0.6, g);
+  const W = 7.4;
+  const D = 4.8;
+  const H = 5.4;
+  at(box(W, H, D, WHITE), 0, H / 2, 0, house);
+  at(box(W + 0.14, 0.6, D + 0.14, 0xc9b99c), 0, 0.3, 0, house);
+  at(box(W + 0.12, 0.14, D + 0.12, 0xe6dcc8), 0, 2.7, 0, house);
+  at(box(W + 0.3, 0.2, D + 0.3, 0xe6dcc8), 0, H + 0.1, 0, house);
+  for (const [x, z, sx, sz] of [[0, D / 2, W, 0.14], [0, -D / 2, W, 0.14], [W / 2, 0, 0.14, D], [-W / 2, 0, 0.14, D]]) at(box(sx + 0.1, 0.5, sz + 0.1, WHITE), x, H + 0.45, z, house);
+  const window = (x, yy, z) => {
+    at(box(0.8, 1.2, 0.08, 0xe6dcc8), x, yy, z, house);
+    at(box(0.62, 1.05, 0.1, 0x3b3346), x, yy, z + Math.sign(z) * 0.02, house);
+    for (const s of [-1, 1]) at(box(0.3, 1.05, 0.06, 0x4d7a62), x + s * 0.5, yy, z + Math.sign(z) * 0.04, house);
+  };
+  for (const x of [-2.4, 2.4]) window(x, 1.5, D / 2 + 0.02);
+  for (const x of [-2.4, -0.8, 0.8, 2.4]) window(x, 4.1, D / 2 + 0.02);
+  for (const x of [-2.4, -0.8, 0.8, 2.4]) for (const yy of [1.5, 4.1]) window(x, yy, -D / 2 - 0.02);
+  at(box(1.2, 2.2, 0.1, 0xe6dcc8), 0, 1.1, D / 2 + 0.02, house);
+  at(box(1.0, 2.1, 0.12, DARK_WOOD), 0, 1.05, D / 2 + 0.04, house);
+  at(box(1.6, 0.14, 0.9, STONE), 0, 0.07, D / 2 + 0.5, house);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) at(cyl(0.08, 0.08, 2.2, DARK_WOOD, 5), -1.6 + sx * 1.5, H + 1.3, sz * 1.5, house);
+  at(box(3.4, 0.08, 3.4, DARK_WOOD), -1.6, H + 2.4, 0, house);
+  for (let k = 0; k < 6; k++) at(ball(0.5, 0x5f8e4c, { leaf: true }, 6, 4), -1.6 + (rng() - 0.5) * 2.8, H + 2.55, (rng() - 0.5) * 2.8, house).scale.set(1.8, 0.5, 1.8);
+  at(cyl(1.5, 1.5, 1.4, WHITE, 14), 2.3, H + 0.9, 0, house);
+  at(ring(1.55, 0.08, COPPER, Math.PI * 2, 14), 2.3, H + 1.65, 0, house).rotation.x = Math.PI / 2;
+  at(ball(1.55, COPPER, { flat: true }, 14, 7), 2.3, H + 1.6, 0, house).scale.y = 0.85;
+  at(box(0.5, 1.4, 0.7, INK), 2.3, H + 2.3, 0.3, house).rotation.x = -0.5;
+  at(box(0.5, 1.2, 0.5, WHITE), -3.0, H + 0.8, -1.4, house);
+  for (let k = 0; k < 12; k++) at(box(0.9, 0.3, 0.5, STONE), -W / 2 + 0.6 + k * 0.5, 0.15 + k * 0.45, -D / 2 - 0.5, house);
+
+  // The steps down to the lower terrace.
+  const steps = Math.ceil(L.drop / 0.32);
+  for (let k = 0; k < steps; k++) {
+    const d = R + 0.3 + k * 0.34;
+    const step = at(box(2.4, 0.32, 0.4, STONE), Math.cos(stairAngle) * d, -0.16 - k * 0.32, Math.sin(stairAngle) * d, g);
+    step.rotation.y = Math.PI / 2 - stairAngle;
+  }
+
+  // The lower terrace: flagstones, its own parapet with a gap toward the steps and one where
+  // the trail leaves, the bench facing out over the bay, the telescopes, a lantern, the
+  // cistern, the shed and a lemon tree.
+  const lower = at(new THREE.Group(), L.dx, -L.drop, L.dz, g);
+  at(cyl(L.r, L.r + 0.4, 0.5, STONE, 22, { flat: true }), 0, 0.15, 0, lower);
+  at(cyl(L.r + 0.5, L.r + 1.0, 2.2, 0xc9b99c, 22, { flat: true }), 0, -1.05, 0, lower);
+  parapet(lower, L.r, 22, (a) => near(a, stairAngle + Math.PI, 0.26) || near(a, Math.PI / 2, 0.2));
+  const bench = at(new THREE.Group(), -1.6, 0.5, 2.6, lower);
   at(box(2.0, 0.14, 0.6, PAL.wood), 0, 0.5, 0, bench);
   at(box(2.0, 0.5, 0.1, PAL.wood), 0, 0.85, -0.28, bench);
   for (const dx of [-0.8, 0.8]) at(box(0.14, 0.5, 0.56, INK), dx, 0.25, 0, bench);
   for (const dx of [-0.5, 0.5]) seat(bench, dx, 0.57, 0, 0);
-  for (const a of [2.0, 3.6]) {
-    const stand = at(new THREE.Group(), Math.cos(a) * (R - 0.9), 0.5, Math.sin(a) * (R - 0.9), g);
+  for (const a of [0.1, 0.95]) {
+    const stand = at(new THREE.Group(), Math.cos(a) * (L.r - 0.9), 0.5, Math.sin(a) * (L.r - 0.9), lower);
     at(cyl(0.05, 0.08, 1.2, INK, 6), 0, 0.6, 0, stand);
     const eye = at(cyl(0.1, 0.14, 0.7, 0x8a8a96, 8), 0, 1.3, 0, stand);
     eye.rotation.set(Math.PI / 2 - 0.35, 0, -a + Math.PI / 2);
   }
+  lantern(lower, 2.6, 0.5, -3.2);
+  const shed = at(new THREE.Group(), -2.8, 0.5, -2.6, lower);
+  shed.rotation.y = 0.3;
+  at(box(2.6, 2.0, 2.2, 0xe4d9c2), 0, 1.0, 0, shed);
+  at(box(0.8, 1.5, 0.1, DARK_WOOD), 0.4, 0.75, 1.12, shed);
+  at(cone(2.1, 0.9, 0xbc6444, 4, { flat: true }), 0, 2.45, 0, shed).rotation.y = Math.PI / 4;
+  at(lemonTree(rng), 3.2, 0.4, 1.6, lower).scale.setScalar(0.75);
   scene.add(bake(g));
 }
 

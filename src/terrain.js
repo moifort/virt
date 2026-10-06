@@ -259,7 +259,9 @@ function villageClimb(u, v, x, z, inland) {
 }
 
 // The observatory stands on the summit, on a round terrace cut level into the crest.
-export const OBSERVATORY = { u: 166, v: 94, r: 7, x: toX(166, 94), z: toZ(166, 94) };
+export const OBSERVATORY = { u: 166, v: 94, r: 8.5, x: toX(166, 94), z: toZ(166, 94) };
+// A lower terrace a flight of steps down from the upper one, on the gentler side of the summit.
+OBSERVATORY.lower = { dx: -13.4, dz: 13.4, r: 5.5, drop: 4.2 };
 
 // Footpaths: from the agora to each work area, then the road from the library that comes into
 // the main village at the near end of its sea front.
@@ -271,7 +273,7 @@ export const PATHS = [...ZONES.slice(1, -1).map((z) => [0, 0, z.x, z.z]), [zone(
 export const ESTATE = { u: 84, v: 12, r: 30 };
 export const estateWeight = (u, v) => smoothstep(ESTATE.r + 8, ESTATE.r - 4, Math.hypot(u - ESTATE.u, v - ESTATE.v));
 /** Built sites kept clear of wild growth ({ x, z, r }); builders add their own. */
-export const CLEARINGS = [{ x: OBSERVATORY.x, z: OBSERVATORY.z, r: OBSERVATORY.r + 4 }, { x: ISLET.x, z: ISLET.z, r: 5.5 }];
+export const CLEARINGS = [{ x: OBSERVATORY.x, z: OBSERVATORY.z, r: OBSERVATORY.r + 4 }, { x: OBSERVATORY.x + OBSERVATORY.lower.dx, z: OBSERVATORY.z + OBSERVATORY.lower.dz, r: OBSERVATORY.lower.r + 3 }, { x: ISLET.x, z: ISLET.z, r: 5.5 }];
 
 // The railway crosses the angle between the mountain (a) and the right-hand ridge (b) at a
 // constant level, high enough that its station stands out on the flank, a little way from the
@@ -305,11 +307,11 @@ for (const s of [4, 11, 18]) CLEARINGS.push({ ...railPoint(STATION.s0 + s, -8), 
 // Nothing grows over the tunnel mouth and the cutting before the station.
 for (const [s, r] of [[-15, 9], [-5, 7], [6, 6], [16, 6]]) CLEARINGS.push({ ...railPoint(s, 0), r });
 
-// A single-file trail leaves the observatory terrace by the gap in its parapet and winds down
-// the mountainside in two long S-bends to the back of the station: a bare metre of packed
-// earth, wide enough for one walker.
+// A single-file trail leaves the observatory's lower terrace by the gap in its parapet and
+// winds down the mountainside in two long S-bends to the back of the station: a bare metre of
+// packed earth, wide enough for one walker.
 const TRAIL = (() => {
-  const from = { x: OBSERVATORY.x, z: OBSERVATORY.z + OBSERVATORY.r + 1.5 };
+  const from = { x: OBSERVATORY.x + OBSERVATORY.lower.dx, z: OBSERVATORY.z + OBSERVATORY.lower.dz + OBSERVATORY.lower.r + 1.5 };
   const to = railPoint(STATION.s0 + 12, -15);
   const dx = to.x - from.x;
   const dz = to.z - from.z;
@@ -464,7 +466,11 @@ function landAt(x, z) {
   // Work areas sit on level pads.
   for (const zn of ZONES) if (zn.id !== 'port') h += (0 - h) * smoothstep(zn.r + 7, zn.r + 1, Math.hypot(x - zn.x, z - zn.z));
   const summit = summitLevel();
-  if (summit > -Infinity) h += (summit - h) * smoothstep(OBSERVATORY.r + 6, OBSERVATORY.r + 1, Math.hypot(x - OBSERVATORY.x, z - OBSERVATORY.z));
+  if (summit > -Infinity) {
+    h += (summit - h) * smoothstep(OBSERVATORY.r + 6, OBSERVATORY.r + 1, Math.hypot(x - OBSERVATORY.x, z - OBSERVATORY.z));
+    const low = OBSERVATORY.lower;
+    h += (summit - low.drop - h) * smoothstep(low.r + 4, low.r + 0.8, Math.hypot(x - OBSERVATORY.x - low.dx, z - OBSERVATORY.z - low.dz));
+  }
   h += (RAIL.level - 0.05 - h) * stationArea(x, z, STATION.yard);
   h -= Math.max(0, h - (RAIL.level - 0.3)) * stationArea(x, z, CUTTING);
   h += Math.max(0, RAIL.level + 9 + (fbm(x * 0.05 + 4, z * 0.05 - 9, 2) - 0.5) * 4 - h) * spurAt(x, z);
