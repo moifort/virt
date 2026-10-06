@@ -944,6 +944,7 @@ export function buildPort(g, rng, animated) {
     const top = 0.45;
     at(box(3.8, top - bottom, len, BLOCK[i % 3]), x, (top + bottom) / 2, z, deck).rotation.y = yaw;
     at(box(3.9, 0.12, len, 0xa89c88), x, -0.52, z, deck).rotation.y = yaw;
+    at(box(3.2, 0.08, len, i % 2 ? 0xdcd2bc : 0xd3c8b1), x, top + 0.04, z, deck).rotation.y = yaw;
     at(box(0.6, 0.9, len, BLOCK[(i + 1) % 3]), x + Math.cos(yaw) * 1.6, top + 0.45, z - Math.sin(yaw) * 1.6, deck).rotation.y = yaw;
     if (i % 4 === 2) {
       at(cyl(0.14, 0.18, 0.7, INK, 6), x - Math.cos(yaw) * 1.4, top + 0.35, z + Math.sin(yaw) * 1.4, deck);
@@ -959,6 +960,50 @@ export function buildPort(g, rng, animated) {
     }
     if (i === 5 || i === 11 || i === 16) moorings.push([x - Math.cos(yaw) * 3.1, z + Math.sin(yaw) * 3.1, yaw]);
   }
+  // Along the mole: a bench facing the open sea, nets hung to dry between two poles, lobster
+  // pots stacked against the parapet, and at its root a little shrine to the Madonna of the
+  // sea, with flowers at her feet and a candle that burns all night.
+  const along = (t, side) => {
+    const [x, z] = mole(t);
+    const [nx, nz] = mole(t + 0.01);
+    const yaw = Math.atan2(nx - x, nz - z);
+    return { x: x + Math.cos(yaw) * side, z: z - Math.sin(yaw) * side, yaw };
+  };
+  const seatAt = along(0.2, 0.9);
+  const bench = at(new THREE.Group(), seatAt.x, 0.45, seatAt.z, deck);
+  bench.rotation.y = seatAt.yaw - Math.PI / 2;
+  at(box(2.0, 0.12, 0.5, PAL.wood), 0, 0.5, 0, bench);
+  at(box(2.0, 0.45, 0.08, PAL.wood), 0, 0.85, -0.24, bench);
+  for (const dx of [-0.8, 0.8]) at(box(0.12, 0.5, 0.48, INK), dx, 0.25, 0, bench);
+  for (const dx of [-0.5, 0.5]) seat(bench, dx, 0.56, 0, 0);
+  const netAt = along(0.5, -0.4);
+  const nets = at(new THREE.Group(), netAt.x, 0.45, netAt.z, deck);
+  nets.rotation.y = netAt.yaw;
+  for (const dz of [-1.8, 1.8]) at(cyl(0.06, 0.06, 2.4, PAL.wood, 4), 0, 1.2, dz, nets);
+  for (let k = 0; k < 6; k++) at(box(0.03, 0.03, 3.6, 0x6d8f8a), 0, 0.9 + k * 0.25, 0, nets);
+  for (let k = 0; k < 9; k++) at(box(0.03, 1.4, 0.03, 0x6d8f8a), 0, 1.5, -1.6 + k * 0.4, nets);
+  for (const [dz, dy] of [[-0.9, 0.3], [-0.9, 0.9], [0.1, 0.3]]) at(ball(0.07, PAL.coral, {}, 5, 4), 0.05, 0.9 + dy, dz, nets);
+  const potAt = along(0.72, 0.9);
+  for (const [dx, dz, dy] of [[0, 0, 0.28], [0.8, 0.1, 0.28], [0.4, 0.05, 0.84]]) {
+    at(cyl(0.38, 0.38, 0.55, 0x5a6a7a, 8), potAt.x + dx, 0.45 + dy, potAt.z + dz, deck);
+    at(ring(0.38, 0.03, PAL.saffron, Math.PI * 2, 10), potAt.x + dx, 0.45 + dy + 0.26, potAt.z + dz, deck).rotation.x = Math.PI / 2;
+  }
+  const shrineAt = along(0.04, 1.3);
+  const shrine = at(new THREE.Group(), shrineAt.x, 0.45, shrineAt.z, deck);
+  shrine.rotation.y = shrineAt.yaw + Math.PI / 2;
+  at(box(1.1, 1.7, 0.7, STONE), 0, 0.85, 0, shrine);
+  at(box(1.3, 0.14, 0.9, 0xc9b99c), 0, 1.75, 0, shrine);
+  at(box(1.3, 0.12, 0.9, 0xc9b99c), 0, 0.06, 0, shrine);
+  at(box(0.6, 0.9, 0.1, INK), 0, 0.95, 0.33, shrine);
+  at(cyl(0.3, 0.3, 0.1, INK, 12), 0, 1.4, 0.33, shrine).rotation.x = Math.PI / 2;
+  at(cone(0.17, 0.5, 0x4a86c2, 8), 0, 0.82, 0.3, shrine);
+  at(ball(0.09, PAL.skin, {}, 6, 4), 0, 1.12, 0.3, shrine);
+  at(ball(0.13, 0x4a86c2, {}, 6, 4), 0, 1.16, 0.26, shrine).scale.z = 0.6;
+  at(ball(0.08, WARM_LIGHT, { glow: true }, 5, 4), 0.2, 0.68, 0.38, shrine);
+  lamplight(shrine, 0.2, 0.7, 0.4, 2.6);
+  for (const [dx, c] of [[-0.35, PAL.pink], [0.4, PAL.red], [0.05, PAL.ivory]]) at(ball(0.1, c, {}, 5, 4), dx, 0.2, 0.52, shrine);
+  at(ball(0.16, 0x5a9050, { leaf: true }, 5, 4), 0, 0.16, 0.5, shrine).scale.set(2.6, 0.6, 0.8);
+
   const [hx, hz] = mole(1);
   at(cyl(2.8, 3.0, 0.6, BLOCK[0], 10, { flat: true }), hx, 0.5, hz, deck);
   const light = at(new THREE.Group(), hx, 0.8, hz, deck);
