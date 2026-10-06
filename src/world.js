@@ -2,10 +2,10 @@
 // Ghibli background is.
 import * as THREE from 'three';
 import { mulberry32 } from './noise.js';
-import { GLOBALS, PATH_COUNT, TRAIL_COUNT } from './style.js';
+import { GLOBALS, PATH_COUNT, TRACK_COUNT, TRAIL_COUNT } from './style.js';
 import { buildLife } from './life.js';
 import { buildNature } from './nature.js';
-import { GRID, HALF, PATHS, SEGMENTS, TRAILS, WORLD_SIZE, ZONES, buildSides, buildTerrain, buildWater } from './terrain.js';
+import { GRID, HALF, PATHS, SEGMENTS, TRACKS, TRAILS, WORLD_SIZE, ZONES, buildSides, buildTerrain, buildWater } from './terrain.js';
 import { buildEstate } from './estate.js';
 import { bake } from './kit.js';
 import { buildRailway } from './railway.js';
@@ -23,6 +23,8 @@ export function createWorld(scene) {
   for (let i = PATHS.length; i < PATH_COUNT; i++) GLOBALS.uPaths.value[i].set(1e4, 1e4, 1e4, 1e4);
   TRAILS.forEach((t, i) => GLOBALS.uTrails.value[i].set(...t));
   for (let i = TRAILS.length; i < TRAIL_COUNT; i++) GLOBALS.uTrails.value[i].set(1e4, 1e4, 1e4, 1e4);
+  TRACKS.forEach((t, i) => GLOBALS.uTracks.value[i].set(...t));
+  for (let i = TRACKS.length; i < TRACK_COUNT; i++) GLOBALS.uTracks.value[i].set(1e4, 1e4, 1e4, 1e4);
 
   const halfs = new Uint16Array(GRID.length);
   for (let i = 0; i < GRID.length; i++) halfs[i] = THREE.DataUtils.toHalfFloat(GRID[i]);

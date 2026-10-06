@@ -327,6 +327,31 @@ const TRAIL = (() => {
 /** The trail as segments [x0, z0, x1, z1]. */
 export const TRAILS = TRAIL.slice(1).map(([x, z], i) => [...TRAIL[i], x, z]);
 
+// A goat track, half the width of the trail: it leaves the upper terrace of the observatory by
+// a gap on its right, picks its way down the summit cone in short zigzags, then wanders left
+// across the whole face of the mountain above the railway and gives out in the grass over the
+// tunnel. Between its marks it is pushed a little off the straight line, as a path worn by
+// feet always is.
+const TRACK = (() => {
+  const marks = [[167.5, 104], [163, 108], [159, 103], [155, 107], [151, 101], [147, 105], [143, 100], [138, 92], [134, 80], [131, 68], [129, 56], [127, 44], [125, 34]];
+  const points = [];
+  marks.forEach(([u, v], i) => {
+    if (i === 0) return points.push([toX(u, v), toZ(u, v)]);
+    const [pu, pv] = marks[i - 1];
+    const du = u - pu;
+    const dv = v - pv;
+    const len = Math.hypot(du, dv);
+    for (let k = 1; k <= 3; k++) {
+      const t = k / 3;
+      const wobble = k < 3 ? (hash(i * 7 + k, 13) - 0.5) * 2.4 : 0;
+      points.push([toX(pu + du * t - (dv / len) * wobble, pv + dv * t + (du / len) * wobble), toZ(pu + du * t - (dv / len) * wobble, pv + dv * t + (du / len) * wobble)]);
+    }
+  });
+  return points;
+})();
+/** The goat track as segments [x0, z0, x1, z1]. */
+export const TRACKS = TRACK.slice(1).map(([x, z], i) => [...TRACK[i], x, z]);
+
 /**
  * The estate is a patchwork of plots with wandering outlines. Each plot sets its terraces at
  * its own level, so the shelves never line up from one plot to the next.
@@ -566,6 +591,7 @@ export function isWild(x, z, margin = 0, floor = WATER_LEVEL + 0.4) {
   for (const zn of ZONES) if (Math.hypot(x - zn.x, z - zn.z) < zn.r + 3 + margin) return false;
   for (const p of PATHS) if (segmentDistance(x, z, p) < 2.6 + margin) return false;
   for (const t of TRAILS) if (segmentDistance(x, z, t) < 1.1 + Math.max(0, margin)) return false;
+  for (const t of TRACKS) if (segmentDistance(x, z, t) < 0.6 + Math.max(0, margin)) return false;
   for (const c of CLEARINGS) if (Math.hypot(x - c.x, z - c.z) < c.r + margin) return false;
   const streets = villagePlan();
   if (streets) {

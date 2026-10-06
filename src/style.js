@@ -36,6 +36,8 @@ export const WATER_LEVEL = -1.6;
 export const PATH_COUNT = 16;
 // Single-file trails, a bare metre wide.
 export const TRAIL_COUNT = 24;
+// Goat tracks, half that.
+export const TRACK_COUNT = 40;
 
 const blank = new THREE.DataTexture(new Uint8Array([0]), 1, 1, THREE.RedFormat);
 blank.needsUpdate = true;
@@ -54,6 +56,7 @@ export const GLOBALS = {
   uCloud: { value: new THREE.Vector2() },
   uPaths: { value: Array.from({ length: PATH_COUNT }, () => new THREE.Vector4()) },
   uTrails: { value: Array.from({ length: TRAIL_COUNT }, () => new THREE.Vector4()) },
+  uTracks: { value: Array.from({ length: TRACK_COUNT }, () => new THREE.Vector4()) },
   // Terrain heightmap, so water knows its depth: (half size, size, texels per side).
   uHeight: { value: null },
   uHeightMap: { value: new THREE.Vector3(1, 2, 2) },
@@ -168,6 +171,7 @@ uniform vec4 uSeason;
 uniform vec2 uCloud;
 uniform vec4 uPaths[${PATH_COUNT}];
 uniform vec4 uTrails[${TRAIL_COUNT}];
+uniform vec4 uTracks[${TRACK_COUNT}];
 uniform vec4 uWet;
 uniform vec3 uWind;
 uniform vec3 uSkyTint;
@@ -314,6 +318,15 @@ vec3 terrainColor(vec3 w, vec3 n) {
     flat_ = fine > 0.8 ? ${lin(0xc4ae86)} : ${lin(0xd6c29a)};
     if (fine < 0.09) flat_ = STRATA[band] * 0.92;
     track = true;
+  }
+  // A goat track: a bare half metre of trodden earth threading through the grass, that keeps
+  // its line across the rock like the trail.
+  float goat = 1e3;
+  for (int i = 0; i < ${TRACK_COUNT}; i++) goat = min(goat, pxSegment(w.xz, uTracks[i]));
+  if (goat < 0.27 + (pxNoise(w.xz * 2.1) - 0.5) * 0.14) {
+    flat_ = fine > 0.78 ? ${lin(0xc7b28a)} : ${lin(0xd8c59d)};
+    track = true;
+    onTrail = true;
   }
 
   // As the ground steepens, stones show through the turf before the rock takes over.
