@@ -43,6 +43,8 @@ uniform float uLine;
 uniform float uLowSun;
 uniform vec3 uSun;
 uniform vec3 uMoon;
+uniform float uFlash;
+uniform vec3 uBolt;
 varying vec2 vUv;
 
 float hash1(float n) { return fract(sin(n * 12.9898) * 43758.5453); }
@@ -145,6 +147,17 @@ void main() {
     float gap = mix(1.05, 0.3, smoothstep(0.35, 1.0, uCloud)) + (1.0 - alt) * 0.1;
     if (sheet > gap) col = mix(col, uCloudTint, 0.6);
     if (sheet > gap + 0.07) col = mix(col, uCloudTint * 1.1, 0.6);
+    // Lightning: the clouds flare, and a jagged fork comes down out of them, branching once.
+    col += uFlash * 0.55;
+    if (uFlash > 0.3 && alt > uBolt.z) {
+      float x = uBolt.x * uRes.x / uRes.y + (noise2(vec2(alt * 9.0, uBolt.y)) - 0.5) * 0.16 + (noise2(vec2(alt * 38.0, uBolt.y + 5.0)) - 0.5) * 0.05;
+      float width = 0.0035 + 0.003 * smoothstep(uBolt.z, uBolt.z + 0.6, alt);
+      float off = abs(sky.x - x);
+      float branch = abs(sky.x - (x + (alt - uBolt.z - 0.08) * 0.7 + (noise2(vec2(alt * 30.0, uBolt.y + 9.0)) - 0.5) * 0.03));
+      bool fork = alt > uBolt.z + 0.08 && alt < uBolt.z + 0.3 && branch < width * 0.6;
+      if (off < width || fork) col = vec3(1.0, 1.0, 0.97);
+      else if (off < width * 6.0) col = mix(col, vec3(0.8, 0.82, 1.0), 0.4 * (1.0 - off / (width * 6.0)));
+    }
   } else {
     vec3 n = normalAt(vec2(0.0));
     vec2 taps[4] = vec2[4](vec2(1, 0), vec2(-1, 0), vec2(0, 1), vec2(0, -1));
@@ -222,6 +235,9 @@ void main() {
     }
   }
 
+  // The flash of the lightning lights the whole picture for an instant.
+  col = mix(col, vec3(0.96, 0.97, 1.05), uFlash * 0.62);
+
   // The grade of a Ghibli background in poster colour: pigments a little richer than life,
   // the dull ones most, and the darks lifted toward the clear blue of the air so nothing ever
   // goes to black and nothing yellows.
@@ -289,6 +305,8 @@ export class PixelRenderer {
         uLowSun: { value: 0 },
         uSun: { value: new THREE.Vector3() },
         uMoon: { value: new THREE.Vector3() },
+        uFlash: { value: 0 },
+        uBolt: { value: new THREE.Vector3() },
       },
       vertexShader: FULLSCREEN_VERTEX,
       fragmentShader: COMPOSITE_FRAGMENT,
@@ -348,6 +366,8 @@ export class PixelRenderer {
       u.uLowSun.value = weather.lowSun;
       if (weather.sun) u.uSun.value.copy(weather.sun);
       if (weather.moon) u.uMoon.value.copy(weather.moon);
+      u.uFlash.value = weather.flash ?? 0;
+      if (weather.bolt) u.uBolt.value.set(weather.bolt.x, weather.bolt.seed, weather.bolt.reach);
     }
 
     r.setRenderTarget(this.gbuffer);

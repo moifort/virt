@@ -102,6 +102,13 @@ export class Climate {
     this._soft = new THREE.Color();
     this.sunDir = new THREE.Vector3(0, 1, 0);
     this.lowSun = 0;
+    // The storm: how hard it blows and pours; the lightning, as a flash that lights the whole
+    // picture for an instant and the fork that made it.
+    this.storm = 0;
+    this.flash = 0;
+    this.nextBolt = 2;
+    this.reflash = 0;
+    this.bolt = { x: 0.5, seed: 0, reach: 0.3 };
 
     this.previewFromUrl();
     this.locate();
@@ -316,6 +323,24 @@ export class Climate {
     const from = ((this.override ? 225 : this.real.windFrom) * DEG) + drift;
     this.wind.set(0, 0).addScaledVector(NORTH_2D, -Math.cos(from)).addScaledVector(WEST_2D, Math.sin(from)).normalize();
 
+    // A storm is heavy rain in a strong wind. Every few seconds a bolt comes down: the picture
+    // flares, flickers once more, and the dark comes back.
+    this.storm = clamp01((rain - 0.6) * 2.5) * clamp01((wind - 0.7) * 3.3);
+    this.flash = Math.max(0, this.flash - dt * 6);
+    if (this.reflash > 0) {
+      this.reflash -= dt;
+      if (this.reflash <= 0) this.flash = 0.8;
+    }
+    if (this.storm > 0.3) {
+      this.nextBolt -= dt;
+      if (this.nextBolt <= 0) {
+        this.nextBolt = 2.5 + Math.random() * 6;
+        this.flash = 1;
+        this.reflash = 0.14 + Math.random() * 0.1;
+        this.bolt = { x: 0.1 + Math.random() * 0.8, seed: Math.random() * 100, reach: 0.12 + Math.random() * 0.4 };
+      }
+    } else this.nextBolt = 2;
+
     // Lamps: the street lanterns come on at dusk; windows light up one after the other through
     // the evening, and all but a few night owls are dark again in the small hours.
     const hour = sun.solarHours;
@@ -329,6 +354,7 @@ export class Climate {
     // No cloud shadows cross the ground: drifting patches read as the shadows of things moving.
     // A grey sky flattens the light instead (above) and greys the sea.
     GLOBALS.uOvercast.value = smooth(0.5, 1.2, cloud);
+    GLOBALS.uStorm.value = this.storm;
     GLOBALS.uSeason.value.set(autumn, winter, spring, snowCover);
     GLOBALS.uWet.value.set(this.wetness, this.puddles, rain, this.runoff);
     GLOBALS.uWind.value.set(this.wind.x, this.wind.y, wind);
@@ -346,6 +372,9 @@ export class Climate {
       wind: this.now.wind,
       night: this.night,
       lowSun: this.lowSun * (1 - this.now.cloud * 0.7),
+      storm: this.storm,
+      flash: this.flash,
+      bolt: this.bolt,
       cloudTint: this.cloudTint,
       cloudLight: this.cloudLight,
       // Leaves fall in autumn and petals in spring, on fair days only.

@@ -51,6 +51,8 @@ export const GLOBALS = {
   uNight: { value: 0 },
   // How grey the sky is, 0 to 1: the sea greys with it.
   uOvercast: { value: 0 },
+  // A storm on the sea: whitecaps, surf flung up the rocks, spray.
+  uStorm: { value: 0 },
   // Seasons: (autumn, winter, spring, snow cover), each 0 to 1.
   uSeason: { value: new THREE.Vector4() },
   uPaths: { value: Array.from({ length: PATH_COUNT }, () => new THREE.Vector4()) },
@@ -169,6 +171,7 @@ uniform vec3 uShadowTint;
 uniform float uGlow;
 uniform float uNight;
 uniform float uOvercast;
+uniform float uStorm;
 uniform vec4 uSeason;
 uniform vec4 uPaths[${PATH_COUNT}];
 uniform vec4 uTrails[${TRAIL_COUNT}];
@@ -395,12 +398,19 @@ vec3 waterColor(vec3 w) {
   float overcast = uOvercast;
   col = mix(col, uSkyTint * 0.8, 0.12 + overcast * 0.3);
 
-  // The swell: long broken crests running in to the shore.
+  // The swell: long broken crests running in to the shore. In a storm they come faster and
+  // closer, and break white all over the open sea.
   float shoreward = -(w.x + w.z) * 0.7071;
   float along = (w.x - w.z) * 0.7071;
-  float crest = sin(shoreward * 0.5 + pxNoise(vec2(along * 0.06, shoreward * 0.04)) * 7.0 + uTime * 0.55);
-  float broken = pxNoise(vec2(along * 0.25 + uTime * 0.08, shoreward * 0.6));
-  if (depth > 1.4 && crest > 0.955 && broken > 0.46) col = mix(col, ${lin(0xcdf2ee)}, 0.3 + uWind.z * 0.25);
+  float crest = sin(shoreward * 0.5 + pxNoise(vec2(along * 0.06, shoreward * 0.04)) * 7.0 + uTime * (0.55 + uStorm * 1.4));
+  float broken = pxNoise(vec2(along * 0.25 + uTime * (0.08 + uStorm * 0.3), shoreward * 0.6));
+  if (depth > 1.4 && crest > 0.955 - uStorm * 0.08 && broken > 0.46 - uStorm * 0.14) col = mix(col, ${lin(0xcdf2ee)}, 0.3 + uWind.z * 0.25 + uStorm * 0.3);
+  // In a storm the sea is torn into whitecaps between the crests, and the tops blow off in spray.
+  if (uStorm > 0.05 && depth > 1.4) {
+    float cap = pxNoise(vec2(along * 0.32 + uTime * 0.6, shoreward * 0.55 - uTime * 0.9)) * 0.7 + pxNoise(vec2(along * 0.9 - uTime * 0.4, shoreward * 1.3) + 5.0) * 0.3;
+    if (cap > 0.74 - uStorm * 0.1) col = mix(col, ${lin(0xdff6f2)}, uStorm * (0.5 + 2.5 * (cap - 0.7)));
+    if ((crest > 0.93 || cap > 0.7) && pxHash(floor(vec2(along * 1.3, shoreward * 2.1)) + floor(uTime * 4.0) * vec2(5.0, 11.0)) > 1.0 - uStorm * 0.3) col = ${lin(0xf7fbf2)};
+  }
   // Glitter: short dashes of light gathered in shoals where the sun strikes, gold when it is
   // low, silver under the moon.
   float dash = pxHash(floor(vec2(along * 1.1, shoreward * 4.3)) + floor(uTime * 2.5) * vec2(7.0, 3.0));
@@ -413,11 +423,17 @@ vec3 waterColor(vec3 w) {
   // Rain dimples the whole surface.
   if (uWet.z > 0.02 && pxRings(w.xz * 0.95, uWet.z * 0.3) > 0.3) col = mix(col, vec3(0.9, 0.95, 1.0), 0.4);
 
-  // Foam: a bright lip lapping on the shore, and the lace the last wave left behind it.
-  float swash = pxNoise(vec2(along * 0.2, uTime * 0.1));
-  float lap = 0.32 + 0.24 * sin(uTime * 1.2 + swash * 6.0);
+  // Foam: a bright lip lapping on the shore, and the lace the last wave left behind it. In a
+  // storm the surf runs far up the shallows and bursts in spray on the rocks and the breakwaters.
+  float swash = pxNoise(vec2(along * 0.2, uTime * (0.1 + uStorm * 0.5)));
+  float lap = 0.32 + 0.24 * sin(uTime * 1.2 + swash * 6.0) + uStorm * (0.45 + 0.4 * sin(uTime * 2.6 + swash * 9.0));
   if (depth < lap) col = ${lin(0xf7fbf2)};
-  else if (depth < lap + 0.75 && pxNoise(w.xz * 1.5 + vec2(0.0, uTime * 0.15)) > 0.62 + (depth - lap) * 0.3) col = mix(col, ${lin(0xf7fbf2)}, 0.7);
+  else if (depth < lap + 0.75 + uStorm * 0.9 && pxNoise(w.xz * 1.5 + vec2(0.0, uTime * (0.15 + uStorm * 0.6))) > 0.62 + (depth - lap) * (0.3 - uStorm * 0.18)) col = mix(col, ${lin(0xf7fbf2)}, 0.7);
+  if (uStorm > 0.05 && depth < 3.5) {
+    float burst = pxNoise(vec2(along * 0.12 + uTime * 0.3, shoreward * 0.3 - uTime * 1.1));
+    float spray = pxHash(grain + floor(uTime * 7.0) * vec2(3.0, 7.0));
+    if (burst > 0.62 && spray > 1.0 - uStorm * 0.45 * smoothstep(3.5, 0.3, depth)) col = ${lin(0xffffff)};
+  }
   return col;
 }
 #endif
@@ -554,6 +570,10 @@ if (pxLit > 0.5) {
 #ifdef GLOW
   pxCol = mix(pxCol, pxAlb * 1.5 + 0.06, uGlow);
 #endif
+#ifdef UNLIT
+  // Spray and foam: white whichever way the light falls, only a little dimmer after dark.
+  pxCol = pxAlb * (1.0 - 0.35 * uNight);
+#endif
 #ifdef WATER
   // Far out the water pales into the haze until nothing tells it from the sky.
   pxCol = mix(pxCol, uHaze, smoothstep(-190.0, -12.0, pxOffing));
@@ -602,15 +622,16 @@ gNormal = vec4(normal * 0.5 + 0.5, 1.0);
 `;
 
 const cache = new Map();
-const FLAGS = { terrain: 'TERRAIN', water: 'WATER', sway: 'SWAY', glow: 'GLOW', leaf: 'LEAF', blossom: 'BLOSSOM', deciduous: 'DECIDUOUS', roof: 'ROOF', wall: 'WALL', flow: 'FLOW', cascade: 'CASCADE', carriage: 'CARRIAGE' };
+const FLAGS = { terrain: 'TERRAIN', water: 'WATER', sway: 'SWAY', glow: 'GLOW', unlit: 'UNLIT', leaf: 'LEAF', blossom: 'BLOSSOM', deciduous: 'DECIDUOUS', roof: 'ROOF', wall: 'WALL', flow: 'FLOW', cascade: 'CASCADE', carriage: 'CARRIAGE' };
 
 /**
  * @param {number} color sRGB hex
- * @param {{terrain?: boolean, water?: boolean, sway?: boolean, glow?: boolean, leaf?: boolean, blossom?: boolean, deciduous?: boolean, roof?: boolean, wall?: boolean, flow?: boolean, cascade?: boolean, carriage?: boolean, flat?: boolean, doubleSide?: boolean, backSide?: boolean, vertexColors?: boolean, map?: THREE.Texture}} [opts]
+ * @param {{terrain?: boolean, water?: boolean, sway?: boolean, glow?: boolean, leaf?: boolean, blossom?: boolean, deciduous?: boolean, roof?: boolean, wall?: boolean, flow?: boolean, cascade?: boolean, carriage?: boolean, unlit?: boolean, flat?: boolean, doubleSide?: boolean, backSide?: boolean, vertexColors?: boolean, map?: THREE.Texture}} [opts]
  *   `leaf` is foliage (painted in clumps, rustling, evergreen unless `deciduous`), `blossom` an
  *   orchard crown that flowers and
  *   sheds, `roof` tiles, `wall` aged plaster, `flow` rain water running off a roof, `cascade` a
- *   stream or a waterfall, `carriage` the panes of a vehicle, all lit after dark wherever it goes.
+ *   stream or a waterfall, `carriage` the panes of a vehicle, all lit after dark wherever it goes,
+ *   `unlit` spray that stays white whichever way the light falls.
  */
 export function paint(color, opts = {}) {
   const { map, ...flags } = opts;
