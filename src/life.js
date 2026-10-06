@@ -26,8 +26,9 @@ function gull() {
   return { group: g, wings };
 }
 
-// Stretches of deep open water where the big animals show themselves, in (u, v).
-const OFFING = [[-84, -30], [-88, 20], [-80, 62], [-70, -70], [10, -128], [60, -132], [-90, -5]];
+// Stretches of deep open water where the big animals show themselves, in (u, v): well out to
+// sea, past the edge of the map in front of the bay and off to the left.
+const OFFING = [[-150, -40], [-162, 12], [-146, 58], [-140, -112], [-62, -186], [18, -192], [-172, -70]];
 const offing = (k) => OFFING[Math.floor(hash(k, 77) * OFFING.length)];
 
 /**
@@ -54,25 +55,26 @@ function whale(scale) {
 }
 
 /**
- * Whales: now and then a mother surfaces far out with her calf at her side. They show their
- * long backs, blow a few times, then she arches, lifts her flukes high and sounds, and the
- * little one follows her down. Then the sea is empty again for a good while.
+ * Whales: now and then a mother surfaces far out with her calf at her side. She is not there
+ * long: her back breaks the water, she blows a geyser of spray high into the air, blows once
+ * more, then arches, lifts her flukes and sounds, the little one after her. Then the sea is
+ * empty again for a good while.
  */
 function buildWhales(scene, animated) {
-  const BLOW = 6;
-  const EVERY = 95;
-  const SHOW = 28;
-  // One visit: rises, rolls at the surface, blows at `blows`, arches from `dive` on and lifts
-  // the flukes, then slides under from `sink`, flukes last.
+  const BLOW = 12;
+  const EVERY = 70;
+  const SHOW = 14;
+  // One visit: rises, rolls at the surface, arches from `dive` on and lifts the flukes, then
+  // slides under from `sink`, flukes last.
   const visit = (age, { body, tail }, lift, dive, sink, t) => {
-    const up = Math.min(1, age / 2.5) * (1 - Math.max(0, (age - dive - 2.5) / 4));
-    const arch = Math.min(1, Math.max(0, (age - dive) / 3.5));
-    const under = Math.min(1, Math.max(0, (age - sink) / 3.5));
-    body.position.y = -2.4 + up * (2.3 + lift) + Math.sin(t * 1.1 + dive) * 0.12 - under * 8;
+    const up = Math.min(1, age / 1.4) * (1 - Math.max(0, (age - dive - 2) / 3));
+    const arch = Math.min(1, Math.max(0, (age - dive) / 2.4));
+    const under = Math.min(1, Math.max(0, (age - sink) / 2.4));
+    body.position.y = -2.4 + up * (2.3 + lift) + Math.sin(t * 1.1 + dive) * 0.1 - under * 8;
     // Pitching about the head: the nose goes under and the tail stock comes up out of the
     // water, the flukes swinging on up until they stand clear.
-    body.rotation.x = arch * 0.32;
-    tail.rotation.x = arch * 1.0;
+    body.rotation.x = arch * 0.34;
+    tail.rotation.x = arch * 1.05;
   };
   const mother = whale(1);
   const calf = whale(0.5);
@@ -85,23 +87,28 @@ function buildWhales(scene, animated) {
   const p = new THREE.Vector3();
   const q = new THREE.Quaternion();
   const s = new THREE.Vector3();
-  // A column of mist thrown up from the blowhole, drifting and thinning: `at` is the blowhole
+  // The blow: a geyser of spray shot straight up from the blowhole in a moment, a tall white
+  // column that opens out at the top, hangs, drifts and thins away. `origin` is the blowhole
   // in the frame of the pair, `size` the animal's.
   const blow = (k, age, blows, origin, size, heading, g) => {
     let scale = 0.001;
+    const n = k % BLOW;
     for (const blown of blows) {
-      const life = (age - blown - k * 0.09) / 2.6;
+      const life = (age - blown - (n % 4) * 0.04) / 2.2;
       if (life < 0 || life > 1) continue;
-      const rise = Math.sqrt(life) * (3.2 + (k % 3) * 0.7) * size;
-      p.set(Math.sin(k * 2.4) * life * 0.9 * size, 0.5 * size + rise, Math.cos(k * 2.4) * life * 0.9 * size).add(origin).applyAxisAngle(UP, heading).add(g.position);
-      scale = (0.5 + life * 1.1) * Math.sin(Math.min(1, (1 - life) * 2.4) * Math.PI * 0.5) * size;
+      // Up fast, then slowing as the spray tops out; the higher drops fan out the most.
+      const height = (6.5 + (n % 3) * 1.2) * size;
+      const rise = height * (1 - (1 - Math.min(1, life * 2.2)) ** 3) * (n / BLOW * 0.6 + 0.4);
+      const fan = life * (0.4 + (n / BLOW) * 1.4) * size;
+      p.set(Math.sin(n * 2.4) * fan, 0.5 * size + rise, Math.cos(n * 2.4) * fan + life * 1.2 * size).add(origin).applyAxisAngle(UP, heading).add(g.position);
+      scale = (0.35 + life * 1.3) * (n / BLOW * 0.5 + 0.6) * Math.sin(Math.min(1, (1 - life) * 2.6) * Math.PI * 0.5) * size;
     }
     spout.setMatrixAt(k, m.compose(p, q, s.setScalar(scale)));
   };
   const motherBlowhole = new THREE.Vector3(0, 0, -1.0);
   const calfBlowhole = new THREE.Vector3(3.6, 0, -2.5 - 0.5);
   animated.push((t) => {
-    const clock = t + 55;
+    const clock = t + 40;
     const turn = Math.floor(clock / EVERY);
     const age = clock % EVERY;
     mother.g.visible = spout.visible = age < SHOW;
@@ -109,21 +116,22 @@ function buildWhales(scene, animated) {
     // Each visit somewhere else, on a new heading.
     const [u, v] = offing(turn * 2);
     const heading = hash(turn, 5) * Math.PI * 2;
-    const swum = age * 1.1 - 12;
+    const swum = age * 1.6 - 8;
     mother.g.position.set(toX(u, v) + Math.sin(heading) * swum, WATER_LEVEL, toZ(u, v) + Math.cos(heading) * swum);
     mother.g.rotation.y = heading;
-    visit(age, mother, 0, 19.5, 23.5, t);
-    // The calf comes up a moment after her, blows oftener and shallower, and sounds after her.
-    visit(Math.max(0, age - 1.2), calf, 0.5, 20.8, 24.5, t + 2);
-    for (let k = 0; k < BLOW; k++) blow(k, age, [3, 9.5, 16], motherBlowhole, 1, heading, mother.g);
-    for (let k = 0; k < BLOW; k++) blow(BLOW + k, age - 1.2, [4.5, 8.5, 12.5, 17], calfBlowhole, 0.5, heading, mother.g);
+    visit(age, mother, 0, 6.5, 8.5, t);
+    // The calf comes up a moment after her, blows smaller, and sounds after her.
+    visit(Math.max(0, age - 0.8), calf, 0.5, 7.2, 9.2, t + 2);
+    for (let k = 0; k < BLOW; k++) blow(k, age, [1.5, 4.6], motherBlowhole, 1, heading, mother.g);
+    for (let k = 0; k < BLOW; k++) blow(BLOW + k, age - 0.8, [2.2, 5.2], calfBlowhole, 0.55, heading, mother.g);
     spout.instanceMatrix.needsUpdate = true;
   });
 }
 
 /**
- * Dolphins: from time to time a school crosses the bay, leaping one after another in long
- * low arcs, and is gone.
+ * Dolphins: from time to time a school passes far out, quick as anything: each one shoots out
+ * of the water in a short arc and is back under in half a second, a burst of spray where it
+ * leaves the sea and where it goes in, then again a moment later, and the school is gone.
  */
 function buildDolphins(scene, animated) {
   const POD = 6;
@@ -136,29 +144,62 @@ function buildDolphins(scene, animated) {
     at(solid(new THREE.ConeGeometry(0.16, 0.42, 4), paint(0x5d6c80, { flat: true })), 0, 0.42, -0.1, g).rotation.x = -0.5;
     for (const s of [-1, 1]) at(ball(1, 0x5d6c80, {}, 5, 4), s * 0.24, 0, -1.35, g).scale.set(0.3, 0.06, 0.2);
     scene.add(g);
-    pod.push({ g, side: (i % 3) - 1 + (i % 2) * 0.4, back: Math.floor(i / 3) * 2.6 + (i % 2) * 1.1, phase: i * 1.9 });
+    pod.push({ g, side: (i % 3) - 1 + (i % 2) * 0.4, back: Math.floor(i / 3) * 3.2 + (i % 2) * 1.4, phase: hash(i, 41) });
   }
-  const EVERY = 64;
-  const SHOW = 30;
-  const SPEED = 5.5;
+  // Two bursts of spray for each: where it leaves the water and where it goes back in.
+  const spray = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.3, 0), paint(0xf4f9ff, { flat: true }), POD * 2);
+  spray.frustumCulled = false;
+  spray.castShadow = false;
+  scene.add(spray);
+  const m = new THREE.Matrix4();
+  const q = new THREE.Quaternion();
+  const sv = new THREE.Vector3();
+  const pv = new THREE.Vector3();
+  const EVERY = 52;
+  const SHOW = 18;
+  const SPEED = 10;
+  // Each dolphin leaps every `CYCLE` seconds and is out of the water for `AIR` of them.
+  const CYCLE = 1.5;
+  const AIR = 0.55;
   animated.push((t) => {
     const clock = t + 20;
     const pass = Math.floor(clock / EVERY);
     const age = clock % EVERY;
     const out = age < SHOW;
-    // Each pass starts from another stretch of water and runs along the shore one way or the other.
+    spray.visible = out;
+    // Each pass starts from another stretch of open water and runs along the coast one way or the other.
     const [u, v] = offing(pass * 3 + 1);
     const heading = (hash(pass, 31) < 0.5 ? 0.75 : 1.75) * Math.PI + (hash(pass, 9) - 0.5) * 0.7;
     const [dx, dz] = [Math.sin(heading), Math.cos(heading)];
-    for (const { g, side, back, phase } of pod) {
-      g.visible = out;
-      if (!out) continue;
-      const along = (age - SHOW / 2) * SPEED - back;
-      const arc = t * 2.3 + phase;
-      g.position.set(toX(u, v) + dx * along + dz * side * 1.6, WATER_LEVEL - 0.35 + Math.sin(arc) * 1.25, toZ(u, v) + dz * along - dx * side * 1.6);
-      // Nose up on the way out of the water, down on the way back in.
-      g.rotation.set(-Math.cos(arc) * 0.7, heading, 0, 'YXZ');
-    }
+    pod.forEach(({ g, side, back, phase }, i) => {
+      // Where it is along its way `ago` seconds back.
+      const spot = (ago) => {
+        const along = (age - ago - SHOW / 2) * SPEED - back;
+        return [toX(u, v) + dx * along + dz * side * 1.8, toZ(u, v) + dz * along - dx * side * 1.8];
+      };
+      // Each cycle starts as it goes back under; it breaks the surface again at CYCLE - AIR.
+      const tc = (age + phase * CYCLE) % CYCLE;
+      const flown = tc - (CYCLE - AIR);
+      const leaping = out && flown >= 0;
+      g.visible = leaping;
+      if (leaping) {
+        const k = flown / AIR;
+        const [x, z] = spot(0);
+        g.position.set(x, WATER_LEVEL - 0.3 + Math.sin(k * Math.PI) * 1.7, z);
+        // Nose up on the way out of the water, down on the way back in.
+        g.rotation.set(-Math.cos(k * Math.PI) * 0.9, heading, 0, 'YXZ');
+      }
+      // The spray: a puff where it broke out, and one where it went back in.
+      [flown, tc].forEach((since, slot) => {
+        const life = since / 0.45;
+        const show = out && life >= 0 && life < 1;
+        const [x, z] = spot(Math.max(0, since));
+        pv.set(x, WATER_LEVEL + (show ? life * 0.5 : -5), z);
+        sv.setScalar(show ? (0.5 + life * 1.1) * Math.sin((1 - life) * Math.PI * 0.5) : 0.001);
+        spray.setMatrixAt(i * 2 + slot, m.compose(pv, q, sv));
+      });
+    });
+    spray.instanceMatrix.needsUpdate = true;
   });
 }
 
