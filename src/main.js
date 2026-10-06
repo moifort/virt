@@ -49,7 +49,7 @@ if (params.has('at')) {
 }
 if (params.has('zoom')) view.viewHeight = Number(params.get('zoom'));
 if (params.has('yaw')) view.yaw = (Number(params.get('yaw')) * Math.PI) / 2;
-globalThis.virt = { climate, player, view, scene };
+globalThis.virt = { climate, player, view, scene, sun, renderer, pixels };
 
 function resize() {
   pixels.setSize(innerWidth, innerHeight);
@@ -127,6 +127,9 @@ const focus = new THREE.Vector3();
 const ahead = new THREE.Vector2();
 const sunSpot = new THREE.Vector3();
 const moonSpot = new THREE.Vector3();
+// The axes of the shadow map in the world: across the light, as three.js lays the map out.
+const sunRight = new THREE.Vector3();
+const sunUp = new THREE.Vector3();
 let t = 0;
 
 renderer.setAnimationLoop(() => {
@@ -174,7 +177,19 @@ renderer.setAnimationLoop(() => {
     Object.assign(sun.shadow.camera, { left: -reach, right: reach, top: reach, bottom: -reach, far: 260 + reach });
     sun.shadow.camera.updateProjectionMatrix();
   }
+  // The shadow camera follows the view, but only by whole texels of its map, measured across
+  // the light: otherwise every slide of the view resamples the map on a shifted grid and the
+  // edges of the shadows crawl over the ground.
+  sunRight.set(0, 1, 0).cross(climate.lightDir).normalize();
+  sunUp.crossVectors(climate.lightDir, sunRight);
+  const shadowTexel = (2 * reach) / sun.shadow.mapSize.x;
+  const snap = (axis) => {
+    const along = sun.target.position.dot(axis);
+    sun.target.position.addScaledVector(axis, Math.round(along / shadowTexel) * shadowTexel - along);
+  };
   sun.target.position.copy(player.position).add(pan);
+  snap(sunRight);
+  snap(sunUp);
   sun.position.copy(sun.target.position).addScaledVector(climate.lightDir, 120 + reach * 0.5);
   // The road the low sun, or the moon, lays on the sea runs through the middle of the view.
   const level = Math.hypot(climate.lightDir.x, climate.lightDir.z) || 1;
