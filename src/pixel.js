@@ -3,7 +3,10 @@
 //  2. composite at that resolution: the painted sky, dark outlines on depth breaks, light rims
 //     on convex creases, the weather falling across the picture, ordered dithering onto a
 //     reduced palette,
-//  3. upscale with nearest sampling, shifting by the camera's sub-texel snap error for smooth motion.
+//  3. let the browser enlarge the canvas with nearest sampling (CSS `image-rendering: pixelated`),
+//     sliding it by the camera's sub-texel snap error for smooth motion.
+// The canvas holds the low-resolution picture itself: no full-resolution pass is drawn, and the
+// page hands the screen a few hundred thousand pixels a frame instead of millions.
 import * as THREE from 'three';
 
 const FULLSCREEN_VERTEX = /* glsl */ `
@@ -235,17 +238,6 @@ void main() {
   gl_FragColor = vec4(clamp(s, 0.0, 1.0), 1.0);
 }`;
 
-const UPSCALE_FRAGMENT = /* glsl */ `
-uniform sampler2D tImage;
-uniform vec2 uRes;
-uniform float uScale;
-uniform vec2 uOffset;
-void main() {
-  vec2 texel = gl_FragCoord.xy / uScale - uOffset;
-  vec2 uv = (floor(texel) + 0.5) / uRes;
-  gl_FragColor = texture2D(tImage, clamp(uv, 0.5 / uRes, 1.0 - 0.5 / uRes));
-}`;
-
 function fullscreen(material) {
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), material);
   mesh.frustumCulled = false;
@@ -266,7 +258,8 @@ export class PixelRenderer {
     const nearest = { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter };
     this.gbuffer = new THREE.WebGLRenderTarget(1, 1, { ...nearest, count: 2, type: THREE.HalfFloatType });
     this.gbuffer.depthTexture = new THREE.DepthTexture(1, 1);
-    this.image = new THREE.WebGLRenderTarget(1, 1, nearest);
+    // Where the canvas stands in the window, in CSS pixels, before the sub-texel slide.
+    this.origin = new THREE.Vector2();
 
     this.composite = new THREE.ShaderMaterial({
       uniforms: {
@@ -302,31 +295,22 @@ export class PixelRenderer {
       depthTest: false,
       depthWrite: false,
     });
-    this.upscale = new THREE.ShaderMaterial({
-      uniforms: {
-        tImage: { value: this.image.texture },
-        uRes: { value: this.lowRes },
-        uScale: { value: 1 },
-        uOffset: { value: this.offset },
-      },
-      vertexShader: FULLSCREEN_VERTEX,
-      fragmentShader: UPSCALE_FRAGMENT,
-      depthTest: false,
-      depthWrite: false,
-    });
     this.compositeScene = fullscreen(this.composite);
-    this.upscaleScene = fullscreen(this.upscale);
   }
 
+  /**
+   * The picture is as many art pixels as fit the window, and one more all round: the canvas
+   * slides by up to half of one as the camera moves, and the window's edges must stay covered.
+   */
   setSize(width, height) {
-    const dpr = Math.min(devicePixelRatio, 2);
-    this.renderer.setPixelRatio(dpr);
-    this.renderer.setSize(width, height);
-    const scale = this.pixelSize * dpr;
-    this.lowRes.set(Math.ceil((width * dpr) / scale), Math.ceil((height * dpr) / scale));
+    const size = this.pixelSize;
+    this.lowRes.set(Math.ceil(width / size) + 2, Math.ceil(height / size) + 2);
+    this.renderer.setPixelRatio(1);
+    this.renderer.setSize(this.lowRes.x, this.lowRes.y, false);
+    const style = this.renderer.domElement.style;
+    Object.assign(style, { position: 'fixed', left: '0', top: '0', willChange: 'transform', width: `${this.lowRes.x * size}px`, height: `${this.lowRes.y * size}px` });
+    this.origin.set((width - this.lowRes.x * size) / 2, (height - this.lowRes.y * size) / 2);
     this.gbuffer.setSize(this.lowRes.x, this.lowRes.y);
-    this.image.setSize(this.lowRes.x, this.lowRes.y);
-    this.upscale.uniforms.uScale.value = scale;
   }
 
   /**
@@ -370,14 +354,15 @@ export class PixelRenderer {
     r.setClearColor(0x000000, 0);
     r.clear();
     r.render(scene, camera);
-    r.setRenderTarget(this.image);
-    r.render(this.compositeScene, this.quadCamera);
     r.setRenderTarget(null);
-    r.render(this.upscaleScene, this.quadCamera);
+    r.render(this.compositeScene, this.quadCamera);
+    // The camera stands on whole texels; the picture slides by what that rounding took off.
+    const size = this.pixelSize;
+    this.renderer.domElement.style.transform = `translate(${this.origin.x + this.offset.x * size}px, ${this.origin.y - this.offset.y * size}px)`;
   }
 }
 
-/** Isometric orthographic camera locked to the texel grid; the snap error is handed to the upscaler. */
+/** Isometric orthographic camera locked to the texel grid; the snap error slides the canvas (see PixelRenderer). */
 export class PixelCamera {
   constructor() {
     this.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 1, 600);
