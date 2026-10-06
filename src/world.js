@@ -2,12 +2,12 @@
 // Ghibli background is.
 import * as THREE from 'three';
 import { mulberry32 } from './noise.js';
-import { GLOBALS, PATH_COUNT, TRACK_COUNT, TRAIL_COUNT } from './style.js';
+import { GLOBALS, PATH_COUNT, TRACK_COUNT, TRAIL_COUNT, WATER_LEVEL, paint } from './style.js';
 import { buildLife } from './life.js';
 import { buildNature } from './nature.js';
 import { GRID, HALF, PATHS, SEGMENTS, TRACKS, TRAILS, WORLD_SIZE, ZONES, buildSides, buildTerrain, buildWater, segmentDistance } from './terrain.js';
 import { buildEstate } from './estate.js';
-import { bake } from './kit.js';
+import { at, bake, live } from './kit.js';
 import { buildRailway } from './railway.js';
 import { buildVillages } from './village.js';
 import { buildAgora, buildAtelier, buildLibrary, buildLighthouseWalk, buildMoot, buildObservatory, buildPods, buildPort, buildPub } from './zones.js';
@@ -15,6 +15,46 @@ import { buildAgora, buildAtelier, buildLibrary, buildLighthouseWalk, buildMoot,
 export { LAND_ENDS, SUN_DIR, WATER_LEVEL, ZONES, groundAt, inSquare } from './terrain.js';
 
 // ---------------------------------------------------------------- World
+
+/**
+ * The beam of the lighthouse as a thing seen: a cone of warm light from the lantern, brightest
+ * at its root and thinning away, long enough to come down to the sea far out. Returns the pivot
+ * that turns it and the material that dims it.
+ */
+function lightCone(scene, lamp) {
+  const LENGTH = 160;
+  const REACH = 120; // where the axis of the cone meets the water
+  const geo = new THREE.ConeGeometry(9, LENGTH, 18, 1, true);
+  const pos = geo.attributes.position;
+  const colors = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i++) {
+    // From the tip (y = +LENGTH / 2) to the base: warm and bright, then dim.
+    const k = 0.5 + pos.getY(i) / LENGTH;
+    colors.set([0.12 + 0.88 * k, 0.1 + 0.82 * k, 0.06 + 0.64 * k], i * 3);
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const material = paint(0xffffff, { unlit: true, volume: true, vertexColors: true, doubleSide: true });
+  material.transparent = true;
+  material.blending = THREE.AdditiveBlending;
+  material.depthWrite = false;
+  material.opacity = 0;
+  const cone = new THREE.Mesh(geo, material);
+  cone.castShadow = cone.receiveShadow = false;
+  cone.frustumCulled = false;
+  // Drawn after the sea, which is translucent too and would otherwise paint over it.
+  cone.renderOrder = 10;
+  // Tip at the lantern, base far out along +x, then leaned down toward the water; the pivot turns it.
+  cone.rotation.z = Math.PI / 2;
+  cone.position.x = LENGTH / 2;
+  const lean = at(new THREE.Group(), 0, 0, 0);
+  lean.rotation.z = -Math.atan2(lamp.y - WATER_LEVEL, REACH);
+  lean.add(cone);
+  const pivot = live(new THREE.Group());
+  pivot.position.copy(lamp);
+  pivot.add(lean);
+  scene.add(pivot);
+  return { pivot, material };
+}
 
 export function createWorld(scene) {
   const rng = mulberry32(20261005);
@@ -60,14 +100,24 @@ export function createWorld(scene) {
   buildLife(scene, rng, animated);
   buildRailway(scene, animated);
   GLOBALS.uLampMap.value = lampMap(scene);
-  // The lighthouse turns its beam once every quarter of a minute, as long as the lamps are lit.
+  // The lighthouse turns its beam once every quarter of a minute, as long as the lamps are lit:
+  // a long cone of light from the lantern room, leaning down to the sea, and the pool it lays
+  // on the water out where it comes down (see `uBeam` in style.js).
   scene.updateMatrixWorld(true);
+  let beacon = null;
   scene.traverse((obj) => {
-    if (!obj.userData.beacon) return;
-    const lamp = obj.getWorldPosition(new THREE.Vector3());
-    GLOBALS.uBeam.value.set(lamp.x, lamp.z, 0, 0);
+    if (obj.userData.beacon) beacon = obj.getWorldPosition(new THREE.Vector3());
   });
-  animated.push((t) => GLOBALS.uBeam.value.setZ(t * 0.42).setW(GLOBALS.uLamps.value.x));
+  const beam = beacon ? lightCone(scene, beacon) : null;
+  animated.push((t) => {
+    const lit = GLOBALS.uLamps.value.x;
+    GLOBALS.uBeam.value.set(beacon?.x ?? 0, beacon?.z ?? 0, t * 0.42, lit);
+    if (beam) {
+      beam.pivot.rotation.y = -t * 0.42;
+      beam.material.opacity = 0.26 * lit;
+      beam.pivot.visible = lit > 0.01;
+    }
+  });
 
   // Every chair, bench and step that can be sat on: where, and which way it faces.
   const seats = [];

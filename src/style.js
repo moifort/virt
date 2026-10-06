@@ -605,7 +605,8 @@ if (uBeam.w > 0.01 && vWorld.y < 6.0) {
   vec2 pxAim = vec2(cos(uBeam.z), sin(uBeam.z));
   float pxOut = dot(pxTo, pxAim);
   float pxOff = abs(pxTo.x * pxAim.y - pxTo.y * pxAim.x);
-  if (pxOut > 4.0 && pxOut < 170.0 && pxOff < 1.5 + pxOut * 0.06) pxCol += (pxAlb * 0.5 + 0.02) * vec3(1.0, 0.92, 0.7) * uBeam.w * (pxOff < 0.6 + pxOut * 0.025 ? 0.9 : 0.4) * (1.0 - pxOut / 170.0);
+  // The pool begins where the cone from the lantern comes down to the water (see world.js).
+  if (pxOut > 30.0 && pxOut < 170.0 && pxOff < 1.5 + pxOut * 0.06) pxCol += (pxAlb * 0.5 + 0.02) * vec3(1.0, 0.92, 0.7) * uBeam.w * (pxOff < 0.6 + pxOut * 0.025 ? 0.9 : 0.4) * (1.0 - pxOut / 170.0) * smoothstep(30.0, 60.0, pxOut);
 }
 #ifdef FLOW
   // Rain water: gutters pour while it rains and drip long afterwards; when it freezes the
@@ -617,21 +618,27 @@ if (uBeam.w > 0.01 && vWorld.y < 6.0) {
   pxCol = pxIce ? vec3(0.8, 0.9, 1.0) * (0.5 + 0.5 * uSunTint) : mix(uSkyTint, vec3(1.0), 0.55) * (0.45 + 0.55 * uSunTint);
 #endif
 outgoingLight = pxCol;
-gNormal = vec4(normal * 0.5 + 0.5, 1.0);
+#ifdef VOLUME
+  // A volume of light added over the picture: it has no surface, so no normal to draw an edge on.
+  gNormal = vec4(0.0);
+#else
+  gNormal = vec4(normal * 0.5 + 0.5, 1.0);
+#endif
 #include <opaque_fragment>
 `;
 
 const cache = new Map();
-const FLAGS = { terrain: 'TERRAIN', water: 'WATER', sway: 'SWAY', glow: 'GLOW', unlit: 'UNLIT', leaf: 'LEAF', blossom: 'BLOSSOM', deciduous: 'DECIDUOUS', roof: 'ROOF', wall: 'WALL', flow: 'FLOW', cascade: 'CASCADE', carriage: 'CARRIAGE' };
+const FLAGS = { terrain: 'TERRAIN', water: 'WATER', sway: 'SWAY', glow: 'GLOW', unlit: 'UNLIT', volume: 'VOLUME', leaf: 'LEAF', blossom: 'BLOSSOM', deciduous: 'DECIDUOUS', roof: 'ROOF', wall: 'WALL', flow: 'FLOW', cascade: 'CASCADE', carriage: 'CARRIAGE' };
 
 /**
  * @param {number} color sRGB hex
- * @param {{terrain?: boolean, water?: boolean, sway?: boolean, glow?: boolean, leaf?: boolean, blossom?: boolean, deciduous?: boolean, roof?: boolean, wall?: boolean, flow?: boolean, cascade?: boolean, carriage?: boolean, unlit?: boolean, flat?: boolean, doubleSide?: boolean, backSide?: boolean, vertexColors?: boolean, map?: THREE.Texture}} [opts]
+ * @param {{terrain?: boolean, water?: boolean, sway?: boolean, glow?: boolean, leaf?: boolean, blossom?: boolean, deciduous?: boolean, roof?: boolean, wall?: boolean, flow?: boolean, cascade?: boolean, carriage?: boolean, unlit?: boolean, volume?: boolean, flat?: boolean, doubleSide?: boolean, backSide?: boolean, vertexColors?: boolean, map?: THREE.Texture}} [opts]
  *   `leaf` is foliage (painted in clumps, rustling, evergreen unless `deciduous`), `blossom` an
  *   orchard crown that flowers and
  *   sheds, `roof` tiles, `wall` aged plaster, `flow` rain water running off a roof, `cascade` a
  *   stream or a waterfall, `carriage` the panes of a vehicle, all lit after dark wherever it goes,
- *   `unlit` spray that stays white whichever way the light falls.
+ *   `unlit` spray that stays white whichever way the light falls, `volume` a translucent volume
+ *   of light added over the picture (with `unlit`), which draws no outline.
  */
 export function paint(color, opts = {}) {
   const { map, ...flags } = opts;
