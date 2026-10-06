@@ -7,6 +7,7 @@ import { dayNightSwitch } from './daynight.js';
 import { seasonSwitch } from './season.js';
 import { weatherSwitch } from './weather.js';
 import { LAND_ENDS, SQUARE, WATER_LEVEL, createWorld, groundAt, toX, toZ } from './world.js';
+import OPENING from '../assets/loading/opening.json' with { type: 'json' };
 
 const clamp = THREE.MathUtils.clamp;
 
@@ -62,10 +63,21 @@ if (params.has('at')) {
 }
 if (params.has('zoom')) view.viewHeight = Number(params.get('zoom'));
 if (params.has('yaw')) view.yaw = (Number(params.get('yaw')) * Math.PI) / 2;
+// The map opens on the shot blurred behind the loading screen (see shoot.js): the same
+// view, at the same hour and in the same weather, which then run on to the player's own. A view
+// or a moment asked for in the address bar takes its place.
+const opensOnShot = !['at', 'zoom', 'yaw', 'hour', 'day', 'weather', 'bench'].some((name) => params.has(name));
+if (opensOnShot) {
+  const { yaw, pitch, viewHeight } = OPENING.view;
+  Object.assign(view, { yaw, pitch, viewHeight });
+  climate.preview(OPENING.moment);
+}
 // The corners of the island's tile, at sea level and over the summit, for measuring how deep
 // into the view it runs.
 const ISLAND_CORNERS = [[SQUARE.u0, SQUARE.v0], [SQUARE.u0, SQUARE.v1], [SQUARE.u1, SQUARE.v0], [SQUARE.u1, SQUARE.v1]].flatMap(([u, v]) => [0, 120].map((y) => [toX(u, v), y, toZ(u, v)]));
 globalThis.virt = { climate, player, view, scene, sun, renderer, pixels, world };
+// `virt.shoot()` takes the view on screen as the loading screen's shot: see shoot.js.
+virt.shoot = () => import('./shoot.js').then((m) => m.shoot(virt));
 
 function resize() {
   pixels.setSize(innerWidth, innerHeight);
@@ -112,7 +124,7 @@ let yawTarget = view.yaw;
 let pitchTarget = view.pitch;
 let dragging = null; // 'pan' | 'orbit'
 let homing = false; // the view is on its way back to the avatar
-const pan = new THREE.Vector3();
+const pan = opensOnShot ? new THREE.Vector3(OPENING.view.pan[0], 0, OPENING.view.pan[1]) : new THREE.Vector3();
 renderer.domElement.addEventListener('pointerdown', (e) => {
   dragging = e.button === 2 || e.ctrlKey || e.metaKey || e.altKey ? 'orbit' : 'pan';
   homing = false;
@@ -296,11 +308,13 @@ function frame() {
   weather.slant = (climate.wind.x * view.right.x + climate.wind.y * view.right.z) * weather.wind;
   pixels.render(scene, view.camera, { skyTop: climate.skyTop, skyHorizon: climate.skyHorizon, texelWorld: view.texelWorld, time: t, weather });
   // The first frame compiles every shader; once the second is drawn the map runs, and the
-  // lighthouse of the loading screen (index.html) fades away over it.
+  // blurred shot of the loading screen (index.html) comes into focus on it as it fades away.
+  // Then the hour and the weather move on to the player's own.
   if (frames === 2) {
     const loading = document.getElementById('loading');
     loading?.classList.add('is-done');
-    setTimeout(() => loading?.remove(), 1000);
+    setTimeout(() => loading?.remove(), 1400);
+    if (opensOnShot) setTimeout(() => climate.rejoin(), 1600);
   }
 }
 // `virt.frame()` runs one frame by hand, for timing it while the page is hidden.

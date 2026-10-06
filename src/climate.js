@@ -179,6 +179,7 @@ export class Climate {
    * Jumps to a chosen moment instead of the real one: `hour` of the solar day (0–24), `day` of
    * the year (1–365), `weather` by name. The weather is set at once, as if it had lasted a while.
    * The same can be asked in the address bar: `?hour=21&day=172&weather=rain`.
+   * `weather` may also be a sky as `now` holds it, which then rolls back to the real one.
    */
   preview({ hour, day, weather } = {}) {
     const now = new Date(Date.now() + this.offset);
@@ -186,8 +187,8 @@ export class Climate {
     if (Number.isFinite(day)) this.offset += (day - Math.floor(current.dayOfYear)) * DAY;
     if (Number.isFinite(hour)) this.offset += (hour - current.solarHours) * 3_600_000;
     if (weather !== undefined) {
-      this.override = Math.max(0, WEATHERS.indexOf(weather));
-      const target = this.override ? PRESETS[WEATHERS[this.override]] : this.real;
+      if (typeof weather === 'string') this.override = Math.max(0, WEATHERS.indexOf(weather));
+      const target = typeof weather === 'object' ? weather : this.override ? PRESETS[WEATHERS[this.override]] : this.real;
       for (const name of ELEMENTS) this.now[name] = target[name];
       this.wetness = this.puddles = this.runoff = target.rain > 0.05 ? 1 : 0;
       this.snowLying = target.snow > 0.05 ? 0.85 : 0;
@@ -214,10 +215,36 @@ export class Climate {
     this.calendar = { from: this.offset, days, time: 0, seconds };
   }
 
+  /**
+   * Brings a previewed moment back to the player's own, as the map opens on the shot of the
+   * loading screen: the calendar runs to today the shortest way round the year, the hour kept,
+   * then the hours run forward to now, through the dusk or the dawn on the way. The weather
+   * rolls back to the real one meanwhile.
+   */
+  rejoin() {
+    this.settle();
+    this.override = 0;
+    // The hours only ever run forward: they start up to a day short of now.
+    const short = -((DAY - (((this.offset % DAY) + DAY) % DAY)) % DAY);
+    let days = Math.round((short - this.offset) / DAY);
+    days -= Math.round(days / 365) * 365;
+    const hours = { hours: -short / 3_600_000, seconds: 2 + (-short / 3_600_000) * 0.25 };
+    if (days) this.calendar = { from: this.offset, days, time: 0, seconds: 3, then: hours };
+    else this.homeward(hours);
+  }
+
+  /** The last leg of `rejoin`: the hours up to now, after which the clock is the real one again. */
+  homeward({ hours, seconds }) {
+    if (hours > 0) this.trip = { from: this.offset, to: this.offset + hours * 3_600_000, time: 0, seconds, home: true };
+    else this.offset = 0;
+  }
+
   /** Ends any passage of time under way at once, so two of them never fight over the clock. */
   settle() {
     if (this.trip) this.offset = this.trip.to;
     if (this.calendar) this.offset = this.calendar.from + Math.round(this.calendar.days) * DAY;
+    // Cut short on its way back to today, the clock is today's at once.
+    if (this.trip?.home || this.calendar?.then) this.offset = 0;
     this.trip = this.calendar = null;
   }
 
@@ -240,13 +267,20 @@ export class Climate {
       const trip = this.trip;
       trip.time = Math.min(trip.seconds, trip.time + dt);
       this.offset = trip.from + (trip.to - trip.from) * smooth(0, trip.seconds, trip.time);
-      if (trip.time >= trip.seconds) this.trip = null;
+      if (trip.time >= trip.seconds) {
+        this.trip = null;
+        // Back from a year away at most: the same day and hour, the clock simply the real one.
+        if (trip.home) this.offset = 0;
+      }
     }
     if (this.calendar) {
       const calendar = this.calendar;
       calendar.time = Math.min(calendar.seconds, calendar.time + dt);
       this.offset = calendar.from + Math.round(calendar.days * smooth(0, calendar.seconds, calendar.time)) * DAY;
-      if (calendar.time >= calendar.seconds) this.calendar = null;
+      if (calendar.time >= calendar.seconds) {
+        this.calendar = null;
+        if (calendar.then) this.homeward(calendar.then);
+      }
     }
     const date = new Date(Date.now() + this.offset);
     const sun = sunAt(date, this.place.lat, this.place.lon);
