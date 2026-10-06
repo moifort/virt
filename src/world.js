@@ -5,7 +5,7 @@ import { mulberry32 } from './noise.js';
 import { GLOBALS, PATH_COUNT, TRACK_COUNT, TRAIL_COUNT } from './style.js';
 import { buildLife } from './life.js';
 import { buildNature } from './nature.js';
-import { GRID, HALF, PATHS, SEGMENTS, TRACKS, TRAILS, WORLD_SIZE, ZONES, buildSides, buildTerrain, buildWater } from './terrain.js';
+import { GRID, HALF, PATHS, SEGMENTS, TRACKS, TRAILS, WORLD_SIZE, ZONES, buildSides, buildTerrain, buildWater, segmentDistance } from './terrain.js';
 import { buildEstate } from './estate.js';
 import { bake } from './kit.js';
 import { buildRailway } from './railway.js';
@@ -25,6 +25,7 @@ export function createWorld(scene) {
   for (let i = TRAILS.length; i < TRAIL_COUNT; i++) GLOBALS.uTrails.value[i].set(1e4, 1e4, 1e4, 1e4);
   TRACKS.forEach((t, i) => GLOBALS.uTracks.value[i].set(...t));
   for (let i = TRACKS.length; i < TRACK_COUNT; i++) GLOBALS.uTracks.value[i].set(1e4, 1e4, 1e4, 1e4);
+  GLOBALS.uWayMap.value = wayMap();
 
   const halfs = new Uint16Array(GRID.length);
   for (let i = 0; i < GRID.length; i++) halfs[i] = THREE.DataUtils.toHalfFloat(GRID[i]);
@@ -83,6 +84,35 @@ export function createWorld(scene) {
       for (const fn of animated) fn(t, dt, climate);
     },
   };
+}
+
+/**
+ * Where the ways run: a channel each for the footpaths, the trails and the goat tracks, set
+ * wherever one passes within reach. Away from them, which is most of the island, the ground
+ * shader is spared measuring its distance to every one of them.
+ */
+function wayMap() {
+  const SIZE = 1024;
+  const texel = WORLD_SIZE / SIZE;
+  const data = new Uint8Array(SIZE * SIZE * 4);
+  // The widest each kind is ever painted (see terrainColor), a whole texel to spare.
+  [[PATHS, 1.9], [TRAILS, 0.75], [TRACKS, 0.4]].forEach(([segments, width], channel) => {
+    const reach = width + texel;
+    for (const s of segments) {
+      const [ax, az, bx, bz] = s;
+      const lo = (a, b) => Math.max(0, Math.floor((Math.min(a, b) - reach + HALF) / texel));
+      const hi = (a, b) => Math.min(SIZE - 1, Math.ceil((Math.max(a, b) + reach + HALF) / texel));
+      for (let iz = lo(az, bz); iz <= hi(az, bz); iz++) {
+        for (let ix = lo(ax, bx); ix <= hi(ax, bx); ix++) {
+          if (segmentDistance((ix + 0.5) * texel - HALF, (iz + 0.5) * texel - HALF, s) < reach) data[(iz * SIZE + ix) * 4 + channel] = 255;
+        }
+      }
+    }
+  });
+  const map = new THREE.DataTexture(data, SIZE, SIZE, THREE.RGBAFormat);
+  map.minFilter = map.magFilter = THREE.NearestFilter;
+  map.needsUpdate = true;
+  return map;
 }
 
 /**

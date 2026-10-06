@@ -57,6 +57,9 @@ export const GLOBALS = {
   uPaths: { value: Array.from({ length: PATH_COUNT }, () => new THREE.Vector4()) },
   uTrails: { value: Array.from({ length: TRAIL_COUNT }, () => new THREE.Vector4()) },
   uTracks: { value: Array.from({ length: TRACK_COUNT }, () => new THREE.Vector4()) },
+  // Where a footpath, a trail or a goat track may pass, one per channel, laid out like the
+  // heightmap: the ground measures its distance to them only there.
+  uWayMap: { value: blank },
   // Terrain heightmap, so water knows its depth: (half size, size, texels per side).
   uHeight: { value: null },
   uHeightMap: { value: new THREE.Vector3(1, 2, 2) },
@@ -172,6 +175,7 @@ uniform vec2 uCloud;
 uniform vec4 uPaths[${PATH_COUNT}];
 uniform vec4 uTrails[${TRAIL_COUNT}];
 uniform vec4 uTracks[${TRACK_COUNT}];
+uniform sampler2D uWayMap;
 uniform vec4 uWet;
 uniform vec3 uWind;
 uniform vec3 uSkyTint;
@@ -300,8 +304,9 @@ vec3 terrainColor(vec3 w, vec3 n) {
   }
 
   // Footpaths between the work areas: trodden earth with pebbles, grass creeping in.
+  vec3 ways = texture2D(uWayMap, (w.xz + uHeightMap.x) / uHeightMap.y).rgb;
   float path = 1e3;
-  for (int i = 0; i < ${PATH_COUNT}; i++) path = min(path, pxSegment(w.xz, uPaths[i]));
+  if (ways.r > 0.5) for (int i = 0; i < ${PATH_COUNT}; i++) path = min(path, pxSegment(w.xz, uPaths[i]));
   float edge = 1.5 + (pxNoise(w.xz * 1.2) - 0.5) * 0.7;
   bool track = path < edge;
   if (track) {
@@ -312,7 +317,7 @@ vec3 terrainColor(vec3 w, vec3 n) {
   // A single-file trail: a bare metre of packed earth and loose stones, worn by walkers, that
   // keeps its line even across the rock.
   float trail = 1e3;
-  for (int i = 0; i < ${TRAIL_COUNT}; i++) trail = min(trail, pxSegment(w.xz, uTrails[i]));
+  if (ways.g > 0.5) for (int i = 0; i < ${TRAIL_COUNT}; i++) trail = min(trail, pxSegment(w.xz, uTrails[i]));
   bool onTrail = trail < 0.55 + (pxNoise(w.xz * 1.7) - 0.5) * 0.3;
   if (onTrail) {
     flat_ = fine > 0.8 ? ${lin(0xc4ae86)} : ${lin(0xd6c29a)};
@@ -322,7 +327,7 @@ vec3 terrainColor(vec3 w, vec3 n) {
   // A goat track: a bare half metre of trodden earth threading through the grass, that keeps
   // its line across the rock like the trail.
   float goat = 1e3;
-  for (int i = 0; i < ${TRACK_COUNT}; i++) goat = min(goat, pxSegment(w.xz, uTracks[i]));
+  if (ways.b > 0.5) for (int i = 0; i < ${TRACK_COUNT}; i++) goat = min(goat, pxSegment(w.xz, uTracks[i]));
   if (goat < 0.27 + (pxNoise(w.xz * 2.1) - 0.5) * 0.14) {
     flat_ = fine > 0.78 ? ${lin(0xc7b28a)} : ${lin(0xd8c59d)};
     track = true;
