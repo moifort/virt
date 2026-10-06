@@ -812,10 +812,12 @@ export function buildPort(g, rng, animated) {
   // Everything from the quay out is built on the low deck.
   const deck = at(new THREE.Group(), 0, DECK - 0.12, 0, g);
 
-  // A timber quay: a plank boardwalk carried on driven piles and faced with boards, with
-  // mooring posts and lamps. Everything in the harbour is wood.
-  for (let x = -22.5; x <= 22.5; x += 1.5) at(cyl(0.2, 0.24, 5.2, DARK_WOOD, 6), x, -2.3, Q + 1.35, deck);
-  for (let k = 0; k < 4; k++) at(box(45.2, 0.5, 0.12, TIMBER[k % 3]), 0, -0.3 - k * 0.56, Q + 1.15, deck);
+  // The quay: a wall of grey sandstone blocks standing in the water, laid course on course,
+  // with a plank boardwalk along the top, mooring posts and lamps. The decks and piers are
+  // wood; the quay, the mole and the slipway are stone, as in every harbour of the coast.
+  const BLOCK = [0xcdc2ab, 0xbcb09c, 0xd8cdb7];
+  for (let k = 0; k < 5; k++) at(box(45.4, 0.56, 0.5, BLOCK[k % 3]), 0, -0.3 - k * 0.56, Q + 1.25, deck);
+  for (let x = -22; x <= 22; x += 2.2) at(box(0.08, 2.8, 0.52, 0xa89c88), x + 0.4 * (Math.floor(x / 2.2) % 2), -1.4, Q + 1.26, deck);
   for (let x = -22.5; x < 22.5; x += 0.62) at(box(0.56, 0.14, 3.2, pick(rng, TIMBER)), x + 0.31, 0.12, Q - 0.2, deck);
   for (const z of [Q - 1.6, Q + 1.2]) at(box(45, 0.12, 0.2, DARK_WOOD), 0, 0.02, z, deck);
   for (let x = -21; x <= 21; x += 4.2) {
@@ -851,8 +853,76 @@ export function buildPort(g, rng, animated) {
     lantern(deck, px + 1.1, 0.13, Q + 18.6);
   }
 
-  // Moored boats along the piers, bobbing.
+  // The sea bed under a point of the harbour, in the deck's own frame.
+  const sin = Math.sin(g.rotation.y);
+  const cos = Math.cos(g.rotation.y);
+  const bedAt = (x, z) => groundAt(g.position.x + x * cos + z * sin, g.position.z - x * sin + z * cos) - (DECK - 0.12);
+  const BOULDER = [0xcfc3b0, 0xb9ad9c, 0xa99d8e];
+  const boulder = (x, y, z, r) => {
+    const rock = at(solid(new THREE.IcosahedronGeometry(r, 0), paint(pick(rng, BOULDER), { flat: true })), x, y, z, deck);
+    rock.rotation.set(rng() * 3, rng() * 3, rng() * 3);
+    rock.scale.y = 0.7;
+  };
+
+  // A stone mole shelters the harbour, as at Manarola: big blocks of sandstone running out
+  // from the right-hand end of the quay and curving round in front of the piers, a parapet
+  // on the weather side, boulders heaped at its foot, bollards along its lee and a little
+  // green light at its head. Boats lie moored in its shelter.
+  const mole = (t) => [24 - 15 * (1 - Math.cos(t * Math.PI * 0.5)), Q + 0.5 + 35 * Math.sin(t * Math.PI * 0.5)];
+  const SEGS = 22;
   const moorings = [];
+  for (let i = 0; i < SEGS; i++) {
+    const t = (i + 0.5) / SEGS;
+    const [x, z] = mole(t);
+    const [nx, nz] = mole(t + 0.01);
+    const [ax, az] = mole(i / SEGS);
+    const [bx, bz] = mole((i + 1) / SEGS);
+    const yaw = Math.atan2(nx - x, nz - z);
+    const len = Math.hypot(bx - ax, bz - az) + 0.2;
+    const bottom = bedAt(x, z) - 0.5;
+    const top = 0.45;
+    at(box(3.8, top - bottom, len, BLOCK[i % 3]), x, (top + bottom) / 2, z, deck).rotation.y = yaw;
+    at(box(3.9, 0.12, len, 0xa89c88), x, -0.52, z, deck).rotation.y = yaw;
+    at(box(0.6, 0.9, len, BLOCK[(i + 1) % 3]), x + Math.cos(yaw) * 1.6, top + 0.45, z - Math.sin(yaw) * 1.6, deck).rotation.y = yaw;
+    if (i % 4 === 2) {
+      at(cyl(0.14, 0.18, 0.7, INK, 6), x - Math.cos(yaw) * 1.4, top + 0.35, z + Math.sin(yaw) * 1.4, deck);
+      at(ball(0.18, INK, {}, 6, 4), x - Math.cos(yaw) * 1.4, top + 0.72, z + Math.sin(yaw) * 1.4, deck);
+    }
+    if (i % 6 === 3) lantern(deck, x - Math.cos(yaw) * 0.6, top, z + Math.sin(yaw) * 0.6);
+    for (let k = 0; k < 2; k++) {
+      const off = 2.5 + rng() * 1.6;
+      const along = (rng() - 0.5) * len;
+      boulder(x + Math.cos(yaw) * off + Math.sin(yaw) * along, -0.6 + rng() * 0.9, z - Math.sin(yaw) * off + Math.cos(yaw) * along, 0.6 + rng() * 0.7);
+    }
+    if (i === 5 || i === 11 || i === 16) moorings.push([x - Math.cos(yaw) * 3.1, z + Math.sin(yaw) * 3.1, yaw]);
+  }
+  const [hx, hz] = mole(1);
+  at(cyl(2.8, 3.0, 0.6, BLOCK[0], 10, { flat: true }), hx, 0.5, hz, deck);
+  const light = at(new THREE.Group(), hx, 0.8, hz, deck);
+  at(cyl(0.55, 0.78, 3.4, PAL.ivory, 10), 0, 1.7, 0, light);
+  at(cyl(0.7, 0.7, 0.5, 0x3f8a55, 10), 0, 2.3, 0, light);
+  at(cyl(0.46, 0.46, 0.6, 0x9ff0b0, 8, { glow: true }), 0, 3.7, 0, light);
+  for (let k = 0; k < 4; k++) at(box(0.06, 0.6, 0.06, INK), Math.cos((k / 4) * Math.PI * 2 + 0.4) * 0.46, 3.7, Math.sin((k / 4) * Math.PI * 2 + 0.4) * 0.46, light);
+  at(cone(0.62, 0.5, 0x3f8a55, 10), 0, 4.25, 0, light);
+  lamplight(light, 0, 3.7, 0, 7);
+  at(cyl(0.14, 0.18, 0.7, INK, 6), hx - 1.8, 1.15, hz, deck);
+
+  // A slipway on the left, where the boats are hauled up out of the water on rollers.
+  const SLIP = -15;
+  const lean = 0.2;
+  const rampAt = (z) => 0.3 - Math.tan(lean) * (z - (Q + 0.8));
+  const slip = at(box(4.6, 0.5, 10, 0xd3c7b0), SLIP, rampAt(Q + 5.8) - 0.25, Q + 5.8, deck);
+  slip.rotation.x = lean;
+  for (const sx of [-1, 1]) at(box(0.3, 0.7, 10, BLOCK[1]), SLIP + sx * 2.45, rampAt(Q + 5.8) - 0.1, Q + 5.8, deck).rotation.x = lean;
+  for (const [dx, z] of [[-1.15, Q + 2.6], [1.15, Q + 3.9], [-0.2, Q + 7.4]]) {
+    for (const dz of [-1.2, 1.2]) at(cyl(0.1, 0.1, 1.9, DARK_WOOD, 6), SLIP + dx, rampAt(z + dz) + 0.1, z + dz, deck).rotation.z = Math.PI / 2;
+    const boat = at(gozzo(rng), SLIP + dx, rampAt(z) + 0.2, z, deck);
+    boat.rotation.x = lean;
+    boat.rotation.y = Math.PI;
+  }
+  at(cyl(0.12, 0.16, 0.9, INK, 6), SLIP - 1.6, 0.45, Q + 0.4, deck);
+
+  // Moored boats along the piers and in the lee of the mole, bobbing.
   for (const px of [-9, 5]) for (const side of [-1, 1]) for (let k = 0; k < 3; k++) moorings.push([px + side * 2.6, Q + 4 + k * 5, (rng() - 0.5) * 0.2]);
   moorings.forEach(([x, z, yaw], i) => {
     const boat = at(live(gozzo(rng, i % 5 === 4)), x, surface, z, g);
