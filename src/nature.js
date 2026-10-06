@@ -470,15 +470,6 @@ export function buildNature(scene, rng) {
   grow(scene, rng, holmOak, { count: 12, variants: 3, margin: 1.5, maxSlope: 0.8, sample: onSpur });
   grow(scene, rng, maquis, { count: 40, variants: 4, margin: -1, maxSlope: 1.4, size: [0.7, 1.5], sample: onSpur });
   grow(scene, rng, broom, { count: 16, variants: 3, maxSlope: 1.1, size: [0.8, 1.3], sample: onSpur });
-  // The steep bank falling from the tunnel mouth and the cutting to the hollow under the
-  // viaduct: bare rock, but the maquis and the broom cling to it in clumps.
-  const onBank = (rng, p) => {
-    const spot = railPoint(SPUR_END - 10 + rng() * 22, 3 + rng() * 26);
-    p.set(spot.x, groundAt(spot.x, spot.z), spot.z);
-    return p;
-  };
-  grow(scene, rng, maquis, { count: 45, variants: 4, margin: -1, maxSlope: 1.6, size: [0.8, 1.6], sample: onBank });
-  grow(scene, rng, broom, { count: 20, variants: 3, maxSlope: 1.4, size: [0.8, 1.3], sample: onBank });
 
   // Shrubs: the maquis clings even to the steep slopes.
   grow(scene, rng, maquis, { count: 650, variants: 6, margin: -1, maxSlope: 1.4, size: [0.7, 1.5] });

@@ -13,7 +13,7 @@ import { pick, smoothstep } from './noise.js';
 import { PAL, WATER_LEVEL, paint } from './style.js';
 import { at, bake, lamplight, lantern, seat } from './kit.js';
 import { festoon, gozzo } from './zones.js';
-import { CLEARINGS, PATHS, SQUARE, VILLAGES, ZONES, cultivated, estateWeight, footU, groundAt, inSquare, isWild, laneAt, lanePoint, occupy, segmentDistance, slopeAt, toU, toV, toX, toZ, UP, villagePlan } from './terrain.js';
+import { CLEARINGS, PATHS, SQUARE, UP, VILLAGES, ZONES, bankAt, cultivated, estateWeight, footU, groundAt, inSquare, isWild, laneAt, lanePoint, occupy, segmentDistance, slopeAt, toU, toV, toX, toZ, villagePlan } from './terrain.js';
 
 const ballShape = new THREE.SphereGeometry(0.5, 8, 6);
 const boxShape = new THREE.BoxGeometry(1, 1, 1);
@@ -925,7 +925,7 @@ export function buildVillages(scene, rng, animated) {
       const z = toZ(u, v);
       // Vines grow wherever the mountain has been terraced for them.
       if (u < footU(v) + 1 || cultivated(u, v) < 0.6) continue;
-      if (estateWeight(u, v) > 0.25) continue; // the estate plants its own rows
+      if (estateWeight(u, v) > 0.25 || bankAt(x, z) > 0.3) continue; // the estate and the bank plant their own rows
       if (slopeAt(x, z) > 0.3 || !isWild(x, z, -1)) continue;
       if (placed.some((p) => Math.hypot(p.x - x, p.z - z) < 3 * SCALE)) continue;
       parts.at(new THREE.Vector3(x, groundAt(x, z), z), Math.PI / 4);

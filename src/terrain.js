@@ -340,7 +340,15 @@ export const SPUR_END = STATION.s0 - 10;
 export const CUTTING = { s0: SPUR_END, s1: STATION.s0 + 2, l0: -3.6, l1: 3.2 };
 export function spurAt(x, z) {
   const { s, l } = railCoords(x, z);
-  return smoothstep(SPUR_END - 1, SPUR_END - 7, s) * smoothstep(SPUR_END - 38, SPUR_END - 22, s) * smoothstep(l > 0 ? 38 : 27, 8, Math.abs(l));
+  // Away from the line, on the village side, the front of the spur falls away slowly instead
+  // of dropping into the hollow: a long bank the vines are terraced on (see `cultivated`).
+  const gentle = l > 0 ? smoothstep(5, 14, l) * 30 : 0;
+  return smoothstep(SPUR_END - 1 + gentle, SPUR_END - 7, s) * smoothstep(SPUR_END - 38, SPUR_END - 22, s) * smoothstep(l > 0 ? 38 : 27, 8, Math.abs(l));
+}
+/** The bank below the railway cutting, on the village side: terraced and planted with vines. */
+export function bankAt(x, z) {
+  const { s, l } = railCoords(x, z);
+  return smoothstep(SPUR_END - 10, SPUR_END - 4, s) * smoothstep(SPUR_END + 32, SPUR_END + 24, s) * smoothstep(4, 9, l) * smoothstep(40, 32, l);
 }
 for (const s of [4, 11, 18]) CLEARINGS.push({ ...railPoint(STATION.s0 + s, -8), r: 8 });
 // Nothing grows against the tunnel's headwall and its mound, nor in the cutting before the
@@ -416,7 +424,7 @@ export function cultivated(u, v) {
   const foot = footU(v, u);
   const heart = smoothstep(-22, -12, v) * smoothstep(48, 38, v) * smoothstep(foot + 40, foot + 30, u);
   const patches = smoothstep(0.47, 0.55, fbm(v * 0.03 + 5, u * 0.03, 2)) * smoothstep(foot - 2, foot + 6, u) * smoothstep(foot + 78, foot + 52, u);
-  let worked = Math.max(heart, patches, estateWeight(u, v));
+  let worked = Math.max(heart, patches, estateWeight(u, v), bankAt(toX(u, v), toZ(u, v)));
   for (const village of VILLAGES) worked = Math.max(worked, smoothstep(village.r + 12, village.r + 2, Math.hypot((u - village.u) / (village.up ?? 1), v - village.v)));
   return worked;
 }
