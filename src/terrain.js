@@ -259,13 +259,12 @@ export const OBSERVATORY = { u: 166, v: 94, r: 7, x: toX(166, 94), z: toZ(166, 9
 const GATE = (([u, v]) => ({ x: toX(u, v), z: toZ(u, v) }))(VILLAGES[0].lanes[0].points[0]);
 export const PATHS = [...ZONES.slice(1, -1).map((z) => [0, 0, z.x, z.z]), [zone('library').x, zone('library').z, GATE.x, GATE.z]];
 
-// The wine estate on the mountain side, left of the railway: a Florentine villa on its own
-// level ground, among vineyards planted on irregular terraces.
-export const ESTATE = { u: 80, v: 5, r: 27 };
-export const VILLA = { u: 82, v: 9, r: 9, y: 17, x: toX(82, 9), z: toZ(82, 9) };
+// The wine estate on the mountain side, left of the railway: vineyards planted on irregular
+// terraces, right up to the edge of the village.
+export const ESTATE = { u: 84, v: 12, r: 30 };
 export const estateWeight = (u, v) => smoothstep(ESTATE.r + 8, ESTATE.r - 4, Math.hypot(u - ESTATE.u, v - ESTATE.v));
 /** Built sites kept clear of wild growth ({ x, z, r }); builders add their own. */
-export const CLEARINGS = [{ x: VILLA.x, z: VILLA.z, r: VILLA.r + 3 }, { x: OBSERVATORY.x, z: OBSERVATORY.z, r: OBSERVATORY.r + 4 }, { x: ISLET.x, z: ISLET.z, r: 5.5 }];
+export const CLEARINGS = [{ x: OBSERVATORY.x, z: OBSERVATORY.z, r: OBSERVATORY.r + 4 }, { x: ISLET.x, z: ISLET.z, r: 5.5 }];
 
 // The railway crosses the angle between the mountain (a) and the right-hand ridge (b) at a
 // constant level, high enough that its station stands out on the flank, a little way from the
@@ -421,7 +420,6 @@ function landAt(x, z) {
   }
   // Work areas sit on level pads.
   for (const zn of ZONES) if (zn.id !== 'port') h += (0 - h) * smoothstep(zn.r + 7, zn.r + 1, Math.hypot(x - zn.x, z - zn.z));
-  h += (VILLA.y - h) * smoothstep(VILLA.r + 4, VILLA.r + 0.5, Math.hypot(x - VILLA.x, z - VILLA.z));
   const summit = summitLevel();
   if (summit > -Infinity) h += (summit - h) * smoothstep(OBSERVATORY.r + 6, OBSERVATORY.r + 1, Math.hypot(x - OBSERVATORY.x, z - OBSERVATORY.z));
   h += (RAIL.level - 0.05 - h) * stationArea(x, z, STATION.yard);
