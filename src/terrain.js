@@ -265,6 +265,42 @@ for (let iz = 0; iz <= SEGMENTS; iz++) {
     GRID[iz * (SEGMENTS + 1) + ix] = inSquare(x, z, -1.5) ? Math.max(SEA_FLOOR, heightAt(x, z)) : SEA_FLOOR;
   }
 }
+shelveShores();
+
+/**
+ * Off every shore the sea bed shelves away gently, so the water stays turquoise a long way out
+ * along the beach and around the harbour, and only darkens to blue in the offing. Under the
+ * cliffs of the headlands the bottom drops away at once and the sea is deep at their feet.
+ */
+function shelveShores() {
+  const row = SEGMENTS + 1;
+  // How far each cell of the sea lies from the nearest land, by a two-pass chamfer sweep.
+  const away = new Float32Array(GRID.length);
+  for (let i = 0; i < GRID.length; i++) away[i] = GRID[i] > WATER_LEVEL ? 0 : 1e4;
+  const sweep = (iz, ix, dz, dx) => {
+    const i = iz * row + ix;
+    const near = (jz, jx, cost) => {
+      if (jz >= 0 && jz < row && jx >= 0 && jx < row) away[i] = Math.min(away[i], away[jz * row + jx] + cost);
+    };
+    near(iz, ix - dx, CELL);
+    near(iz - dz, ix, CELL);
+    near(iz - dz, ix - dx, CELL * Math.SQRT2);
+    near(iz - dz, ix + dx, CELL * Math.SQRT2);
+  };
+  for (let iz = 0; iz < row; iz++) for (let ix = 0; ix < row; ix++) sweep(iz, ix, 1, 1);
+  for (let iz = row - 1; iz >= 0; iz--) for (let ix = row - 1; ix >= 0; ix--) sweep(iz, ix, -1, -1);
+  for (let iz = 0; iz < row; iz++) {
+    for (let ix = 0; ix < row; ix++) {
+      const i = iz * row + ix;
+      if (away[i] === 0) continue;
+      const x = ix * CELL - HALF;
+      const z = iz * CELL - HALF;
+      if (!inSquare(x, z, -1.5)) continue;
+      const fall = 0.1 + headland(toV(x, z)) * 0.5 + (fbm(x * 0.03 + 17, z * 0.03 - 5, 2) - 0.5) * 0.04;
+      GRID[i] = Math.max(GRID[i], WATER_LEVEL - 0.5 - away[i] * fall);
+    }
+  }
+}
 
 /** The corners of the map, in world (x, z): the horizon lies beyond them all. */
 export const LAND_ENDS = [[SQUARE.u0, SQUARE.v0], [SQUARE.u0, SQUARE.v1], [SQUARE.u1, SQUARE.v1], [SQUARE.u1, SQUARE.v0]].map(([u, v]) => [toX(u, v), toZ(u, v)]);
