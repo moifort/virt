@@ -7,12 +7,11 @@ import { buildLife } from './life.js';
 import { buildNature } from './nature.js';
 import { GRID, HALF, PATHS, SEGMENTS, WORLD_SIZE, ZONES, buildSides, buildTerrain, buildWater } from './terrain.js';
 import { buildEstate } from './estate.js';
-import { buildStream } from './stream.js';
 import { bake } from './kit.js';
 import { buildRailway } from './railway.js';
 import { buildSky } from './sky.js';
 import { buildVillages } from './village.js';
-import { buildAgora, buildAtelier, buildLibrary, buildLighthouseWalk, buildMoot, buildPods, buildPort, buildPub } from './zones.js';
+import { buildAgora, buildAtelier, buildLibrary, buildLighthouseWalk, buildMoot, buildObservatory, buildPods, buildPort, buildPub } from './zones.js';
 
 export { LAND_ENDS, SUN_DIR, WATER_LEVEL, ZONES, groundAt, inSquare } from './terrain.js';
 
@@ -50,7 +49,7 @@ export function createWorld(scene) {
     bake(g);
   }
   buildLighthouseWalk(scene, rng);
-  buildStream(scene, rng, animated);
+  buildObservatory(scene, rng);
   buildVillages(scene, rng, animated);
   buildEstate(scene, rng);
   buildNature(scene, rng);

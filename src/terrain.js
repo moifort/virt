@@ -68,21 +68,28 @@ export const VILLAGES = [
 ];
 const hub = { x: toX(VILLAGES[0].u, VILLAGES[0].v), z: toZ(VILLAGES[0].u, VILLAGES[0].v) };
 
-// Footpaths: from the agora to each work area, then the lane from the library to the harbour
-// and the village street that comes down to it from the bell tower.
+// The observatory stands on the summit, on a round terrace cut level into the crest.
+export const OBSERVATORY = { u: 166, v: 94, r: 7, x: toX(166, 94), z: toZ(166, 94) };
+// The path to it climbs the mountain in long zigzags from the work areas, passing left of
+// the villa, bend after bend up to the terrace.
+const CLIMB = [[36, 40], [58, 18], [72, -12], [96, 6], [112, -16], [126, 12], [134, 44], [150, 70], [OBSERVATORY.u, OBSERVATORY.v]];
+
+// Footpaths: from the agora to each work area, then the lane from the library to the harbour,
+// the village street that comes down to it from the bell tower, and the climb to the summit.
 export const PATHS = [
   ...ZONES.slice(1, -1).map((z) => [0, 0, z.x, z.z]),
   [zone('library').x, zone('library').z, zone('port').x, zone('port').z],
   [hub.x, hub.z, zone('port').x, zone('port').z],
+  ...CLIMB.slice(1).map(([u, v], i) => [toX(...CLIMB[i]), toZ(...CLIMB[i]), toX(u, v), toZ(u, v)]),
 ];
 
 // The wine estate on the mountain side, left of the railway: a Florentine villa on its own
 // level ground, among vineyards planted on irregular terraces.
 export const ESTATE = { u: 80, v: 5, r: 27 };
-export const VILLA = { u: 82, v: 9, r: 9, y: 12, x: toX(82, 9), z: toZ(82, 9) };
+export const VILLA = { u: 82, v: 9, r: 9, y: 17, x: toX(82, 9), z: toZ(82, 9) };
 export const estateWeight = (u, v) => smoothstep(ESTATE.r + 8, ESTATE.r - 4, Math.hypot(u - ESTATE.u, v - ESTATE.v));
 /** Built sites kept clear of wild growth ({ x, z, r }); builders add their own. */
-export const CLEARINGS = [{ x: VILLA.x, z: VILLA.z, r: VILLA.r + 3 }];
+export const CLEARINGS = [{ x: VILLA.x, z: VILLA.z, r: VILLA.r + 3 }, { x: OBSERVATORY.x, z: OBSERVATORY.z, r: OBSERVATORY.r + 4 }];
 
 // The railway crosses the angle between the mountain (a) and the right-hand ridge (b) at a
 // constant level. Its station stands on a shelf cut into the mountain by the first tunnel:
@@ -133,21 +140,23 @@ export function cultivated(u, v) {
 
 
 
-/** The lie of the land before the stream has cut its bed into it. */
+/** The lie of the land. */
 function landAt(x, z) {
   const u = toU(x, z);
   const v = toV(x, z);
   let h = 0.7 + (fbm(x * 0.03, z * 0.03, 3) - 0.5) * 2.2;
-  // The mountain rises behind the bay, as steep as the Ligurian coast. Behind its first crest
-  // it carries on and climbs to its true summit.
+  // One mountain stands behind the bay, as steep as the Ligurian coast. Its summit is over on
+  // the right, above the station, and from there one long even flank runs down leftward all
+  // the way to the sea, while its back falls to the far shore.
   const foot = footU(v, u);
-  const massif = 30 * smoothstep(1, 0, Math.hypot((u - 165) / 55, (v + 5) / 85) + (fbm(x * 0.012 + 4, z * 0.012 - 6, 2) - 0.5) * 0.4) ** 1.3;
-  const back = smoothstep(foot, foot + 80, u) * (40 + (fbm(x * 0.015, z * 0.015, 3) - 0.5) * 20) + Math.max(0, u - foot) * 0.05 + massif * smoothstep(foot, foot + 50, u);
-  // Side ridges run down from the mountain and plunge into the sea, closing the bay.
-  const ridge = headland(v) * (13 + smoothstep(-110, 70, u) * 30 + (fbm(x * 0.03, z * 0.03, 3) - 0.5) * 10);
+  const flank = smoothstep(-110, 112, v + (fbm(u * 0.02 + 3, 1.7, 2) - 0.5) * 20) ** 0.7;
+  const across = smoothstep(foot - 10, foot + 95, u) * smoothstep(240, 185, u);
+  const back = 78 * flank * across + (fbm(x * 0.015, z * 0.015, 3) - 0.5) * 12 * smoothstep(0, 20, 78 * flank * across) + Math.max(0, u - foot) * 0.05;
+  // On the right a tall ridge comes down from the summit and plunges into the sea, closing the bay.
+  const ridge = headland(v) * (22 + smoothstep(-110, 70, u) * 48 + (fbm(x * 0.03, z * 0.03, 3) - 0.5) * 10);
   // On its far sides — to the left, behind and to the right — the mountain comes down to the
   // sea in long slopes rather than cliffs: `inland` is how far a point lies from those shores.
-  const inland = Math.min(v - leftShore(u), farShore(v) - u, rightShore(u) - v);
+  const inland = Math.min(v - leftShore(u), farShore(v) - u, (rightShore(u) - v) * 3);
   const ease = smoothstep(-4, 64, inland + (fbm(x * 0.02 + 9, z * 0.02, 2) - 0.5) * 18);
   const mountain = Math.max(back, ridge) * ease;
   const estate = estateWeight(u, v);
@@ -194,67 +203,25 @@ function landAt(x, z) {
   // Work areas sit on level pads.
   for (const zn of ZONES) if (zn.id !== 'port') h += (0 - h) * smoothstep(zn.r + 7, zn.r + 1, Math.hypot(x - zn.x, z - zn.z));
   h += (VILLA.y - h) * smoothstep(VILLA.r + 4, VILLA.r + 0.5, Math.hypot(x - VILLA.x, z - VILLA.z));
+  const summit = summitLevel();
+  if (summit > -Infinity) h += (summit - h) * smoothstep(OBSERVATORY.r + 6, OBSERVATORY.r + 1, Math.hypot(x - OBSERVATORY.x, z - OBSERVATORY.z));
   h += (RAIL.level - 0.05 - h) * stationYard(x, z);
   // On the open sides the land has sunk under the sea before the bounds of the map.
   const brink = Math.min(u - SQUARE.u0, v - SQUARE.v0) + (fbm(x * 0.05 + 8, z * 0.05, 2) - 0.5) * 8;
   return h + (-12 - h) * smoothstep(11, 2, brink);
 }
 
-// A stream rises high on the left flank of the mountain, plunges over a rock step beside the
-// upper village, runs down a ravine and goes over the sea cliff into the water. Its course in
-// (u, v); `plunge` is how far along it the great fall is, and how high.
-const COURSE = [[178, -40], [168, -50], [160, -60], [150, -72], [142, -84], [136, -94], [131, -103], [126, -114]];
-const PLUNGE = { at: 0.2, drop: 13 };
+export const heightAt = landAt;
 
-/**
- * The bed of the stream, a point every metre or so: { x, z, y, run, pool }. It keeps just under
- * the lie of the land and never climbs, so it tumbles wherever the slope is steep.
- */
-export const STREAM = (() => {
-  const bed = [];
-  let length = 0;
-  for (let i = 1; i < COURSE.length; i++) length += Math.hypot(COURSE[i][0] - COURSE[i - 1][0], COURSE[i][1] - COURSE[i - 1][1]);
-  let run = 0;
-  let level = Infinity;
-  let plunged = false;
-  for (let i = 1; i < COURSE.length; i++) {
-    const [u0, v0] = COURSE[i - 1];
-    const [u1, v1] = COURSE[i];
-    const span = Math.hypot(u1 - u0, v1 - v0);
-    for (let d = 0; d < span; d += 1) {
-      const u = u0 + ((u1 - u0) * d) / span;
-      const v = v0 + ((v1 - v0) * d) / span + Math.sin((run + d) * 0.35) * 1.2;
-      const x = toX(u, v);
-      const z = toZ(u, v);
-      level = Math.min(level - 0.06, landAt(x, z) - 0.9);
-      const pool = !plunged && (run + d) / length > PLUNGE.at;
-      if (pool) {
-        level -= PLUNGE.drop;
-        plunged = true;
-      }
-      if (level < WATER_LEVEL) return bed;
-      bed.push({ x, z, y: level, pool });
-    }
-    run += span;
+// The level of the observatory terrace: the lie of the crest where it stands, measured once.
+let summit;
+function summitLevel() {
+  if (summit === undefined) {
+    summit = -Infinity;
+    summit = landAt(OBSERVATORY.x, OBSERVATORY.z) + 0.3;
   }
-  return bed;
-})();
-const streamBounds = STREAM.reduce((b, p) => ({ x0: Math.min(b.x0, p.x - 9), x1: Math.max(b.x1, p.x + 9), z0: Math.min(b.z0, p.z - 9), z1: Math.max(b.z1, p.z + 9) }), { x0: Infinity, x1: -Infinity, z0: Infinity, z1: -Infinity });
-
-export function heightAt(x, z) {
-  const h = landAt(x, z);
-  if (x < streamBounds.x0 || x > streamBounds.x1 || z < streamBounds.z0 || z > streamBounds.z1) return h;
-  // The stream has cut its bed: level with the water where it runs, banks easing back to the
-  // lie of the land, wider around the pool under the great fall.
-  let nearest = Infinity;
-  let bed = null;
-  for (const p of STREAM) {
-    const d = Math.hypot(x - p.x, z - p.z) - (p.pool ? 3 : 0);
-    if (d < nearest) [nearest, bed] = [d, p];
-  }
-  return nearest > 7 ? h : bed.y + (h - bed.y) * smoothstep(1, 7, nearest);
+  return summit;
 }
-for (const p of STREAM) CLEARINGS.push({ x: p.x, z: p.z, r: p.pool ? 6 : 3 });
 
 // The heightfield everything else reads: the land inside the bounds, open sea beyond them.
 export const GRID = new Float32Array((SEGMENTS + 1) ** 2);

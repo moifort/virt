@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { mulberry32, pick } from './noise.js';
 import { PAL, WATER_LEVEL, paint, solid } from './style.js';
 import { DARK_WOOD, INK, SCREEN, STONE, WARM_LIGHT, at, bake, ball, box, cone, cyl, lamplight, lantern, live, plant, ring, screen, seat } from './kit.js';
-import { SUN_DIR, ZONES, groundAt, toX, toZ } from './terrain.js';
+import { OBSERVATORY, SUN_DIR, ZONES, groundAt, toX, toZ } from './terrain.js';
 
 /** Shelves of books along a wall. axis 'x' runs along x facing +z; axis 'z' runs along z facing +x. */
 export function bookshelf(parent, books, rng, { axis, from, to, at: fixed, y0, rows = 5, rowH = 1.18 }) {
@@ -656,6 +656,73 @@ function mussels(parent, rng, x, z, radius = 0.17) {
  * timber piles running out from the shore and curving round to its platform. The piles are
  * black with mussels at the waterline.
  */
+/**
+ * The observatory on the summit: a whitewashed round tower under a copper dome gone green,
+ * its slit open to the sky with the telescope looking out of it, on a flagged terrace with a
+ * low parapet, a bench to sit on through the night and a lantern by the door.
+ */
+export function buildObservatory(scene, rng) {
+  const g = new THREE.Group();
+  const y = groundAt(OBSERVATORY.x, OBSERVATORY.z);
+  g.position.set(OBSERVATORY.x, y, OBSERVATORY.z);
+  const R = OBSERVATORY.r;
+  const WHITE = 0xf3ebdd;
+  const COPPER = 0x5f9a86;
+  // The terrace: flagstones in a ring, a parapet of dry stone, steps down to the path.
+  at(cyl(R, R + 0.4, 0.5, STONE, 20, { flat: true }), 0, 0.15, 0, g);
+  at(cyl(R + 0.5, R + 0.9, 0.7, 0xc9b99c, 20, { flat: true }), 0, -0.3, 0, g);
+  for (let k = 0; k < 20; k++) {
+    const a = (k / 20) * Math.PI * 2;
+    if (k === 15) continue; // the gap where the path comes in
+    const wall = at(box(2.1, 0.7, 0.4, 0xd6c8ad), Math.cos(a) * (R - 0.2), 0.7, Math.sin(a) * (R - 0.2), g);
+    wall.rotation.y = -a;
+  }
+  // The tower and its dome.
+  at(cyl(3.1, 3.3, 5.2, WHITE, 16), 0, 3.0, 0, g);
+  at(cyl(3.5, 3.5, 0.3, 0xc9b99c, 16), 0, 0.55, 0, g);
+  at(cyl(3.4, 3.1, 0.3, WHITE, 16), 0, 5.6, 0, g);
+  at(ring(3.25, 0.12, COPPER, Math.PI * 2, 16), 0, 5.85, 0, g).rotation.x = Math.PI / 2;
+  const dome = at(ball(3.2, COPPER, { flat: true }, 16, 8), 0, 5.8, 0, g);
+  dome.scale.y = 0.9;
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2;
+    at(box(0.12, 2.6, 0.12, 0x4d8070), Math.cos(a) * 2.2, 7.6, Math.sin(a) * 2.2, g).rotation.set(-Math.sin(a) * 0.7, 0, Math.cos(a) * 0.7);
+  }
+  // The slit, open, with the telescope tilted out of it toward the night sky.
+  const slit = at(new THREE.Group(), 0, 5.8, 0, g);
+  slit.rotation.y = -0.6;
+  at(box(0.9, 3.2, 1.2, INK), 0, 1.6, 2.4, slit).rotation.x = -0.4;
+  const scope = at(new THREE.Group(), 0, 1.0, 1.0, slit);
+  scope.rotation.x = -0.9;
+  at(cyl(0.28, 0.34, 3.4, 0x8a8a96, 10), 0, 1.4, 0, scope);
+  at(cyl(0.36, 0.36, 0.3, INK, 10), 0, 3.2, 0, scope);
+  at(ring(0.3, 0.05, PAL.saffron, Math.PI * 2, 10), 0, 3.35, 0, scope);
+  // Door, a window band, the lantern by the door, a weathervane on the dome.
+  at(box(1.1, 2.3, 0.2, DARK_WOOD), 0, 1.15, 3.2, g);
+  at(box(1.3, 0.2, 0.3, 0xc9b99c), 0, 2.35, 3.2, g);
+  for (let k = 0; k < 6; k++) {
+    const a = 0.7 + (k / 6) * Math.PI * 1.6;
+    at(box(0.6, 0.9, 0.1, 0x3b3346), Math.sin(a) * 3.2, 3.9, Math.cos(a) * 3.2, g).rotation.y = a;
+  }
+  lantern(g, 1.2, 0.5, 3.4);
+  at(cyl(0.04, 0.04, 1.2, INK, 5), 0, 9.3, 0, g);
+  at(box(0.7, 0.25, 0.03, PAL.red), 0.35, 9.7, 0, g);
+  // A bench on the terrace, facing out over the bay, and a pair of telescopes on the parapet.
+  const bench = at(new THREE.Group(), -4.2, 0.5, 3.4, g);
+  bench.rotation.y = Math.PI * 0.75;
+  at(box(2.0, 0.14, 0.6, PAL.wood), 0, 0.5, 0, bench);
+  at(box(2.0, 0.5, 0.1, PAL.wood), 0, 0.85, -0.28, bench);
+  for (const dx of [-0.8, 0.8]) at(box(0.14, 0.5, 0.56, INK), dx, 0.25, 0, bench);
+  for (const dx of [-0.5, 0.5]) seat(bench, dx, 0.57, 0, 0);
+  for (const a of [2.0, 3.6]) {
+    const stand = at(new THREE.Group(), Math.cos(a) * (R - 0.9), 0.5, Math.sin(a) * (R - 0.9), g);
+    at(cyl(0.05, 0.08, 1.2, INK, 6), 0, 0.6, 0, stand);
+    const eye = at(cyl(0.1, 0.14, 0.7, 0x8a8a96, 8), 0, 1.3, 0, stand);
+    eye.rotation.set(Math.PI / 2 - 0.35, 0, -a + Math.PI / 2);
+  }
+  scene.add(bake(g));
+}
+
 export function buildLighthouseWalk(scene, rng) {
   const g = new THREE.Group();
   g.position.set(toX(4, -72), 0, toZ(4, -72));

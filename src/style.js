@@ -33,7 +33,7 @@ export const PAL = {
 };
 
 export const WATER_LEVEL = -1.6;
-export const PATH_COUNT = 8;
+export const PATH_COUNT = 16;
 
 const blank = new THREE.DataTexture(new Uint8Array([0]), 1, 1, THREE.RedFormat);
 blank.needsUpdate = true;
