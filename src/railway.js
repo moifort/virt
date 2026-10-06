@@ -76,6 +76,19 @@ function buildTunnel(line, x, side) {
     }
     at(box(1.02, 0.4, 8.6, PAL.grass), s, MOUND - 0.2, 0, line);
   }
+  // On the grass of the mound, a pair of cypresses and a few bushes of the maquis.
+  for (const [d, z, h] of [[2.6, -2.9, 5.2], [4.4, 2.7, 4.4]]) cypress(line, into(d), MOUND, z, h);
+  for (const [d, z, r, color] of [[3.4, 0.9, 0.7, 0x5a8a52], [5.2, -1.6, 0.55, 0x4c7448], [2.2, 1.9, 0.45, 0x7aa05c], [5.6, 2.4, 0.5, 0x5a8a52]]) {
+    at(ball(r, color, { flat: true }, 7, 5), into(d), MOUND + r * 0.6, z, line).scale.y = 0.7;
+  }
+}
+
+/** A cypress `h` tall, as the station's: a stub of trunk, a tall ball, a cone on top. */
+function cypress(parent, x, y, z, h) {
+  at(cyl(0.1, 0.14, 0.7, 0x7d5a48, 5), x, y + 0.3, z, parent);
+  const body = at(ball(0.6 * (h / 5), 0x2f5840, { flat: true }, 7, 6), x, y + h * 0.42, z, parent);
+  body.scale.y = 2.4;
+  at(cone(0.4 * (h / 5), h * 0.5, 0x2f5840, 7, { flat: true }), x, y + h * 0.85, z, parent);
 }
 
 function buildLine() {

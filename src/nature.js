@@ -8,7 +8,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { fbm, pick } from './noise.js';
 import { PAL, WATER_LEVEL, paint, solid } from './style.js';
 import { at, bake, ball, box, cone, cyl, lantern } from './kit.js';
-import { PATHS, UP, ZONES, anywhere, coastU, cultivated, footU, groundAt, isWild, occupy, scatterInstanced, slopeAt, toU, toV, toX, toZ } from './terrain.js';
+import { PATHS, SPUR_END, UP, ZONES, anywhere, coastU, cultivated, footU, groundAt, isWild, occupy, railPoint, scatterInstanced, slopeAt, toU, toV, toX, toZ } from './terrain.js';
 
 const BARK = 0x7d5a48;
 const DARK_BARK = 0x5e463c;
@@ -335,14 +335,14 @@ function prototype(group) {
 }
 
 /** Instances a species across the bay: a few baked variants, many placements. */
-function grow(scene, rng, build, { count, variants = 3, margin = 0, maxSlope = 0.4, where = () => true, size = [0.8, 1.25], sink = 0.1 }) {
+function grow(scene, rng, build, { count, variants = 3, margin = 0, maxSlope = 0.4, where = () => true, size = [0.8, 1.25], sink = 0.1, sample = anywhere }) {
   const protos = Array.from({ length: variants }, () => prototype(build(rng)));
   const placements = protos.map(() => []);
   const p = new THREE.Vector3();
   const q = new THREE.Quaternion();
   const s = new THREE.Vector3();
   for (let i = 0, n = 0; i < count * 20 && n < count; i++) {
-    anywhere(rng, p);
+    sample(rng, p);
     const slope = slopeAt(p.x, p.z);
     if (!isWild(p.x, p.z, margin) || slope > maxSlope || !where(p.x, p.z)) continue;
     q.setFromAxisAngle(UP, rng() * Math.PI * 2);
@@ -458,6 +458,27 @@ export function buildNature(scene, rng) {
   grow(scene, rng, lemonTree, { count: 40, variants: 3, maxSlope: 0.4, where: (x, z) => region(x, z) !== 'shore' && tame(x, z) });
   grow(scene, rng, almondTree, { count: 64, variants: 4, margin: 1, maxSlope: 0.45, where: (x, z) => region(x, z) !== 'shore' && tame(x, z), size: [0.9, 1.35] });
   grow(scene, rng, palm, { count: 14, variants: 3, margin: 1.5, maxSlope: 0.3, where: (x, z) => region(x, z) === 'shore' && groundAt(x, z) < 1.5 && toV(x, z) < 60 && toU(x, z) > -60, size: [0.85, 1.2] });
+
+  // The spur the railway tunnels into, a wild knoll beside the station: a grove of pines and
+  // oaks closes over the tunnel, maquis and broom down its flanks.
+  const onSpur = (rng, p) => {
+    const spot = railPoint(SPUR_END - 5 - rng() * 22, -12 + rng() * 36);
+    p.set(spot.x, groundAt(spot.x, spot.z), spot.z);
+    return p;
+  };
+  grow(scene, rng, stonePine, { count: 14, variants: 3, margin: 1.5, maxSlope: 0.8, sample: onSpur });
+  grow(scene, rng, holmOak, { count: 12, variants: 3, margin: 1.5, maxSlope: 0.8, sample: onSpur });
+  grow(scene, rng, maquis, { count: 40, variants: 4, margin: -1, maxSlope: 1.4, size: [0.7, 1.5], sample: onSpur });
+  grow(scene, rng, broom, { count: 16, variants: 3, maxSlope: 1.1, size: [0.8, 1.3], sample: onSpur });
+  // The steep bank falling from the tunnel mouth and the cutting to the hollow under the
+  // viaduct: bare rock, but the maquis and the broom cling to it in clumps.
+  const onBank = (rng, p) => {
+    const spot = railPoint(SPUR_END - 10 + rng() * 22, 3 + rng() * 26);
+    p.set(spot.x, groundAt(spot.x, spot.z), spot.z);
+    return p;
+  };
+  grow(scene, rng, maquis, { count: 45, variants: 4, margin: -1, maxSlope: 1.6, size: [0.8, 1.6], sample: onBank });
+  grow(scene, rng, broom, { count: 20, variants: 3, maxSlope: 1.4, size: [0.8, 1.3], sample: onBank });
 
   // Shrubs: the maquis clings even to the steep slopes.
   grow(scene, rng, maquis, { count: 650, variants: 6, margin: -1, maxSlope: 1.4, size: [0.7, 1.5] });
