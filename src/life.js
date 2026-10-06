@@ -46,10 +46,11 @@ function whale(scale) {
   // The tail stock and the flukes, on a joint that swings them up as the whale sounds.
   const tail = at(new THREE.Group(), 0, -0.4, -9.8, body);
   at(ball(1, SKIN, {}, 6, 5), 0, 0, -0.9, tail).scale.set(0.45, 0.4, 1.3);
+  // The flukes: wide, a notch between them, swept back a little.
   for (const s of [-1, 1]) {
-    const fluke = at(ball(1, SKIN, {}, 6, 4), s * 1.0, 0, -2.1, tail);
-    fluke.scale.set(1.2, 0.14, 0.62);
-    fluke.rotation.y = s * 0.5;
+    const fluke = at(ball(1, SKIN, {}, 6, 4), s * 1.35, 0, -2.2, tail);
+    fluke.scale.set(1.65, 0.14, 0.72);
+    fluke.rotation.y = s * 0.45;
   }
   return { g, body, tail };
 }
@@ -63,23 +64,26 @@ function whale(scale) {
 function buildWhales(scene, animated) {
   const BLOW = 12;
   const EVERY = 70;
-  const SHOW = 14;
+  const SHOW = 15;
   // One visit: rises, rolls at the surface, arches from `dive` on and lifts the flukes, then
   // slides under from `sink`, flukes last.
+  const ease = (k) => k * k * (3 - 2 * k);
   const visit = (age, { body, tail }, lift, dive, sink, t) => {
-    const up = Math.min(1, age / 1.4) * (1 - Math.max(0, (age - dive - 2) / 3));
-    const arch = Math.min(1, Math.max(0, (age - dive) / 2.4));
-    const under = Math.min(1, Math.max(0, (age - sink) / 2.4));
-    body.position.y = -2.4 + up * (2.3 + lift) + Math.sin(t * 1.1 + dive) * 0.1 - under * 8;
-    // Pitching about the head: the nose goes under and the tail stock comes up out of the
-    // water, the flukes swinging on up until they stand clear.
-    body.rotation.x = arch * 0.34;
-    tail.rotation.x = arch * 1.05;
+    const up = Math.min(1, age / 1.4) * (1 - Math.max(0, (age - dive - 1.5) / 3));
+    const arch = ease(Math.min(1, Math.max(0, (age - dive) / 3.2)));
+    const under = ease(Math.min(1, Math.max(0, (age - sink) / 2.8)));
+    // The head goes down as she arches, and the whole of her slides away under at the end.
+    body.position.y = -2.4 + up * (2.3 + lift) + Math.sin(t * 1.1 + dive) * 0.1 - arch * 1.6 - under * 10;
+    // Pitching about the head: the nose goes under, the back rolls over and the tail stock
+    // comes up out of the water, the flukes swinging on up until they stand high and clear,
+    // the last of her to go.
+    body.rotation.x = arch * 0.62;
+    tail.rotation.x = arch * 1.3;
   };
   const mother = whale(1);
   const calf = whale(0.5);
   at(calf.g, 3.6, 0, -2.5, mother.g);
-  const spout = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.42, 0), paint(0xf4f9ff, { flat: true }), BLOW * 2);
+  const spout = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.5, 0), paint(0xffffff, { flat: true, unlit: true }), BLOW * 2);
   spout.frustumCulled = false;
   spout.castShadow = false;
   scene.add(mother.g, spout);
@@ -119,9 +123,9 @@ function buildWhales(scene, animated) {
     const swum = age * 1.6 - 8;
     mother.g.position.set(toX(u, v) + Math.sin(heading) * swum, WATER_LEVEL, toZ(u, v) + Math.cos(heading) * swum);
     mother.g.rotation.y = heading;
-    visit(age, mother, 0, 6.5, 8.5, t);
+    visit(age, mother, 0, 6.5, 9.4, t);
     // The calf comes up a moment after her, blows smaller, and sounds after her.
-    visit(Math.max(0, age - 0.8), calf, 0.5, 7.2, 9.2, t + 2);
+    visit(Math.max(0, age - 0.8), calf, 0.5, 7.2, 10.0, t + 2);
     for (let k = 0; k < BLOW; k++) blow(k, age, [1.5, 4.6], motherBlowhole, 1, heading, mother.g);
     for (let k = 0; k < BLOW; k++) blow(BLOW + k, age - 0.8, [2.2, 5.2], calfBlowhole, 0.55, heading, mother.g);
     spout.instanceMatrix.needsUpdate = true;
@@ -147,7 +151,7 @@ function buildDolphins(scene, animated) {
     pod.push({ g, side: (i % 3) - 1 + (i % 2) * 0.4, back: Math.floor(i / 3) * 3.2 + (i % 2) * 1.4, phase: hash(i, 41) });
   }
   // Two bursts of spray for each: where it leaves the water and where it goes back in.
-  const spray = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.3, 0), paint(0xf4f9ff, { flat: true }), POD * 2);
+  const spray = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.3, 0), paint(0xf4f9ff, { flat: true, unlit: true }), POD * 2);
   spray.frustumCulled = false;
   spray.castShadow = false;
   scene.add(spray);
