@@ -6,7 +6,7 @@ import { Climate } from './climate.js';
 import { dayNightSwitch } from './daynight.js';
 import { seasonSwitch } from './season.js';
 import { weatherSwitch } from './weather.js';
-import { LAND_ENDS, WATER_LEVEL, createWorld, groundAt } from './world.js';
+import { LAND_ENDS, SQUARE, WATER_LEVEL, createWorld, groundAt, toX, toZ } from './world.js';
 
 const clamp = THREE.MathUtils.clamp;
 
@@ -62,6 +62,9 @@ if (params.has('at')) {
 }
 if (params.has('zoom')) view.viewHeight = Number(params.get('zoom'));
 if (params.has('yaw')) view.yaw = (Number(params.get('yaw')) * Math.PI) / 2;
+// The corners of the island's tile, at sea level and over the summit, for measuring how deep
+// into the view it runs.
+const ISLAND_CORNERS = [[SQUARE.u0, SQUARE.v0], [SQUARE.u0, SQUARE.v1], [SQUARE.u1, SQUARE.v0], [SQUARE.u1, SQUARE.v1]].flatMap(([u, v]) => [0, 120].map((y) => [toX(u, v), y, toZ(u, v)]));
 globalThis.virt = { climate, player, view, scene, sun, renderer, pixels, world };
 
 function resize() {
@@ -252,9 +255,16 @@ function frame() {
   }
   focus.copy(player.position).add(pan).y += 1.4;
   view.update(focus, pixels.lowRes, pixels.offset);
+  // The haze closes in on the far sea; in clear weather it only just touches the back of the
+  // island, however low the view is tilted (then the island runs far back into the depth). A
+  // mist or a rain draws it in over everything.
+  let back = 0;
+  for (const [x, y, z] of ISLAND_CORNERS) back = Math.max(back, (x - view.camera.position.x) * view.forward.x + (y - view.camera.position.y) * view.forward.y + (z - view.camera.position.z) * view.forward.z);
+  const clear = Math.max(view.distance + 60, back - 60);
+  const thick = (1 - climate.visibility) / 0.75;
   scene.fog.color.copy(climate.skyHorizon);
-  scene.fog.near = view.distance + 60 - 240 * (1 - climate.visibility);
-  scene.fog.far = view.distance + 520 * climate.visibility;
+  scene.fog.near = clear + (view.distance - 120 - clear) * thick;
+  scene.fog.far = scene.fog.near + 460 - 210 * thick;
 
   frameShadows();
   renderer.shadowMap.needsUpdate = frames++ % 2 === 0;
