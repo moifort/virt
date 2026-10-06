@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { PAL, paint, solid } from './style.js';
 import { INK, at, bake, ball, box, cone, cyl, lantern, live, ring, seat } from './kit.js';
-import { RAIL, STATION, groundAt, railPoint, toX, toZ } from './terrain.js';
+import { BORE, RAIL, RAIL_MOUTHS, STATION, groundAt, railPoint, toX, toZ } from './terrain.js';
 
 // The line runs straight across the angle between the mountain (A) and the ridge (B), in (u, v).
 const A = RAIL.a;
@@ -16,47 +16,65 @@ const STONE = 0xe2cfae;
 const CASTANO = 0x7a4a3a;
 const ISABELLA = 0xe8d6a8;
 const PIER_GAP = 8;
-const VAULT = 2.6;
+// The pane colour the shader knows (see `pxGlass` in style.js): these windows light up after dark.
+const GLASS = 0x3b3346;
+const DARK = 0x2b2533;
+// The mouth of a tunnel: half its width, the height of the spring of its arch, the underside of
+// the arch at its top, and the grass of the mound over it.
+const VAULT = 3.3;
+const SPRING = 1.6;
+const CROWN = SPRING + VAULT;
+const MOUND = CROWN + 2.0;
 
 const start = new THREE.Vector3(toX(A.u, A.v), 0, toZ(A.u, A.v));
 const end = new THREE.Vector3(toX(B.u, B.v), 0, toZ(B.u, B.v));
 const LENGTH = start.distanceTo(end);
 const dir = end.clone().sub(start).normalize();
 const groundAlong = (s) => groundAt(start.x + dir.x * s, start.z + dir.z * s);
-// Tunnel mouths: where the slope rises above the rails on either side of the station.
-let MOUTH_A = STATION.s0;
-while (MOUTH_A > -60 && groundAlong(MOUTH_A - 0.5) < LEVEL + 0.3) MOUTH_A -= 0.5;
-let MOUTH_B = LENGTH;
-while (MOUTH_B > MOUTH_A && groundAlong(MOUTH_B) > LEVEL + 0.3) MOUTH_B -= 0.5;
-// The dark back of each mouth: past it the train is underground.
-const DEPTH = 1.6;
+// Tunnel mouths: where the slope rises above the rails on either side of the station (terrain.js
+// bores the hill a few metres past each). The dark back of each bore: past it the train is underground.
+const MOUTH_A = RAIL_MOUTHS.a;
+const MOUTH_B = RAIL_MOUTHS.b;
+const DEPTH = BORE - 1.5;
 const inTunnel = (s) => s < MOUTH_A - DEPTH || s > MOUTH_B + DEPTH;
 
 /** Tunnel head at `x`, the hill on the `side` (-1 toward A, +1 toward B), its vault under a terraced mound. */
 function buildTunnel(line, x, side) {
-  // Headwall with a dark mouth, an ochre archivolt with its keystone, a coping, two stout
-  // buttresses, and wing walls splayed back into the hill on either side.
+  const into = (d) => x + side * d; // so many metres into the hill
+  // Headwall: two stout buttresses on plinths, wing walls splayed back into the hill on either
+  // side, the lintel over the arch, an ochre coping along the top.
   for (const z of [-1, 1]) {
-    at(box(1.2, 7.4, 2.4, STONE), x + side * 0.6, 2.7, z * 3.8, line);
-    at(box(2.2, 3.2, 1.4, STONE), x - side * 0.3, 0.6, z * 4.6, line);
-    const wing = at(box(0.9, 4.2, 4.0, STONE), x + side * 1.9, 1.0, z * 6.6, line);
+    at(box(1.2, 9.2, 2.4, STONE), into(0.6), 3.6, z * (VAULT + 1.2), line);
+    at(box(2.2, 3.2, 1.4, STONE), into(-0.3), 0.6, z * (VAULT + 2.0), line);
+    const wing = at(box(0.9, 5.0, 4.0, STONE), into(1.9), 1.4, z * (VAULT + 4.0), line);
     wing.rotation.y = z * side * 0.55;
-    at(box(1.0, 0.4, 4.2, PAL.ochre), x + side * 1.9, 3.2, z * 6.6, line).rotation.y = z * side * 0.55;
+    at(box(1.0, 0.4, 4.2, PAL.ochre), into(1.9), 4.0, z * (VAULT + 4.0), line).rotation.y = z * side * 0.55;
   }
-  at(box(1.2, 2.6, 5.2, STONE), x + side * 0.6, 5.6, 0, line);
-  // The dark of the tunnel, no taller than the vault, so the hill closes over it.
-  at(box(DEPTH * 2, 5.2, 5.2, 0x2b2533), x + side * DEPTH, 1.0, 0, line);
-  const arch = at(ring(VAULT, 0.4, PAL.ochre, Math.PI, 14), x - side * 0.05, 1.6, 0, line);
+  at(box(1.2, 8.8 - CROWN, 2 * VAULT, STONE), into(0.6), (8.2 + CROWN - 0.6) / 2, 0, line);
+  at(box(1.6, 0.6, 2 * VAULT + 4.8, PAL.ochre), into(0.6), 8.5, 0, line);
+  at(box(0.1, 0.5, 1.2, 0xf1e6cc), into(-0.06), CROWN + 1.6, 0, line);
+  // The archivolt with its keystone.
+  const arch = at(ring(VAULT, 0.4, PAL.ochre, Math.PI, 14), into(-0.05), SPRING, 0, line);
   arch.rotation.y = Math.PI / 2;
-  at(box(0.5, 0.9, 0.7, PAL.ochre), x - side * 0.15, VAULT + 1.75, 0, line);
-  at(box(1.6, 0.6, 10.4, PAL.ochre), x + side * 0.6, 7.2, 0, line);
-  at(box(0.1, 0.5, 1.2, 0xf1e6cc), x - side * 0.66, 5.9, 0, line);
-  // The vault runs on into the hill under an earth mound, a stone-walled terrace like the slope's.
-  const top = VAULT + 2.6;
-  for (let s = x + side * 1.7; s > -60 && s < LENGTH && groundAlong(s) < LEVEL + top; s += side) {
+  at(box(0.5, 0.9, 0.7, PAL.ochre), into(-0.15), CROWN + 0.15, 0, line);
+  // The dark of the bore, lined floor, walls and ceiling, closed by a back wall: the rails run
+  // on into it and the train is seen a moment longer before it is swallowed.
+  const mid = into(DEPTH / 2);
+  at(box(DEPTH, 0.5, 2 * VAULT + 0.2, DARK), mid, -0.45, 0, line);
+  for (const z of [-1, 1]) at(box(DEPTH, CROWN + 1.0, 0.4, DARK), mid, (CROWN + 0.2) / 2, z * (VAULT + 0.1), line);
+  at(box(DEPTH, 0.4, 2 * VAULT + 0.6, DARK), mid, CROWN + 0.4, 0, line);
+  at(box(0.4, CROWN + 1.2, 2 * VAULT + 0.6, DARK), into(DEPTH + 0.2), (CROWN + 0.2) / 2, 0, line);
+  // The vault runs on into the hill under an earth mound, a stone-walled terrace like the
+  // slope's: hollow over the bore, with a stone wall either side of the lining and a slab over it.
+  for (let s = into(1.7); s > -60 && s < LENGTH && groundAlong(s) < LEVEL + MOUND; s += side) {
     const bottom = Math.min(-1, groundAlong(s) - LEVEL - 0.5);
-    at(box(1.02, top - 0.4 - bottom, 8.2, STONE), s, (top - 0.4 + bottom) / 2, 0, line);
-    at(box(1.02, 0.4, 8.6, PAL.grass), s, top - 0.2, 0, line);
+    if (Math.abs(s - x) < DEPTH + 0.6) {
+      for (const z of [-1, 1]) at(box(1.02, MOUND - 0.4 - bottom, 4.1 - VAULT - 0.3, STONE), s, (MOUND - 0.4 + bottom) / 2, (z * (4.1 + VAULT + 0.3)) / 2, line);
+      at(box(1.02, MOUND - 0.4 - CROWN - 0.6, 8.2, STONE), s, (MOUND - 0.4 + CROWN + 0.6) / 2, 0, line);
+    } else {
+      at(box(1.02, MOUND - 0.4 - bottom, 8.2, STONE), s, (MOUND - 0.4 + bottom) / 2, 0, line);
+    }
+    at(box(1.02, 0.4, 8.6, PAL.grass), s, MOUND - 0.2, 0, line);
   }
 }
 
@@ -280,14 +298,14 @@ function buildTrain(line, animated) {
     roof.rotation.z = Math.PI / 2;
     roof.scale.z = 0.4;
     for (let w = 0; w < 6; w++) {
-      for (const s of [-1, 1]) at(box(0.7, 0.55, 0.05, 0x3b4a5a), -carLength / 2 + 0.7 + w * 1.0, 2.05, s * 1.17, car);
+      for (const s of [-1, 1]) at(box(0.7, 0.55, 0.05, GLASS, { carriage: true }), -carLength / 2 + 0.7 + w * 1.0, 2.05, s * 1.17, car);
     }
     for (const x of [-carLength / 2 + 1.1, carLength / 2 - 1.1]) {
       at(box(1.6, 0.4, 2.0, INK), x, 0.3, 0, car);
       for (const z of [-0.85, 0.85]) for (const dx of [-0.5, 0.5]) at(cyl(0.3, 0.3, 0.12, 0x3b3346, 10), x + dx, 0.3, z, car).rotation.x = Math.PI / 2;
     }
     if (i === 0) {
-      at(box(0.12, 0.7, 1.8, 0x3b4a5a), carLength / 2 + 0.02, 2.0, 0, car);
+      at(box(0.12, 0.7, 1.8, GLASS, { carriage: true }), carLength / 2 + 0.02, 2.0, 0, car);
       at(ball(0.18, PAL.saffron, { glow: true }, 6, 4), carLength / 2 + 0.05, 1.0, 0, car);
       for (const z of [-0.6, 0.6]) at(ball(0.1, 0xfff1b0, { glow: true }, 4, 3), carLength / 2 + 0.05, 2.6, z, car);
       // Pantograph reaching for the wire.

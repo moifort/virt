@@ -568,6 +568,11 @@ if (pxGlass) {
   float pxPane = pxHash(floor(vWorld.xz * 0.9) + floor(vWorld.y * 0.7) * 13.0);
   pxCol = mix(pxCol, uSkyTint * (pxLit > 0.5 ? 0.75 : 0.45), 0.4 * (1.0 - uNight));
   if (pxPane < uLamps.y) pxCol = pxPane < 0.035 ? vec3(0.55, 0.72, 0.95) * (0.85 + 0.15 * sin(uTime * 9.0 + pxPane * 90.0)) : pxPane < 0.25 ? vec3(1.0, 0.82, 0.45) : vec3(1.0, 0.7, 0.32);
+  #ifdef CARRIAGE
+    // A carriage is lit from end to end as soon as the lamps come on, wherever it has got to:
+    // the house-by-house lottery above would switch its windows as it moved.
+    pxCol = mix(pxCol, vec3(1.0, 0.8, 0.42), uLamps.x);
+  #endif
 }
 // Lamplight pools on whatever stands near a lantern, in two soft steps.
 float pxLamp = texture2D(uLampMap, (vWorld.xz + uHeightMap.x) / uHeightMap.y).r * uLamps.x;
@@ -597,15 +602,15 @@ gNormal = vec4(normal * 0.5 + 0.5, 1.0);
 `;
 
 const cache = new Map();
-const FLAGS = { terrain: 'TERRAIN', water: 'WATER', sway: 'SWAY', glow: 'GLOW', leaf: 'LEAF', blossom: 'BLOSSOM', deciduous: 'DECIDUOUS', roof: 'ROOF', wall: 'WALL', flow: 'FLOW', cascade: 'CASCADE' };
+const FLAGS = { terrain: 'TERRAIN', water: 'WATER', sway: 'SWAY', glow: 'GLOW', leaf: 'LEAF', blossom: 'BLOSSOM', deciduous: 'DECIDUOUS', roof: 'ROOF', wall: 'WALL', flow: 'FLOW', cascade: 'CASCADE', carriage: 'CARRIAGE' };
 
 /**
  * @param {number} color sRGB hex
- * @param {{terrain?: boolean, water?: boolean, sway?: boolean, glow?: boolean, leaf?: boolean, blossom?: boolean, deciduous?: boolean, roof?: boolean, wall?: boolean, flow?: boolean, cascade?: boolean, flat?: boolean, doubleSide?: boolean, backSide?: boolean, vertexColors?: boolean, map?: THREE.Texture}} [opts]
+ * @param {{terrain?: boolean, water?: boolean, sway?: boolean, glow?: boolean, leaf?: boolean, blossom?: boolean, deciduous?: boolean, roof?: boolean, wall?: boolean, flow?: boolean, cascade?: boolean, carriage?: boolean, flat?: boolean, doubleSide?: boolean, backSide?: boolean, vertexColors?: boolean, map?: THREE.Texture}} [opts]
  *   `leaf` is foliage (painted in clumps, rustling, evergreen unless `deciduous`), `blossom` an
  *   orchard crown that flowers and
  *   sheds, `roof` tiles, `wall` aged plaster, `flow` rain water running off a roof, `cascade` a
- *   stream or a waterfall.
+ *   stream or a waterfall, `carriage` the panes of a vehicle, all lit after dark wherever it goes.
  */
 export function paint(color, opts = {}) {
   const { map, ...flags } = opts;

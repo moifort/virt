@@ -515,7 +515,10 @@ function landAt(x, z) {
   return h + (-12 - h) * smoothstep(11, 2, brink);
 }
 
-export const heightAt = landAt;
+export function heightAt(x, z) {
+  const h = landAt(x, z);
+  return h - Math.max(0, h - (RAIL.level - 0.3)) * boreAt(x, z);
+}
 
 // The level of the observatory terrace: the lie of the crest where it stands, measured once.
 let summit;
@@ -527,6 +530,28 @@ function summitLevel() {
   return summit;
 }
 
+// The tunnels: the hill closes over the line where the ground rises above the rails, on either
+// side of the station. From each mouth the line is bored `BORE` metres on into the hill, so the
+// rails can be seen running into the dark; railway.js lines the bore and roofs it over, and
+// nothing of the cut shows from above.
+export const BORE = 5;
+const railGround = (s) => {
+  const p = railPoint(s, 0);
+  return landAt(p.x, p.z);
+};
+export const RAIL_MOUTHS = (() => {
+  let a = STATION.s0;
+  while (a > -60 && railGround(a - 0.5) < RAIL.level + 0.3) a -= 0.5;
+  let b = railLength;
+  while (b > a && railGround(b) > RAIL.level + 0.3) b -= 0.5;
+  return { a, b };
+})();
+function boreAt(x, z) {
+  const { s, l } = railCoords(x, z);
+  const { a, b } = RAIL_MOUTHS;
+  const along = Math.max(smoothstep(a + 1.5, a + 0.5, s) * smoothstep(a - BORE - 1, a - BORE, s), smoothstep(b - 1.5, b - 0.5, s) * smoothstep(b + BORE + 1, b + BORE, s));
+  return along * smoothstep(3.9, 3.1, Math.abs(l));
+}
 // The heightfield everything else reads: the land inside the bounds, open sea beyond them.
 export const GRID = new Float32Array((SEGMENTS + 1) ** 2);
 for (let iz = 0; iz <= SEGMENTS; iz++) {
