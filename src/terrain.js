@@ -28,16 +28,16 @@ export const toU = (x, z) => (-x - z) / Math.SQRT2;
 export const toV = (x, z) => (x - z) / Math.SQRT2;
 // To the right a headland reaches far out to sea; to the left the land falls back and the sea opens.
 export const headland = (v) => smoothstep(52, 96, v + (fbm(v * 0.05, 9.4, 2) - 0.5) * 16);
-export const openSea = (v) => smoothstep(-35, -105, v);
+export const openSea = (v) => smoothstep(-49, -119, v);
 // Past the harbour the water runs all the way up the left side.
-const farLeft = (v) => smoothstep(-74, -94, v);
+const farLeft = (v) => smoothstep(-88, -108, v);
 // Pass `u` to make the left shore wander instead of running in a straight line.
 const wander = (u) => (u === undefined ? 0 : (fbm(u * 0.035, 4.2, 3) - 0.5) * 30);
 export const coastU = (v, u) => -40 + (fbm(v * 0.02, 3.1, 3) - 0.5) * 20 - headland(v) * 58 + openSea(v) * 95 + farLeft(v + wander(u)) * 260;
 export const footU = (v, u) => 50 + (fbm(v * 0.025, 7.7, 3) - 0.5) * 18 + openSea(v) * 70 + farLeft(v + wander(u)) * 260;
 // The far shores of the island, where the mountain comes down to the sea: the water's edge on
 // the left (a v for each u), behind (a u for each v) and on the right (a v for each u).
-const leftShore = (u) => -85 - wander(u);
+const leftShore = (u) => -99 - wander(u);
 const farShore = (v) => 238 + (fbm(v * 0.03 + 2, 6.1, 3) - 0.5) * 22;
 const rightShore = (u) => 128 + (fbm(u * 0.03 - 4, 1.7, 3) - 0.5) * 18;
 // Where along the left shore the main village comes down to the water.
@@ -53,20 +53,185 @@ export const ZONES = [
   placeZone('pub', 'Le Pub', 'après le travail', -22, -40, 12),
   placeZone('pods', 'Bulles focus', 'concentration', 2, 52, 13),
   placeZone('atelier', "L'Atelier", 'prototypes', 8, -54, 12),
-  // The harbour has no ground of its own: its boardwalks start from the foot of the main
-  // village, a dozen metres up from the water's edge, and run out over the sea.
-  placeZone('port', 'Le Port', 'pause au bord de l\'eau', HARBOUR_U, leftShore(HARBOUR_U) + 12, 1),
+  // The harbour has no ground of its own: it starts from the quay of the main village's sea
+  // front (see `VILLAGES`) and runs out over the sea.
+  placeZone('port', 'Le Port', 'pause au bord de l\'eau', HARBOUR_U, leftShore(HARBOUR_U) + 7, 1),
 ];
 export const zone = (id) => ZONES.find((z) => z.id === id);
 
-// The villages, in (u, v): the main one, with its feet in the water, climbing from its harbour
-// far up the left-hand slopes (`up` stretches it uphill), and a hamlet on the right headland.
-// `bell` gives a village its campanile.
+// The villages, in (u, v): the main one, on a little quay along its harbour, climbing from
+// there far up the left-hand slopes (`up` stretches it uphill), and a hamlet on the right
+// headland. Each is laid out as the real ones grew: lanes (`lanes`, [u, v] points, so many
+// metres wide) that follow the contours of the hill, stairs (`stair`) that climb between them,
+// and a square or two (`piazzas`) where they meet, one with the church. The sea front is a
+// `quay`: a stone edge with the water lapping at it. The houses are built along the lanes and
+// scattered beyond them (village.js); the ground is cut level under them (`villagePlan`,
+// `landAt`).
+const shore = leftShore(HARBOUR_U);
+const sh = (u, dv) => [u, shore + dv];
 export const VILLAGES = [
-  { u: HARBOUR_U + 10, v: leftShore(HARBOUR_U) + 26, r: 29, up: 1.5, bell: true, waterfront: true },
-  { u: -46, v: 84, r: 14 },
+  {
+    u: HARBOUR_U + 10,
+    v: shore + 24,
+    r: 29,
+    up: 1.5,
+    waterfront: true,
+    lanes: [
+      // The sea front, along the quay, the harbour in the middle of it: a stone edge a little
+      // above the water, held level the whole way along.
+      { name: 'marina', width: 3.6, quay: 2.2, level: WATER_LEVEL + 2.0, points: [sh(48, 9), sh(60, 9.5), sh(68, 9), sh(78, 9.5), sh(90, 8.5)] },
+      // Three lanes along the contours, each a storey or two above the last.
+      { name: 'bassa', width: 3.4, points: [sh(82, 20.5), sh(75, 23.5), sh(70, 25.5), sh(64, 28.5), sh(63, 33.5), sh(62.5, 38.5), sh(61, 43.5), sh(60.5, 48), sh(60, 52)] },
+      { name: 'mezzo', width: 3.2, points: [sh(95, 17), sh(90, 21), sh(87, 24.5), sh(84, 27), sh(79, 31.5), sh(76.5, 36), sh(73, 41), sh(72, 46), sh(72, 53)] },
+      { name: 'alta', width: 3.0, points: [sh(99, 21), sh(97.5, 24.5), sh(95.5, 27), sh(93, 29.5), sh(89.5, 32.5), sh(88, 37), sh(86.5, 39.5), sh(83.5, 43.5), sh(83, 47.5), sh(82, 52)] },
+      // Stairs, slanting across the slope from one lane up to the next, and the last one
+      // climbing in zigzags from the top lane to the church, on a terrace cut into the brow
+      // of the hill.
+      { stair: true, width: 2.0, points: [sh(78, 9.5), sh(82, 20.5)] },
+      { stair: true, width: 2.0, points: [sh(75, 23.5), sh(84, 27)] },
+      { stair: true, width: 2.0, points: [sh(63, 33.5), sh(74.5, 33.5)] },
+      { stair: true, width: 2.0, points: [sh(61, 43.5), sh(72, 46)] },
+      { stair: true, width: 2.0, points: [sh(76.5, 36), sh(88, 37)] },
+      { stair: true, width: 2.0, points: [sh(72, 50), sh(83, 47.5)] },
+      { stair: true, width: 2.2, points: [sh(99, 21), sh(102, 24), sh(103, 30), sh(101, 37)] },
+    ],
+    piazzas: [
+      { u: 100, v: shore + 44.5, r: 7, level: 38, church: true },
+      { u: 80.2, v: shore + 34.7, r: 4, well: true },
+    ],
+  },
+  {
+    u: -46,
+    v: 84,
+    r: 14,
+    lanes: [
+      { width: 2.8, points: [[-58, 82], [-50, 83], [-42, 83.5], [-34, 83]] },
+      { width: 2.6, points: [[-54, 92], [-46, 92], [-38, 91.5]] },
+      { stair: true, width: 2.0, points: [[-50, 74], [-44, 83.5], [-38, 92]] },
+    ],
+    piazzas: [],
+  },
 ];
-const hub = { x: toX(VILLAGES[0].u, VILLAGES[0].v), z: toZ(VILLAGES[0].u, VILLAGES[0].v) };
+
+/**
+ * The streets of the villages, measured on the ground: each lane as world points with the
+ * level of its paving at every vertex, each square with its level. A lane that follows the
+ * contours keeps a smoothed reading of the natural ground; a stair ramps evenly from the lane
+ * it leaves to the one it reaches; a square lies at the mean level of its ground, and so does
+ * any lane that crosses it. A quay knows which of its sides the sea is on. The ground is then
+ * cut level to them (see `landAt`), and the houses are built along them.
+ */
+let plan = null; // measured on first use; `false` while measuring, so the ground is read as it lies
+export function villagePlan() {
+  if (plan) return plan;
+  if (plan === false) return null;
+  plan = false;
+  const natural = (x, z) => {
+    let sum = 0;
+    for (const [dx, dz] of [[0, 0], [1.6, 0], [-1.6, 0], [0, 1.6], [0, -1.6]]) sum += landAt(x + dx, z + dz);
+    return sum / 5;
+  };
+  const lanes = [];
+  const piazzas = [];
+  for (const village of VILLAGES) {
+    const squares = (village.piazzas ?? []).map((pz) => ({ ...pz, village, x: toX(pz.u, pz.v), z: toZ(pz.u, pz.v) }));
+    for (const pz of squares) {
+      if (pz.level !== undefined) continue;
+      let sum = 0;
+      for (let k = 0; k < 8; k++) sum += natural(pz.x + Math.cos((k * Math.PI) / 4) * pz.r * 0.6, pz.z + Math.sin((k * Math.PI) / 4) * pz.r * 0.6);
+      pz.level = sum / 8;
+    }
+    const measured = [];
+    const streets = (village.lanes ?? []).slice().sort((a, b) => (a.stair ? 1 : 0) - (b.stair ? 1 : 0));
+    for (const street of streets) {
+      const pts = street.points.map(([u, v]) => ({ x: toX(u, v), z: toZ(u, v) }));
+      const segs = [];
+      let length = 0;
+      for (let i = 1; i < pts.length; i++) {
+        const len = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z);
+        segs.push({ a: pts[i - 1], b: pts[i], len, s0: length });
+        length += len;
+      }
+      const xs = pts.map((p) => p.x);
+      const zs = pts.map((p) => p.z);
+      const lane = { ...street, village, half: street.width / 2, pts, segs, length, levels: pts.map((p) => street.level ?? natural(p.x, p.z)), box: { x0: Math.min(...xs), x1: Math.max(...xs), z0: Math.min(...zs), z1: Math.max(...zs) } };
+      if (!lane.stair && street.level === undefined) {
+        for (let pass = 0; pass < 2; pass++) {
+          const l = lane.levels;
+          lane.levels = l.map((v, i) => (i === 0 || i === l.length - 1 ? v : l[i - 1] * 0.25 + v * 0.5 + l[i + 1] * 0.25));
+        }
+      }
+      // Where a lane starts or ends on another, or on a square, it takes that level.
+      const snap = (p) => {
+        for (const pz of squares) if (Math.hypot(p.x - pz.x, p.z - pz.z) < pz.r + 1.5) return pz.level;
+        let best = null;
+        let nearest = 4;
+        for (const other of measured) {
+          const q = laneAt(other, p.x, p.z);
+          if (q.d < nearest) {
+            nearest = q.d;
+            best = q.level;
+          }
+        }
+        return best;
+      };
+      if (street.level === undefined) {
+        for (const end of [0, pts.length - 1]) {
+          const level = snap(pts[end]);
+          if (level !== null) lane.levels[end] = level;
+        }
+      }
+      pts.forEach((p, i) => {
+        for (const pz of squares) if (Math.hypot(p.x - pz.x, p.z - pz.z) < pz.r + 2) lane.levels[i] = pz.level;
+      });
+      if (lane.stair) {
+        const [l0, l1] = [lane.levels[0], lane.levels[pts.length - 1]];
+        lane.levels = pts.map((p, i) => (i === 0 ? l0 : i === pts.length - 1 ? l1 : l0 + ((l1 - l0) * (segs[i - 1].s0 + segs[i - 1].len)) / length));
+      }
+      if (lane.quay) {
+        // The sea lies on the side where the ground falls away.
+        const mid = lanePoint(lane, length / 2);
+        const fall = (side) => landAt(mid.x - mid.tz * side * 9, mid.z + mid.tx * side * 9);
+        lane.seaSide = fall(1) < fall(-1) ? 1 : -1;
+      }
+      measured.push(lane);
+    }
+    lanes.push(...measured);
+    piazzas.push(...squares);
+  }
+  plan = { lanes, piazzas };
+  return plan;
+}
+
+/** The nearest point of a lane to (x, z): its distance, how far along the lane it lies, and the level of the paving there. */
+export function laneAt(lane, x, z) {
+  const best = { d: Infinity, s: 0, level: 0, side: 1 };
+  const { box } = lane;
+  if (x < box.x0 - 9 || x > box.x1 + 9 || z < box.z0 - 9 || z > box.z1 + 9) return best;
+  lane.segs.forEach(({ a, b, len, s0 }, i) => {
+    const t = Math.min(1, Math.max(0, ((x - a.x) * (b.x - a.x) + (z - a.z) * (b.z - a.z)) / (len * len)));
+    const dx = x - a.x - (b.x - a.x) * t;
+    const dz = z - a.z - (b.z - a.z) * t;
+    const d = Math.hypot(dx, dz);
+    if (d < best.d) {
+      best.d = d;
+      best.s = s0 + t * len;
+      best.level = lane.levels[i] + (lane.levels[i + 1] - lane.levels[i]) * t;
+      // Which side of the lane the point lies on, as `lanePoint` numbers them.
+      best.side = -dx * (b.z - a.z) + dz * (b.x - a.x) >= 0 ? 1 : -1;
+    }
+  });
+  return best;
+}
+
+/** A point of a lane, `s` metres along it: where it is, which way it runs, and the level of its paving. */
+export function lanePoint(lane, s) {
+  let i = lane.segs.findIndex((g) => s <= g.s0 + g.len);
+  if (i < 0) i = lane.segs.length - 1;
+  const { a, b, len, s0 } = lane.segs[i];
+  const t = Math.min(1, Math.max(0, (s - s0) / len));
+  return { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t, tx: (b.x - a.x) / len, tz: (b.z - a.z) / len, level: lane.levels[i] + (lane.levels[i + 1] - lane.levels[i]) * t };
+}
 
 // Out in the bay, well off the shore, a rock stands alone in the sea: the lighthouse islet,
 // steep-sided, its top a few metres above the waves, with a ledge in its lee for the landing.
@@ -89,13 +254,10 @@ function villageClimb(u, v, x, z, inland) {
 // The observatory stands on the summit, on a round terrace cut level into the crest.
 export const OBSERVATORY = { u: 166, v: 94, r: 7, x: toX(166, 94), z: toZ(166, 94) };
 
-// Footpaths: from the agora to each work area, then the lane from the library to the harbour
-// and the village street that comes down to it from the bell tower.
-export const PATHS = [
-  ...ZONES.slice(1, -1).map((z) => [0, 0, z.x, z.z]),
-  [zone('library').x, zone('library').z, zone('port').x, zone('port').z],
-  [hub.x, hub.z, zone('port').x, zone('port').z],
-];
+// Footpaths: from the agora to each work area, then the road from the library that comes into
+// the main village at the near end of its sea front.
+const GATE = (([u, v]) => ({ x: toX(u, v), z: toZ(u, v) }))(VILLAGES[0].lanes[0].points[0]);
+export const PATHS = [...ZONES.slice(1, -1).map((z) => [0, 0, z.x, z.z]), [zone('library').x, zone('library').z, GATE.x, GATE.z]];
 
 // The wine estate on the mountain side, left of the railway: a Florentine villa on its own
 // level ground, among vineyards planted on irregular terraces.
@@ -186,7 +348,7 @@ function landAt(x, z) {
   // the right, above the station, and from there one long even flank runs down leftward all
   // the way to the sea, while its back falls to the far shore.
   const foot = footU(v, u);
-  const flank = smoothstep(-110, 112, v + (fbm(u * 0.02 + 3, 1.7, 2) - 0.5) * 20) ** 0.7;
+  const flank = smoothstep(-124, 112, v + (fbm(u * 0.02 + 3, 1.7, 2) - 0.5) * 20) ** 0.7;
   const across = smoothstep(foot - 10, foot + 95, u) * smoothstep(240, 185, u);
   const back = 78 * flank * across + (fbm(x * 0.015, z * 0.015, 3) - 0.5) * 12 * smoothstep(0, 20, 78 * flank * across) + Math.max(0, u - foot) * 0.05;
   // On the right a tall ridge comes down from the summit and plunges into the sea, closing the bay.
@@ -242,6 +404,21 @@ function landAt(x, z) {
   const isletTop = 4.2 + (fbm(x * 0.15, z * 0.15 + 8, 2) - 0.5) * 1.6;
   h += (isletTop - h) * smoothstep(ISLET.r, ISLET.r * 0.45, rock);
   h += (WATER_LEVEL + 0.7 - h) * smoothstep(5, 2.5, Math.hypot(u - ISLET.u - 7, v - ISLET.v));
+  // The village streets are cut level into the hillside: each lane a shelf along the contours,
+  // each stair an even ramp, with a short shoulder up or down to the natural ground on either
+  // side; the squares are levelled whole. Off the quay the bed is dug out so the water laps
+  // at its wall.
+  const streets = villagePlan();
+  if (streets) {
+    for (const lane of streets.lanes) {
+      const near = laneAt(lane, x, z);
+      const sea = lane.quay && near.side === lane.seaSide;
+      const flat = lane.half + (sea ? lane.quay : 0);
+      if (near.d < flat + 1.5) h += (near.level - h) * smoothstep(flat + 1.5, flat + 0.4, near.d);
+      if (sea && near.d > flat + 0.2 && near.d < flat + 9) h = Math.min(h, near.level + (WATER_LEVEL - 1.6 - near.level) * smoothstep(flat + 0.2, flat + 1.4, near.d));
+    }
+    for (const pz of streets.piazzas) h += (pz.level - h) * smoothstep(pz.r + 3, pz.r + 0.5, Math.hypot(x - pz.x, z - pz.z));
+  }
   // Work areas sit on level pads.
   for (const zn of ZONES) if (zn.id !== 'port') h += (0 - h) * smoothstep(zn.r + 7, zn.r + 1, Math.hypot(x - zn.x, z - zn.z));
   h += (VILLA.y - h) * smoothstep(VILLA.r + 4, VILLA.r + 0.5, Math.hypot(x - VILLA.x, z - VILLA.z));
@@ -363,6 +540,11 @@ export function isWild(x, z, margin = 0, floor = WATER_LEVEL + 0.4) {
   for (const p of PATHS) if (segmentDistance(x, z, p) < 2.6 + margin) return false;
   for (const t of TRAILS) if (segmentDistance(x, z, t) < 1.1 + Math.max(0, margin)) return false;
   for (const c of CLEARINGS) if (Math.hypot(x - c.x, z - c.z) < c.r + margin) return false;
+  const streets = villagePlan();
+  if (streets) {
+    for (const lane of streets.lanes) if (laneAt(lane, x, z).d < lane.half + (lane.quay ?? 0) + 0.8 + Math.max(0, margin)) return false;
+    for (const pz of streets.piazzas) if (Math.hypot(x - pz.x, z - pz.z) < pz.r + 1 + Math.max(0, margin)) return false;
+  }
   return true;
 }
 
