@@ -1,6 +1,6 @@
-// A fan of choices unfolding from a button, as a hand of cards spread: the chips fly out one
-// after another along an arc above it and fold back the same way. Used by the weather and the
-// season switches (weather.js, season.js).
+// A fan of choices unfolding from a button, as a stack of the Dock does: the chips rise one
+// after another in a single column that leans away as it climbs, and fold back the same way.
+// Used by the weather and the season switches (weather.js, season.js).
 
 /**
  * @param {HTMLButtonElement} button the button the fan opens from
@@ -12,10 +12,8 @@ export function fan(button, choices, { render, pick }) {
   const tray = document.createElement('div');
   tray.className = 'fan';
   tray.setAttribute('role', 'menu');
-  const n = choices.length;
-  // Along an arc from left to up-right, wider for a longer hand.
-  const radius = n <= 4 ? 76 : 100;
-  const [from, to] = n <= 4 ? [150, 75] : [165, 60];
+  // Up from the button, one chip's height apart, bending to the left a little more each step.
+  const STEP = 40;
   const chips = choices.map((choice, i) => {
     const chip = document.createElement('button');
     chip.type = 'button';
@@ -24,10 +22,9 @@ export function fan(button, choices, { render, pick }) {
     chip.title = choice.label;
     chip.setAttribute('aria-label', choice.label);
     chip.setAttribute('role', 'menuitemradio');
-    const angle = ((from + ((to - from) * i) / Math.max(1, n - 1)) * Math.PI) / 180;
     chip.style.setProperty('--i', i);
-    chip.style.setProperty('--dx', `${(Math.cos(angle) * radius).toFixed(1)}px`);
-    chip.style.setProperty('--dy', `${(-Math.sin(angle) * radius).toFixed(1)}px`);
+    chip.style.setProperty('--dx', `${(-2.2 * i * i).toFixed(1)}px`);
+    chip.style.setProperty('--dy', `${-(STEP + 8 + i * STEP)}px`);
     chip.innerHTML = render(choice);
     chip.addEventListener('click', () => {
       pick(choice);
