@@ -69,6 +69,8 @@ addEventListener('keydown', (e) => {
   keys.add(e.code);
   tapped.add(e.code);
   if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
+  // Any step he is asked to take brings the view back to him, wherever it was looking.
+  if (e.code.startsWith('Arrow') || ['KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) homing = true;
   if (!e.repeat) climate.key(e.code, true);
   // A / E on AZERTY (KeyQ / KeyE codes) turn the view to the next isometric corner.
   if (e.code === 'KeyQ') yawTarget = snapYaw(yawTarget) + Math.PI / 2;
@@ -95,8 +97,12 @@ const PITCH = { min: 0.3, max: 1.5 };
 let yawTarget = view.yaw;
 let pitchTarget = view.pitch;
 let dragging = null; // 'pan' | 'orbit'
+let homing = false; // the view is on its way back to the avatar
 const pan = new THREE.Vector3();
-renderer.domElement.addEventListener('pointerdown', (e) => (dragging = e.button === 2 || e.ctrlKey || e.metaKey || e.altKey ? 'orbit' : 'pan'));
+renderer.domElement.addEventListener('pointerdown', (e) => {
+  dragging = e.button === 2 || e.ctrlKey || e.metaKey || e.altKey ? 'orbit' : 'pan';
+  homing = false;
+});
 renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
 addEventListener('pointerup', () => (dragging = null));
 addEventListener('pointermove', (e) => {
@@ -210,7 +216,11 @@ renderer.setAnimationLoop(() => {
     resize();
   }
 
-  if (player.step) pan.multiplyScalar(Math.exp(-dt * 6));
+  if (player.step || homing) pan.multiplyScalar(Math.exp(-dt * 6));
+  if (homing && pan.lengthSq() < 0.01) {
+    pan.set(0, 0, 0);
+    homing = false;
+  }
   focus.copy(player.position).add(pan).y += 1.4;
   view.update(focus, pixels.lowRes, pixels.offset);
   scene.fog.color.copy(climate.skyHorizon);
