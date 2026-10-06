@@ -313,8 +313,8 @@ function frame() {
   if (frames === 2) {
     const loading = document.getElementById('loading');
     loading?.classList.add('is-done');
-    setTimeout(() => loading?.remove(), 1400);
-    if (opensOnShot) setTimeout(() => climate.rejoin(), 1600);
+    setTimeout(() => loading?.remove(), 3000);
+    if (opensOnShot) setTimeout(() => climate.rejoin(), 3000);
   }
 }
 // `virt.frame()` runs one frame by hand, for timing it while the page is hidden.
