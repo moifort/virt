@@ -56,7 +56,7 @@ if (params.has('at')) {
 }
 if (params.has('zoom')) view.viewHeight = Number(params.get('zoom'));
 if (params.has('yaw')) view.yaw = (Number(params.get('yaw')) * Math.PI) / 2;
-globalThis.virt = { climate, player, view, scene, sun, renderer, pixels };
+globalThis.virt = { climate, player, view, scene, sun, renderer, pixels, world };
 
 function resize() {
   pixels.setSize(innerWidth, innerHeight);
@@ -193,7 +193,7 @@ function frameShadows() {
   }
 }
 
-renderer.setAnimationLoop(() => {
+function frame() {
   owed += clock.getDelta();
   if (owed < FRAME * 0.9) return;
   const dt = Math.min(owed, 0.05);
@@ -266,4 +266,7 @@ renderer.setAnimationLoop(() => {
   // How far the wind pushes the rain sideways on screen.
   weather.slant = (climate.wind.x * view.right.x + climate.wind.y * view.right.z) * weather.wind;
   pixels.render(scene, view.camera, { skyTop: climate.skyTop, skyHorizon: climate.skyHorizon, texelWorld: view.texelWorld, time: t, weather });
-});
+}
+// `virt.frame()` runs one frame by hand, for timing it while the page is hidden.
+virt.frame = frame;
+renderer.setAnimationLoop(frame);
