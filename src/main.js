@@ -21,12 +21,14 @@ scene.fog = new THREE.Fog(0xffffff, 1, 2);
 // Hour, season and weather are the real ones where the player is: see climate.js.
 const climate = new Climate();
 
+// The sun casts its shadows over the whole island at once, from a camera fixed in the world:
+// if it followed the view, the mountain would leave its frame as the view slid away and the
+// long shadows it throws across the valley would come and go with every move of the map.
 const sun = new THREE.DirectionalLight(0xffffff, 1);
 sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
-Object.assign(sun.shadow.camera, { left: -60, right: 60, top: 60, bottom: -60, near: 1, far: 260 });
+sun.shadow.mapSize.set(4096, 4096);
 sun.shadow.bias = -0.0006;
-sun.shadow.normalBias = 0.06;
+sun.shadow.normalBias = 0.08;
 scene.add(sun, sun.target);
 
 const world = createWorld(scene);
@@ -127,10 +129,43 @@ const focus = new THREE.Vector3();
 const ahead = new THREE.Vector2();
 const sunSpot = new THREE.Vector3();
 const moonSpot = new THREE.Vector3();
+let t = 0;
+
+// The island as a box, from the base of the tile up over the summit and the tallest tower.
+const ISLAND = LAND_ENDS.flatMap(([x, z]) => [new THREE.Vector3(x, -16, z), new THREE.Vector3(x, 110, z)]);
 // The axes of the shadow map in the world: across the light, as three.js lays the map out.
 const sunRight = new THREE.Vector3();
 const sunUp = new THREE.Vector3();
-let t = 0;
+const extent = { right: [0, 0], up: [0, 0], along: [0, 0] };
+/** Frames the shadow camera on the whole island, whichever way the light comes from. */
+function frameShadows() {
+  const dir = climate.lightDir;
+  sunRight.set(0, 1, 0).cross(dir).normalize();
+  sunUp.crossVectors(dir, sunRight);
+  for (const [axis, span] of [[sunRight, extent.right], [sunUp, extent.up], [dir, extent.along]]) {
+    span[0] = Infinity;
+    span[1] = -Infinity;
+    for (const corner of ISLAND) {
+      const d = corner.dot(axis);
+      span[0] = Math.min(span[0], d);
+      span[1] = Math.max(span[1], d);
+    }
+  }
+  const cam = sun.shadow.camera;
+  const halfW = (extent.right[1] - extent.right[0]) / 2 + 4;
+  const halfH = (extent.up[1] - extent.up[0]) / 2 + 4;
+  const depth = extent.along[1] - extent.along[0];
+  // The target is the middle of the island as the light sees it, held to whole texels of the
+  // map so that a slow drift of the sun never makes the shadow edges crawl.
+  const texel = (2 * halfW) / sun.shadow.mapSize.x;
+  const mid = (span) => Math.round((span[0] + span[1]) / 2 / texel) * texel;
+  sun.target.position.set(0, 0, 0).addScaledVector(sunRight, mid(extent.right)).addScaledVector(sunUp, mid(extent.up));
+  sun.position.copy(sun.target.position).addScaledVector(dir, extent.along[1] + 10);
+  if (cam.right !== halfW || cam.top !== halfH || cam.far !== depth + 20) {
+    Object.assign(cam, { left: -halfW, right: halfW, top: halfH, bottom: -halfH, near: 1, far: depth + 20 });
+    cam.updateProjectionMatrix();
+  }
+}
 
 renderer.setAnimationLoop(() => {
   const dt = Math.min(clock.getDelta(), 0.05);
@@ -171,26 +206,7 @@ renderer.setAnimationLoop(() => {
   scene.fog.near = view.distance + 60 - 240 * (1 - climate.visibility);
   scene.fog.far = view.distance + 520 * climate.visibility;
 
-  // Shadows are cast over whatever the view takes in, wider as it draws back.
-  const reach = Math.max(60, view.viewHeight * 0.62);
-  if (reach !== sun.shadow.camera.right) {
-    Object.assign(sun.shadow.camera, { left: -reach, right: reach, top: reach, bottom: -reach, far: 260 + reach });
-    sun.shadow.camera.updateProjectionMatrix();
-  }
-  // The shadow camera follows the view, but only by whole texels of its map, measured across
-  // the light: otherwise every slide of the view resamples the map on a shifted grid and the
-  // edges of the shadows crawl over the ground.
-  sunRight.set(0, 1, 0).cross(climate.lightDir).normalize();
-  sunUp.crossVectors(climate.lightDir, sunRight);
-  const shadowTexel = (2 * reach) / sun.shadow.mapSize.x;
-  const snap = (axis) => {
-    const along = sun.target.position.dot(axis);
-    sun.target.position.addScaledVector(axis, Math.round(along / shadowTexel) * shadowTexel - along);
-  };
-  sun.target.position.copy(player.position).add(pan);
-  snap(sunRight);
-  snap(sunUp);
-  sun.position.copy(sun.target.position).addScaledVector(climate.lightDir, 120 + reach * 0.5);
+  frameShadows();
   // The road the low sun, or the moon, lays on the sea runs through the middle of the view.
   const level = Math.hypot(climate.lightDir.x, climate.lightDir.z) || 1;
   const across = { x: -climate.lightDir.z / level, z: climate.lightDir.x / level };
