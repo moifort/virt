@@ -10,6 +10,11 @@ class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
         super().end_headers()
 
 
+class Server(http.server.ThreadingHTTPServer):
+    # A page load asks for every module at once; a short listen queue drops some of them.
+    request_queue_size = 64
+
+
 port = int(sys.argv[1]) if len(sys.argv) > 1 else 8742
 print(f"Serving on http://localhost:{port}")
-http.server.ThreadingHTTPServer(("", port), NoCacheHandler).serve_forever()
+Server(("", port), NoCacheHandler).serve_forever()
