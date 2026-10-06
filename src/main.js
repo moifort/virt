@@ -201,7 +201,9 @@ function frameShadows() {
 
 function frame() {
   owed += clock.getDelta();
-  if (owed < FRAME * 0.9) return;
+  // A 120 Hz screen calls every 8.3 ms, give or take a little: two calls must always make a
+  // frame, or now and then three go by and the picture stutters.
+  if (owed < FRAME * 0.75) return;
   const dt = Math.min(owed, 0.05);
   owed = 0;
   t += dt;
