@@ -85,17 +85,27 @@ addEventListener('keyup', (e) => {
 });
 addEventListener('blur', () => keys.clear());
 
-// Isometric-style view: the pitch is fixed and the yaw rests on one of the four corners of the
-// island (A and E turn it to the next). Dragging with the mouse slides the view over the map to
-// look around; as soon as the avatar walks again, the view comes back to him.
+// The view, as on a map: dragging slides it over the island to look around, and as soon as the
+// avatar walks again it comes back to him. Dragging with the right button, or with Ctrl, Cmd
+// or Alt held, turns the view around the point it looks at and tilts it, from low over the sea
+// to nearly straight down. A and E turn it to the next corner of the island, where the walk
+// lines up with the screen again.
 const snapYaw = (yaw) => Math.round(yaw / (Math.PI / 2)) * (Math.PI / 2);
+const PITCH = { min: 0.3, max: 1.5 };
 let yawTarget = view.yaw;
-let dragging = false;
+let pitchTarget = view.pitch;
+let dragging = null; // 'pan' | 'orbit'
 const pan = new THREE.Vector3();
-renderer.domElement.addEventListener('pointerdown', () => (dragging = true));
-addEventListener('pointerup', () => (dragging = false));
+renderer.domElement.addEventListener('pointerdown', (e) => (dragging = e.button === 2 || e.ctrlKey || e.metaKey || e.altKey ? 'orbit' : 'pan'));
+renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
+addEventListener('pointerup', () => (dragging = null));
 addEventListener('pointermove', (e) => {
   if (!dragging) return;
+  if (dragging === 'orbit') {
+    yawTarget += e.movementX * 0.006;
+    pitchTarget = clamp(pitchTarget + e.movementY * 0.005, PITCH.min, PITCH.max);
+    return;
+  }
   // The map follows the hand: a screen pixel is so many metres across, and more than that
   // along the ground up the screen, which the view looks at aslant.
   const metres = view.viewHeight / innerHeight;
@@ -172,6 +182,7 @@ renderer.setAnimationLoop(() => {
   t += dt;
 
   view.yaw += (yawTarget - view.yaw) * (1 - Math.exp(-dt * 8));
+  view.pitch += (pitchTarget - view.pitch) * (1 - Math.exp(-dt * 8));
   player.update(dt, t, readInput(!player.step), snapYaw(view.yaw));
   climate.update(dt);
   world.update(t, dt, climate);
