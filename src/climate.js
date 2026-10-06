@@ -74,6 +74,7 @@ export class Climate {
     this.place = { lat: 44.13, lon: -standardOffset / 4, known: false };
     this.offset = 0; // preview: milliseconds added to the real time
     this.lapse = false;
+    this.trip = null; // a quick passage of time under way: see `travel`
     this.override = 0; // index in WEATHERS
     this.real = { ...PRESETS.clear, temperature: 18, windFrom: 225 };
     this.now = { ...PRESETS.clear };
@@ -148,6 +149,7 @@ export class Climate {
     if (code === 'KeyR') {
       this.offset = 0;
       this.override = 0;
+      this.trip = null;
     }
   }
 
@@ -170,6 +172,23 @@ export class Climate {
     }
   }
 
+  /**
+   * Lets the hours run by quickly, always forward, until the solar clock reads `hour`: the sky
+   * goes through the sunset on its way to the night and through the dawn on its way back.
+   */
+  travel(hour, seconds = 3) {
+    const now = sunAt(new Date(Date.now() + this.offset), this.place.lat, this.place.lon);
+    const ahead = (((hour - now.solarHours) % 24) + 24) % 24;
+    this.trip = { from: this.offset, to: this.offset + ahead * 3_600_000, time: 0, seconds };
+  }
+
+  /** Whether it is night now, or will be at the end of the passage of time under way. */
+  get nightAhead() {
+    if (!this.trip) return this.night > 0.5;
+    const end = sunAt(new Date(Date.now() + this.trip.to), this.place.lat, this.place.lon);
+    return end.up < -0.02;
+  }
+
   previewFromUrl() {
     const params = new URLSearchParams(location.search);
     const number = (name) => (params.has(name) ? Number(params.get(name)) : undefined);
@@ -178,6 +197,12 @@ export class Climate {
 
   update(dt) {
     if (this.lapse) this.offset += dt * 3_600_000 * 1.5;
+    if (this.trip) {
+      const trip = this.trip;
+      trip.time = Math.min(trip.seconds, trip.time + dt);
+      this.offset = trip.from + (trip.to - trip.from) * smooth(0, trip.seconds, trip.time);
+      if (trip.time >= trip.seconds) this.trip = null;
+    }
     const date = new Date(Date.now() + this.offset);
     const sun = sunAt(date, this.place.lat, this.place.lon);
 

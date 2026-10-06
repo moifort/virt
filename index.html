@@ -33,6 +33,140 @@
       canvas:active {
         cursor: grabbing;
       }
+
+      /* The day / night switch (see daynight.js): a strip of sky with the sun or the moon on it. */
+      .daynight {
+        position: fixed;
+        top: 12px;
+        left: 50%;
+        z-index: 10;
+        width: 64px;
+        height: 30px;
+        padding: 0;
+        border: 2px solid var(--ink);
+        border-radius: 15px;
+        overflow: hidden;
+        background: none;
+        box-shadow: 0 3px 0 var(--ink);
+        cursor: pointer;
+        transform: translateX(-50%);
+        transition: transform 0.12s, box-shadow 0.12s;
+      }
+      .daynight:hover {
+        transform: translate(-50%, -1px);
+        box-shadow: 0 4px 0 var(--ink);
+      }
+      .daynight:active {
+        transform: translate(-50%, 2px);
+        box-shadow: 0 1px 0 var(--ink);
+      }
+      .daynight:focus-visible {
+        outline: 2px solid var(--paper);
+        outline-offset: 2px;
+      }
+      .daynight i {
+        position: absolute;
+        display: block;
+      }
+      .daynight-sky {
+        position: absolute;
+        inset: 0;
+        background: #8fd6f6;
+        transition: background 0.8s;
+      }
+      .is-night .daynight-sky {
+        background: #27306a;
+      }
+      .daynight .star {
+        width: 2px;
+        height: 2px;
+        background: #fff6d5;
+        opacity: 0;
+        transition: opacity 0.8s;
+      }
+      .is-night .star {
+        opacity: 1;
+        animation: daynight-twinkle 1.8s steps(2) infinite;
+      }
+      .daynight .cloud {
+        width: 10px;
+        height: 4px;
+        background: #fff;
+        box-shadow: 3px -2px 0 #fff, -2px 1px 0 #fff;
+        transition: opacity 0.6s;
+        animation: daynight-drift 5s ease-in-out infinite alternate;
+      }
+      .is-night .cloud {
+        opacity: 0;
+      }
+      .daynight-knob {
+        position: absolute;
+        top: 2px;
+        left: 3px;
+        width: 22px;
+        height: 22px;
+        transition: left 0.5s cubic-bezier(0.5, 1.6, 0.4, 0.8);
+      }
+      .is-night .daynight-knob {
+        left: 35px;
+      }
+      .daynight .sun,
+      .daynight .moon {
+        inset: 0;
+        border-radius: 50%;
+        transition: opacity 0.4s, transform 0.5s;
+      }
+      .daynight .sun {
+        background: radial-gradient(circle, #ffd23f 0 6px, transparent 6.5px),
+          repeating-conic-gradient(#ffb703 0 15deg, transparent 15deg 45deg);
+        animation: daynight-spin 8s linear infinite;
+      }
+      .daynight .moon {
+        inset: 4px;
+        background: radial-gradient(circle at 35% 40%, #d9d3b8 0 2px, transparent 2.5px),
+          radial-gradient(circle at 65% 68%, #d9d3b8 0 1.5px, transparent 2px), #fff6d5;
+        opacity: 0;
+        transform: rotate(-90deg) scale(0.4);
+        animation: daynight-glow 2.4s ease-in-out infinite alternate;
+      }
+      .is-night .sun {
+        opacity: 0;
+        transform: rotate(90deg) scale(0.4);
+      }
+      .is-night .moon {
+        opacity: 1;
+        transform: none;
+      }
+      @keyframes daynight-spin {
+        to {
+          rotate: 360deg;
+        }
+      }
+      @keyframes daynight-glow {
+        from {
+          box-shadow: 0 0 2px 1px rgba(255, 246, 213, 0.3);
+        }
+        to {
+          box-shadow: 0 0 6px 2px rgba(255, 246, 213, 0.6);
+        }
+      }
+      @keyframes daynight-twinkle {
+        50% {
+          opacity: 0.3;
+        }
+      }
+      @keyframes daynight-drift {
+        to {
+          translate: -6px 0;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .daynight *,
+        .daynight {
+          animation: none !important;
+          transition: none !important;
+        }
+      }
     </style>
     <script type="importmap">
       {

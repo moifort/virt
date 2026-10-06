@@ -3,6 +3,7 @@ import { PixelCamera, PixelRenderer } from './pixel.js';
 import { Player } from './player.js';
 import { GLOBALS, PAL, paint } from './style.js';
 import { Climate } from './climate.js';
+import { dayNightSwitch } from './daynight.js';
 import { LAND_ENDS, WATER_LEVEL, createWorld, groundAt } from './world.js';
 
 const clamp = THREE.MathUtils.clamp;
@@ -24,6 +25,7 @@ scene.fog = new THREE.Fog(0xffffff, 1, 2);
 
 // Hour, season and weather are the real ones where the player is: see climate.js.
 const climate = new Climate();
+const dayNight = dayNightSwitch(climate);
 
 // The sun casts its shadows over the whole island at once, from a camera fixed in the world:
 // if it followed the view, the mountain would leave its frame as the view slid away and the
@@ -212,6 +214,7 @@ function frame() {
   view.pitch += (pitchTarget - view.pitch) * (1 - Math.exp(-dt * 8));
   player.update(dt, t, readInput(!player.step), snapYaw(view.yaw));
   climate.update(dt);
+  dayNight.update();
   world.update(t, dt, climate);
 
   // The nearest seat within reach, if he is standing still: a little marker bobs over it.
