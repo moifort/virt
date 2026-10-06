@@ -70,17 +70,13 @@ const hub = { x: toX(VILLAGES[0].u, VILLAGES[0].v), z: toZ(VILLAGES[0].u, VILLAG
 
 // The observatory stands on the summit, on a round terrace cut level into the crest.
 export const OBSERVATORY = { u: 166, v: 94, r: 7, x: toX(166, 94), z: toZ(166, 94) };
-// The path to it climbs the mountain in long zigzags from the work areas, passing left of
-// the villa, bend after bend up to the terrace.
-const CLIMB = [[36, 40], [58, 18], [72, -12], [96, 6], [112, -16], [126, 12], [134, 44], [150, 70], [OBSERVATORY.u, OBSERVATORY.v]];
 
-// Footpaths: from the agora to each work area, then the lane from the library to the harbour,
-// the village street that comes down to it from the bell tower, and the climb to the summit.
+// Footpaths: from the agora to each work area, then the lane from the library to the harbour
+// and the village street that comes down to it from the bell tower.
 export const PATHS = [
   ...ZONES.slice(1, -1).map((z) => [0, 0, z.x, z.z]),
   [zone('library').x, zone('library').z, zone('port').x, zone('port').z],
   [hub.x, hub.z, zone('port').x, zone('port').z],
-  ...CLIMB.slice(1).map(([u, v], i) => [toX(...CLIMB[i]), toZ(...CLIMB[i]), toX(u, v), toZ(u, v)]),
 ];
 
 // The wine estate on the mountain side, left of the railway: a Florentine villa on its own
