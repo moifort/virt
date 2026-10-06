@@ -331,17 +331,18 @@ function stationArea(x, z, y) {
   const { s, l } = railCoords(x, z);
   return smoothstep(y.s0 - 2.5, y.s0, s) * smoothstep(y.s1 + 2.5, y.s1, s) * smoothstep(y.l0 - 2.5, y.l0, l) * smoothstep(y.l1 + 2, y.l1, l);
 }
-// Before the station the line runs in a rock cutting, and then into a spur of the mountain
-// thrown across it, so that the train has a hill to go into: the first tunnel's mouth is
-// where the cutting ends and the spur begins.
-export const CUTTING = { s0: -6, s1: STATION.s0 + 2, l0: -3.6, l1: 3.2 };
+// Before the station the line runs in a short rock cutting, and then into a spur of the
+// mountain thrown across it, so that the train has a hill to go into: the first tunnel's mouth
+// is where the cutting ends and the spur begins, a few metres short of the platform.
+export const SPUR_END = STATION.s0 - 10;
+export const CUTTING = { s0: SPUR_END, s1: STATION.s0 + 2, l0: -3.6, l1: 3.2 };
 function spurAt(x, z) {
   const { s, l } = railCoords(x, z);
-  return smoothstep(-7, -11, s) * smoothstep(-42, -28, s) * smoothstep(21, 7, Math.abs(l));
+  return smoothstep(SPUR_END - 1, SPUR_END - 5, s) * smoothstep(SPUR_END - 36, SPUR_END - 22, s) * smoothstep(21, 7, Math.abs(l));
 }
 for (const s of [4, 11, 18]) CLEARINGS.push({ ...railPoint(STATION.s0 + s, -8), r: 8 });
 // Nothing grows over the tunnel mouth and the cutting before the station.
-for (const [s, r] of [[-15, 9], [-5, 7], [6, 6], [16, 6]]) CLEARINGS.push({ ...railPoint(s, 0), r });
+for (const [s, r] of [[SPUR_END - 9, 9], [SPUR_END + 1, 7], [SPUR_END + 10, 6]]) CLEARINGS.push({ ...railPoint(s, 0), r });
 
 // A single-file trail leaves the observatory's lower terrace by the gap in its parapet and
 // winds down the mountainside in two long S-bends to the back of the station: a bare metre of
