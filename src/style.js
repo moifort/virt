@@ -34,6 +34,8 @@ export const PAL = {
 
 export const WATER_LEVEL = -1.6;
 export const PATH_COUNT = 16;
+// Single-file trails, a bare metre wide.
+export const TRAIL_COUNT = 24;
 
 const blank = new THREE.DataTexture(new Uint8Array([0]), 1, 1, THREE.RedFormat);
 blank.needsUpdate = true;
@@ -51,6 +53,7 @@ export const GLOBALS = {
   uSeason: { value: new THREE.Vector4() },
   uCloud: { value: new THREE.Vector2() },
   uPaths: { value: Array.from({ length: PATH_COUNT }, () => new THREE.Vector4()) },
+  uTrails: { value: Array.from({ length: TRAIL_COUNT }, () => new THREE.Vector4()) },
   // Terrain heightmap, so water knows its depth: (half size, size, texels per side).
   uHeight: { value: null },
   uHeightMap: { value: new THREE.Vector3(1, 2, 2) },
@@ -164,6 +167,7 @@ uniform float uCloudGap;
 uniform vec4 uSeason;
 uniform vec2 uCloud;
 uniform vec4 uPaths[${PATH_COUNT}];
+uniform vec4 uTrails[${TRAIL_COUNT}];
 uniform vec4 uWet;
 uniform vec3 uWind;
 uniform vec3 uSkyTint;
@@ -301,10 +305,20 @@ vec3 terrainColor(vec3 w, vec3 n) {
     if (fine > 0.9) flat_ = ${lin(0xd8c8a4)};
     else if (fine < 0.05 && path > edge - 0.9) flat_ = ${lin(PAL.grass)};
   }
+  // A single-file trail: a bare metre of packed earth and loose stones, worn by walkers, that
+  // keeps its line even across the rock.
+  float trail = 1e3;
+  for (int i = 0; i < ${TRAIL_COUNT}; i++) trail = min(trail, pxSegment(w.xz, uTrails[i]));
+  bool onTrail = trail < 0.55 + (pxNoise(w.xz * 1.7) - 0.5) * 0.3;
+  if (onTrail) {
+    flat_ = fine > 0.8 ? ${lin(0xc4ae86)} : ${lin(0xd6c29a)};
+    if (fine < 0.09) flat_ = STRATA[band] * 0.92;
+    track = true;
+  }
 
   // As the ground steepens, stones show through the turf before the rock takes over.
   if (!track && fine < smoothstep(0.16, 0.42, slope) * 0.6) flat_ = STRATA[band] * (kind > 0.5 ? 1.0 : 0.88);
-  vec3 col = slope > 0.42 + (pxNoise(w.xz * 0.8) - 0.5) * 0.12 ? cliff : flat_;
+  vec3 col = !onTrail && slope > 0.42 + (pxNoise(w.xz * 0.8) - 0.5) * 0.12 ? cliff : flat_;
   // White sand just above the waterline, combed by the tide; wet sand at the water's edge.
   if (w.y < ${(WATER_LEVEL + 1.2).toFixed(2)} && slope < 0.3) {
     col = fine > 0.9 ? ${lin(0xeee2c8)} : ${lin(0xfbf5e6)};

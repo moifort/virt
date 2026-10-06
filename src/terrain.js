@@ -1,7 +1,7 @@
 // Terrain: coastal frame, work areas, heightfield, water.
 import * as THREE from 'three';
 import { fbm, hash, smoothstep } from './noise.js';
-import { GLOBALS, PATH_COUNT, WATER_LEVEL, paint } from './style.js';
+import { WATER_LEVEL, paint } from './style.js';
 
 export { WATER_LEVEL };
 // The map is a game tile laid out along its bay (u from the open sea toward the mountain, v
@@ -125,6 +125,28 @@ function stationArea(x, z, y) {
   return smoothstep(y.s0 - 2.5, y.s0, s) * smoothstep(y.s1 + 2.5, y.s1, s) * smoothstep(y.l0 - 2.5, y.l0, l) * smoothstep(y.l1 + 2, y.l1, l);
 }
 for (const s of [4, 11, 18]) CLEARINGS.push({ ...railPoint(STATION.s0 + s, -8), r: 8 });
+
+// A single-file trail leaves the observatory terrace by the gap in its parapet and winds down
+// the mountainside in two long S-bends to the back of the station: a bare metre of packed
+// earth, wide enough for one walker.
+const TRAIL = (() => {
+  const from = { x: OBSERVATORY.x, z: OBSERVATORY.z + OBSERVATORY.r + 1.5 };
+  const to = railPoint(STATION.s0 + 12, -15);
+  const dx = to.x - from.x;
+  const dz = to.z - from.z;
+  const len = Math.hypot(dx, dz);
+  const nx = -dz / len;
+  const nz = dx / len;
+  const points = [];
+  for (let i = 0; i <= 16; i++) {
+    const t = i / 16;
+    const swing = Math.sin(t * Math.PI * 2) * len * 0.2 * Math.sin(t * Math.PI) ** 0.3;
+    points.push([from.x + dx * t + nx * swing, from.z + dz * t + nz * swing]);
+  }
+  return points;
+})();
+/** The trail as segments [x0, z0, x1, z1]. */
+export const TRAILS = TRAIL.slice(1).map(([x, z], i) => [...TRAIL[i], x, z]);
 
 /**
  * The estate is a patchwork of plots with wandering outlines. Each plot sets its terraces at
@@ -339,6 +361,7 @@ export function isWild(x, z, margin = 0, floor = WATER_LEVEL + 0.4) {
   if (groundAt(x, z) < floor) return false;
   for (const zn of ZONES) if (Math.hypot(x - zn.x, z - zn.z) < zn.r + 3 + margin) return false;
   for (const p of PATHS) if (segmentDistance(x, z, p) < 2.6 + margin) return false;
+  for (const t of TRAILS) if (segmentDistance(x, z, t) < 1.1 + Math.max(0, margin)) return false;
   for (const c of CLEARINGS) if (Math.hypot(x - c.x, z - c.z) < c.r + margin) return false;
   return true;
 }

@@ -668,7 +668,7 @@ export function buildObservatory(scene, rng) {
   at(cyl(R + 0.5, R + 0.9, 0.7, 0xc9b99c, 20, { flat: true }), 0, -0.3, 0, g);
   for (let k = 0; k < 20; k++) {
     const a = (k / 20) * Math.PI * 2;
-    if (k === 15) continue; // the gap where the path comes in
+    if (k === 5) continue; // the gap where the trail comes in
     const wall = at(box(2.1, 0.7, 0.4, 0xd6c8ad), Math.cos(a) * (R - 0.2), 0.7, Math.sin(a) * (R - 0.2), g);
     wall.rotation.y = -a;
   }
