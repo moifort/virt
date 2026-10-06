@@ -216,9 +216,12 @@ void main() {
   }
 
   // The grade of a Ghibli background in poster colour: pigments a little richer than life,
-  // and the darks lifted toward the colour of the air so nothing ever goes to black.
-  col = mix(vec3(dot(col, vec3(0.3, 0.59, 0.11))), col, 1.14);
-  col = mix(col, mix(vec3(1.0, 0.96, 0.88), vec3(0.4, 0.48, 0.78), uNight), 0.04);
+  // the dull ones most, and the darks lifted toward the clear blue of the air so nothing ever
+  // goes to black and nothing yellows.
+  float grey = dot(col, vec3(0.3, 0.59, 0.11));
+  float chroma = max(col.r, max(col.g, col.b)) - min(col.r, min(col.g, col.b));
+  col = mix(vec3(grey), col, 1.2 + 0.12 * (1.0 - smoothstep(0.0, 0.3, chroma)));
+  col = mix(col, mix(vec3(0.9, 0.96, 1.0), vec3(0.4, 0.48, 0.78), uNight), 0.04);
   // The corners fall off a touch, so the eye rests on the middle of the picture.
   col *= 1.0 - 0.1 * smoothstep(0.42, 0.82, length(vUv - 0.5));
 

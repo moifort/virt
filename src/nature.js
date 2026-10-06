@@ -384,7 +384,7 @@ export function buildNature(scene, rng) {
     if (lush < 0.5 && r() < 0.8) return false;
     s.setScalar(0.7 + r() * 0.8);
     // Green where it stays damp, straw-coloured where the sun dries it.
-    c.setHex(lush > 0.55 ? pick(r, [PAL.grass, PAL.grassDeep, PAL.moss, 0xa9cb62]) : pick(r, [0xc9c07a, 0xd8c880, PAL.grass]));
+    c.setHex(lush > 0.55 ? pick(r, [PAL.grass, PAL.grassDeep, PAL.moss, 0x98cc6c]) : pick(r, [0xb4c486, 0xc4cc94, PAL.grass]));
     return true;
   });
 

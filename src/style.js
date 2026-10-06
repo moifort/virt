@@ -14,8 +14,8 @@ export const PAL = {
   lilac: 0xb7a0cf,
   cream: 0xf7ecd4,
   wetSand: 0xc9b48e,
-  grass: 0x8cc558,
-  grassDeep: 0x559c4e,
+  grass: 0x7cc95c,
+  grassDeep: 0x4c9e55,
   moss: 0x74ae58,
   teal: 0x4fb0a8,
   ivory: 0xf3ead6,
@@ -221,7 +221,7 @@ float pxGroundAt(vec2 xz) {
 #ifdef TERRAIN
 varying float vTerrace;
 // Dry-stone terrace walls and cliffs: weathered Ligurian sandstone, grey to warm ochre.
-const vec3 STRATA[6] = vec3[6](${[0xcdbb9c, 0xb8a88e, 0xd9c9a8, 0xc2ad8a, 0xa99c88, 0xcfb692].map(lin).join(', ')});
+const vec3 STRATA[6] = vec3[6](${[0xcbbfa8, 0xb7ab98, 0xd8ccb4, 0xc0b29a, 0xa99f90, 0xcdbca2].map(lin).join(', ')});
 // 1 inside a puddle.
 float pxPool = 0.0;
 
@@ -282,9 +282,9 @@ vec3 terrainColor(vec3 w, vec3 n) {
   bool green = patchN > mix(0.42, 0.28, smoothstep(4.0, 14.0, w.y));
   vec3 flat_;
   if (green) {
-    flat_ = tuft > 0.64 ? ${lin(PAL.grassDeep)} : tuft < 0.3 ? ${lin(0xaed862)} : ${lin(PAL.grass)};
+    flat_ = tuft > 0.64 ? ${lin(PAL.grassDeep)} : tuft < 0.3 ? ${lin(0x9ed96c)} : ${lin(PAL.grass)};
     // Blades catching the light, clover in the hollows.
-    if (fine > 0.9) flat_ = ${lin(0xcbe474)};
+    if (fine > 0.9) flat_ = ${lin(0xbbe882)};
     else if (fine < 0.09) flat_ = ${lin(0x3f8c56)};
     // Flowers come in drifts: daisies, buttercups, poppies and wild lavender.
     float bloom = (1.0 - uSeason.y) * (1.0 - uSeason.x * 0.8) * (0.55 + uSeason.z * 0.45);
@@ -294,9 +294,9 @@ vec3 terrainColor(vec3 w, vec3 n) {
   } else {
     flat_ = pxNoise(w.xz * 0.3) > 0.62 ? ${lin(PAL.sandDeep)} : ${lin(PAL.sand)};
     // Away from the shore the bare patches are sun-dried grass and earth, not sand.
-    if (w.y > 3.0) flat_ = pxNoise(w.xz * 0.3) > 0.62 ? ${lin(0xc2ac72)} : ${lin(0xd2be82)};
+    if (w.y > 3.0) flat_ = pxNoise(w.xz * 0.3) > 0.62 ? ${lin(0xbcac8a)} : ${lin(0xccc09e)};
     if (fine > 0.93) flat_ *= 1.07;
-    else if (fine < 0.06) flat_ = ${lin(0x9db868)};
+    else if (fine < 0.06) flat_ = ${lin(0x8fbc6c)};
   }
 
   // Footpaths between the work areas: trodden earth with pebbles, grass creeping in.
@@ -469,7 +469,7 @@ bool pxGlass = max(max(abs(pxBase.r - 0.040), abs(pxBase.g - 0.032)), abs(pxBase
     // This is an evergreen coast: pines, oaks, olives and most of the maquis keep their green
     // all year and only warm a little. The grass yellows in patches. Vines and orchards are
     // the ones that blaze in autumn and stand bare and brown in winter.
-    float pxTurns = step(pxPatch, 0.42) * 0.6;
+    float pxTurns = step(pxPatch, 0.3) * 0.4;
     float pxFades = 0.3 + 0.3 * step(0.5, pxPatch);
     #ifdef LEAF
       pxTurns = step(pxPatch, 0.2) * 0.35;
@@ -480,13 +480,13 @@ bool pxGlass = max(max(abs(pxBase.r - 0.040), abs(pxBase.g - 0.032)), abs(pxBase
       pxFades = 0.75;
     #endif
     pxAlb = mix(pxAlb, pxFall, uSeason.x * 0.85 * pxTurns);
-    pxAlb = mix(pxAlb, vec3(pxLum) * vec3(1.05, 0.98, 0.8), uSeason.y * pxFades);
+    pxAlb = mix(pxAlb, vec3(pxLum) * vec3(0.98, 1.0, 0.94), uSeason.y * pxFades);
     pxAlb = mix(pxAlb, pxAlb * vec3(0.92, 1.14, 0.8) + vec3(0.0, 0.02, 0.0), uSeason.z);
   }
   #ifdef LEAF
     // Foliage is painted in clumps: sunlit tips, a middle green, cool depths between the boughs.
     float pxClump = pxNoise(vWorld.xz * 1.7 + vWorld.y * 1.2 + 5.0);
-    if (pxClump > 0.6 || pxBit > 0.9) pxAlb = pxAlb * vec3(1.24, 1.18, 0.82) + vec3(0.014, 0.022, 0.0);
+    if (pxClump > 0.6 || pxBit > 0.9) pxAlb = pxAlb * vec3(1.14, 1.22, 0.96) + vec3(0.006, 0.022, 0.006);
     else if (pxClump < 0.36 || pxBit < 0.08) pxAlb *= vec3(0.7, 0.82, 0.94);
     // A gust turns the leaves over, pale side up.
     pxAlb *= 1.0 + 0.14 * vGust;
@@ -542,7 +542,7 @@ pxLit *= step(pxFbm(vWorld.xz * 0.012 + uCloud), uCloudGap);
 vec3 pxCol;
 if (pxLit > 0.5) {
   pxCol = pxAlb * uSunTint;
-  if (pxNdl > 0.88) pxCol = pxCol * 1.07 + vec3(0.025, 0.018, 0.0);
+  if (pxNdl > 0.88) pxCol = pxCol * 1.07 + vec3(0.016, 0.016, 0.01);
 } else {
   pxCol = pxAlb * uShadowTint;
   if (pxNdl < -0.3) pxCol *= 0.84;
