@@ -152,6 +152,10 @@ const sunSpot = new THREE.Vector3();
 const moonSpot = new THREE.Vector3();
 let t = 0;
 let frames = 0;
+// A pixel-art picture gains nothing past sixty frames a second: on a faster screen the frames
+// in between are skipped, which halves the work of the graphics card and spares the battery.
+const FRAME = 1 / 60;
+let owed = 0;
 
 // The island as a box, from the base of the tile up over the summit and the tallest tower.
 const ISLAND = LAND_ENDS.flatMap(([x, z]) => [new THREE.Vector3(x, -16, z), new THREE.Vector3(x, 110, z)]);
@@ -190,7 +194,10 @@ function frameShadows() {
 }
 
 renderer.setAnimationLoop(() => {
-  const dt = Math.min(clock.getDelta(), 0.05);
+  owed += clock.getDelta();
+  if (owed < FRAME * 0.9) return;
+  const dt = Math.min(owed, 0.05);
+  owed = 0;
   t += dt;
 
   view.yaw += (yawTarget - view.yaw) * (1 - Math.exp(-dt * 8));
