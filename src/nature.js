@@ -376,6 +376,8 @@ export function buildNature(scene, rng) {
     b.rotateY((k / 5) * Math.PI);
     blades.push(b);
   }
+  // Blades, petals and pebbles are too fine for the shadow map to hold their shadows: they
+  // cast none, which spares drawing them all again from the sun.
   scatterInstanced(scene, rng, mergeGeometries(blades), paint(0xffffff, { sway: true }), 11000, (r, p, s, c) => {
     anywhere(r, p);
     if (!isWild(p.x, p.z, -1.5) || slopeAt(p.x, p.z) > 0.8) return false;
@@ -386,7 +388,7 @@ export function buildNature(scene, rng) {
     // Green where it stays damp, straw-coloured where the sun dries it.
     c.setHex(lush > 0.55 ? pick(r, [PAL.grass, PAL.grassDeep, PAL.moss, 0x98cc6c]) : pick(r, [0xb4c486, 0xc4cc94, PAL.grass]));
     return true;
-  });
+  }).castShadow = false;
 
   // Wildflowers: five petals around a heart.
   const petals = [new THREE.CylinderGeometry(0.025, 0.03, 0.6, 3).translate(0, 0.3, 0).toNonIndexed()];
@@ -405,7 +407,7 @@ export function buildNature(scene, rng) {
     const kinds = [PAL.red, PAL.saffron, PAL.ivory, 0x9a86c8, 0xf2a6c1];
     c.setHex(r() < 0.7 ? kinds[Math.floor(fbm(p.x * 0.03 + 20, p.z * 0.03, 2) * 9.99) % kinds.length] : pick(r, kinds));
     return true;
-  });
+  }).castShadow = false;
 
   // Pebbles: fine speckle on the sand.
   scatterInstanced(scene, rng, new THREE.DodecahedronGeometry(0.22, 0), paint(0xffffff, { flat: true }), 2000, (r, p, s, c) => {
@@ -414,7 +416,7 @@ export function buildNature(scene, rng) {
     s.set(0.6 + r() * 1.2, 0.4 + r() * 0.6, 0.6 + r() * 1.2);
     c.setHex(pick(r, ROCK));
     return true;
-  });
+  }).castShadow = false;
 
   // Boulders, thickest on the wild flanks where they have rolled down from the crags.
   scatterInstanced(scene, rng, new THREE.DodecahedronGeometry(1, 0), paint(0xffffff, { flat: true }), 240, (r, p, s, c) => {
