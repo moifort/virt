@@ -3,11 +3,23 @@
 import http.server
 import sys
 
+BENCH_LOG = "/tmp/virt-bench.jsonl"
+
 
 class NoCacheHandler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header("Cache-Control", "no-store")
         super().end_headers()
+
+    # `?bench` (see src/bench.js) posts its figures here: they are appended to a log and echoed,
+    # so a page opened in another browser can still be measured from the terminal.
+    def do_POST(self):
+        body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        with open(BENCH_LOG, "ab") as log:
+            log.write(body + b"\n")
+        print(body.decode(errors="replace"), flush=True)
+        self.send_response(204)
+        self.end_headers()
 
 
 class Server(http.server.ThreadingHTTPServer):

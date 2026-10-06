@@ -283,3 +283,5 @@ function frame() {
 // `virt.frame()` runs one frame by hand, for timing it while the page is hidden.
 virt.frame = frame;
 renderer.setAnimationLoop(frame);
+// `?bench=label` measures a few seconds of the game and posts the figures to the dev server: see bench.js.
+if (params.has('bench')) import('./bench.js').then((m) => m.bench(virt, params));
