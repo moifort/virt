@@ -9,7 +9,6 @@ import { GRID, HALF, PATHS, SEGMENTS, WORLD_SIZE, ZONES, buildSides, buildTerrai
 import { buildEstate } from './estate.js';
 import { bake } from './kit.js';
 import { buildRailway } from './railway.js';
-import { buildSky } from './sky.js';
 import { buildVillages } from './village.js';
 import { buildAgora, buildAtelier, buildLibrary, buildLighthouseWalk, buildMoot, buildObservatory, buildPods, buildPort, buildPub } from './zones.js';
 
@@ -55,7 +54,6 @@ export function createWorld(scene) {
   buildNature(scene, rng);
   buildLife(scene, rng, animated);
   buildRailway(scene, animated);
-  buildSky(scene, rng, animated);
   GLOBALS.uLampMap.value = lampMap(scene);
   // The lighthouse turns its beam once every quarter of a minute, as long as the lamps are lit.
   scene.updateMatrixWorld(true);
