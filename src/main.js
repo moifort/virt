@@ -295,6 +295,13 @@ function frame() {
   // How far the wind pushes the rain sideways on screen.
   weather.slant = (climate.wind.x * view.right.x + climate.wind.y * view.right.z) * weather.wind;
   pixels.render(scene, view.camera, { skyTop: climate.skyTop, skyHorizon: climate.skyHorizon, texelWorld: view.texelWorld, time: t, weather });
+  // The first frame compiles every shader; once the second is drawn the map runs, and the
+  // lighthouse of the loading screen (index.html) fades away over it.
+  if (frames === 2) {
+    const loading = document.getElementById('loading');
+    loading?.classList.add('is-done');
+    setTimeout(() => loading?.remove(), 1000);
+  }
 }
 // `virt.frame()` runs one frame by hand, for timing it while the page is hidden.
 virt.frame = frame;
