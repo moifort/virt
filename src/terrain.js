@@ -296,10 +296,10 @@ function stationArea(x, z, y) {
 // Before the station the line runs in a rock cutting, and then into a spur of the mountain
 // thrown across it, so that the train has a hill to go into: the first tunnel's mouth is
 // where the cutting ends and the spur begins.
-export const CUTTING = { s0: -8, s1: STATION.s0 + 2, l0: -3.6, l1: 3.2 };
+export const CUTTING = { s0: -6, s1: STATION.s0 + 2, l0: -3.6, l1: 3.2 };
 function spurAt(x, z) {
   const { s, l } = railCoords(x, z);
-  return smoothstep(-7, -16, s) * smoothstep(-42, -28, s) * smoothstep(21, 7, Math.abs(l));
+  return smoothstep(-7, -11, s) * smoothstep(-42, -28, s) * smoothstep(21, 7, Math.abs(l));
 }
 for (const s of [4, 11, 18]) CLEARINGS.push({ ...railPoint(STATION.s0 + s, -8), r: 8 });
 // Nothing grows over the tunnel mouth and the cutting before the station.

@@ -39,12 +39,13 @@ function buildTunnel(line, x, side) {
   for (const z of [-1, 1]) {
     at(box(1.2, 7.4, 2.4, STONE), x + side * 0.6, 2.7, z * 3.8, line);
     at(box(2.2, 3.2, 1.4, STONE), x - side * 0.3, 0.6, z * 4.6, line);
-    const wing = at(box(0.9, 5.2, 4.0, STONE), x + side * 1.9, 1.6, z * 6.6, line);
+    const wing = at(box(0.9, 4.2, 4.0, STONE), x + side * 1.9, 1.0, z * 6.6, line);
     wing.rotation.y = z * side * 0.55;
-    at(box(1.0, 0.4, 4.2, PAL.ochre), x + side * 1.9, 4.3, z * 6.6, line).rotation.y = z * side * 0.55;
+    at(box(1.0, 0.4, 4.2, PAL.ochre), x + side * 1.9, 3.2, z * 6.6, line).rotation.y = z * side * 0.55;
   }
   at(box(1.2, 2.6, 5.2, STONE), x + side * 0.6, 5.6, 0, line);
-  at(box(DEPTH * 2, 6, 5.2, 0x2b2533), x + side * DEPTH, 1.4, 0, line);
+  // The dark of the tunnel, no taller than the vault, so the hill closes over it.
+  at(box(DEPTH * 2, 5.2, 5.2, 0x2b2533), x + side * DEPTH, 1.0, 0, line);
   const arch = at(ring(VAULT, 0.4, PAL.ochre, Math.PI, 14), x - side * 0.05, 1.6, 0, line);
   arch.rotation.y = Math.PI / 2;
   at(box(0.5, 0.9, 0.7, PAL.ochre), x - side * 0.15, VAULT + 1.75, 0, line);
