@@ -500,17 +500,24 @@ function shelveShores() {
       const x = ix * CELL - HALF;
       const z = iz * CELL - HALF;
       if (!inSquare(x, z, -1.5)) continue;
-      // The shelf is wide and uneven, as a sea bed is: the turquoise runs far out in places and
-      // the blue comes close in others, in broad sweeps rather than a band along the shore.
-      let fall = 0.055 + headland(toV(x, z)) * 0.5 + (fbm(x * 0.012 + 17, z * 0.012 - 5, 3) - 0.5) * 0.06;
+      // How far out the shelf runs is no plain function of the distance from the shore: seen
+      // from the air, the edge of the sand meanders, tongues of shallows reach out and fingers
+      // of deep water come in, and the whole thing wanders over a few hundred metres.
+      const wander = (fbm(x * 0.011 + 23, z * 0.011 - 11, 3) - 0.5) * 95 + (fbm(x * 0.045 - 8, z * 0.045 + 4, 2) - 0.5) * 20;
+      const reach = Math.max(away[i] * 0.35, away[i] + wander);
+      let fall = 0.06 + headland(toV(x, z)) * 0.5;
       // The harbour lies in the shallowest water of all, and the lighthouse rock stands on a
       // shoal of its own, pale water all round it.
       fall *= 1 - 0.4 * smoothstep(90, 30, Math.hypot(x - zone('port').x, z - zone('port').z));
       fall *= 1 - 0.5 * smoothstep(40, 12, Math.hypot(x - ISLET.x, z - ISLET.z));
+      const depth = reach * fall;
+      // Sand banks lie across the shelf, the water palest over them.
+      const bank = smoothstep(0.57, 0.68, fbm(x * 0.035 + 41, z * 0.035 - 2, 2)) * 1.4 * smoothstep(0.8, 2.5, depth) * smoothstep(12, 2, depth);
       // Toward the open edges of the map the bed dives to the deep, so the water darkens
-      // before the grid ends instead of stepping down at its last cell.
-      const brink = Math.min(toU(x, z) - SQUARE.u0, toV(x, z) - SQUARE.v0);
-      GRID[i] = Math.max(GRID[i], WATER_LEVEL - 0.5 - away[i] * fall - 10 * smoothstep(18, 1, brink));
+      // before the grid ends instead of stepping down at its last cell; the dive begins a
+      // long way out and wanders, so that no straight line shows where it starts.
+      const brink = Math.min(toU(x, z) - SQUARE.u0, toV(x, z) - SQUARE.v0) + (fbm(x * 0.03 + 5, z * 0.03 + 9, 2) - 0.5) * 30;
+      GRID[i] = Math.max(GRID[i], WATER_LEVEL - 0.5 - depth + bank - 10 * smoothstep(44, 4, brink));
     }
   }
 }

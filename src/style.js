@@ -360,8 +360,15 @@ vec3 waterColor(vec3 w) {
     : d < 5.6 ? ${lin(0x46b2d6)}
     : d < 7.4 ? ${lin(0x3896d2)}
     : ${lin(0x2f82ca)};
-  // The sea bed shows through: dark meadows of posidonia and scattered rock.
-  if (depth > 0.9 && depth < 6.5 && pxFbm(w.xz * 0.13 + 31.0) > 0.58) col = mix(col, ${lin(0x1f6f78)}, depth < 3.6 ? 0.5 : 0.28);
+  // The sea bed shows through, as it does from the air: broad dark meadows of posidonia with
+  // ragged edges over the middle depths, pools of bare sand inside them paler than the rest,
+  // and the brightest water of all over the sand banks.
+  if (depth > 0.7 && depth < 8.0) {
+    float meadow = pxFbm(w.xz * 0.028 + 31.0) * 0.8 + pxFbm(w.xz * 0.11 - 17.0) * 0.2 + (pxNoise(w.xz * 0.6) - 0.5) * 0.08;
+    float hold = smoothstep(0.7, 2.2, depth) * smoothstep(8.0, 5.0, depth);
+    if (meadow > 0.56) col = mix(col, ${lin(0x1e5f6a)}, (0.3 + 0.35 * smoothstep(0.56, 0.66, meadow)) * hold);
+    else if (meadow < 0.4 && depth < 3.6) col = mix(col, ${lin(0xbdf6e6)}, 0.35);
+  }
   // A net of light dances on the sand in the shallows.
   if (depth < 2.4 && uNight < 0.5) {
     vec2 q = w.xz * 0.8;
