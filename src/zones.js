@@ -914,8 +914,10 @@ export function buildPort(g, rng, animated) {
   // from the hill end of the quay, across the water from the houses, and curving round in
   // front of the piers, a parapet on the weather side, boulders heaped at its foot, bollards
   // along its lee and a little green light at its head. Boats lie moored in its shelter.
-  const mole = (t) => [-22 + 15 * (1 - Math.cos(t * Math.PI * 0.5)), Q + 0.5 + 35 * Math.sin(t * Math.PI * 0.5)];
+  // Its root is set into the end of the quay, a few steps down from the paving.
+  const mole = (t) => [-22 + 15 * (1 - Math.cos(t * Math.PI * 0.5)), Q - 2.6 + 38 * Math.sin(t * Math.PI * 0.5)];
   const out = -1; // the open sea lies to the left of the way along the mole
+  steps(-22, 3.2);
   const SEGS = 22;
   const moorings = [];
   for (let i = 0; i < SEGS; i++) {
