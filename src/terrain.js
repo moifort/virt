@@ -63,8 +63,8 @@ export const zone = (id) => ZONES.find((z) => z.id === id);
 // far up the left-hand slopes (`up` stretches it uphill), and a hamlet on the right headland.
 // `bell` gives a village its campanile.
 export const VILLAGES = [
-  { u: HARBOUR_U + 10, v: leftShore(HARBOUR_U) + 26, r: 26, up: 1.5, bell: true, waterfront: true },
-  { u: -46, v: 84, r: 12 },
+  { u: HARBOUR_U + 10, v: leftShore(HARBOUR_U) + 26, r: 29, up: 1.5, bell: true, waterfront: true },
+  { u: -46, v: 84, r: 14 },
 ];
 const hub = { x: toX(VILLAGES[0].u, VILLAGES[0].v), z: toZ(VILLAGES[0].u, VILLAGES[0].v) };
 

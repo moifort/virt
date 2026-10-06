@@ -330,9 +330,10 @@ export function buildVillages(scene, rng, animated) {
   const placed = [];
   const yaw = Math.PI / 4;
   const SUNK = 1.4; // houses are dug into the slope: their street door is this far up
-  // The houses are drawn in their own units and set in the world at the avatar's scale, with
-  // their doors and floors the height of his.
-  const SCALE = 1.6;
+  // The houses are drawn in their own units and set in the world at the avatar's scale: his
+  // head fills a window, a door stands a head taller than him, a house is two or three of him
+  // across, as a Ligurian house is to the people who live in it.
+  const SCALE = 2.0;
 
   // Houses packed in rows along the slope, as in Manarola, inside an organic blob.
   const villages = VILLAGES.map((village) => ({ cu: village.u, cv: village.v, radius: village.r, up: village.up ?? 1, bell: village.bell, waterfront: village.waterfront }));
@@ -355,7 +356,7 @@ export function buildVillages(scene, rng, animated) {
         parts.at(new THREE.Vector3(x, Math.max(groundAt(x, z), WATER_LEVEL + 0.45) - SUNK * SCALE, z), yaw, SCALE);
         // Taller houses toward the heart of the village.
         const floors = 2 + Math.floor(rng() * 2) + (d < edge * 0.5 ? 1 : 0);
-        house(parts, rng, 2.8 + rng() * 0.6, 2.6 + rng() * 0.5, floors, SUNK);
+        house(parts, rng, 3.0 + rng() * 0.8, 2.8 + rng() * 0.6, floors, SUNK);
       }
     }
     if (village.bell) {
