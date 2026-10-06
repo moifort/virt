@@ -6,7 +6,7 @@
 import * as THREE from 'three';
 import { PAL, paint, solid } from './style.js';
 import { INK, at, bake, ball, box, cone, cyl, lantern, live, ring, seat } from './kit.js';
-import { BORE, RAIL, RAIL_MOUTHS, STATION, groundAt, railPoint, toX, toZ } from './terrain.js';
+import { BORE, PORTAL, RAIL, RAIL_MOUTHS, STATION, groundAt, railPoint, toX, toZ } from './terrain.js';
 
 // The line runs straight across the angle between the mountain (A) and the ridge (B), in (u, v).
 const A = RAIL.a;
@@ -19,6 +19,8 @@ const PIER_GAP = 8;
 // The pane colour the shader knows (see `pxGlass` in style.js): these windows light up after dark.
 const GLASS = 0x3b3346;
 const DARK = 0x2b2533;
+// The far dark of the skew portal, which the sun reaches into across its face.
+const NIGHT = 0x0b0910;
 // The mouth of a tunnel: half its width, the height of the spring of its arch, the underside of
 // the arch at its top, and the grass of the mound over it.
 const VAULT = 3.3;
@@ -36,7 +38,7 @@ const groundAlong = (s) => groundAt(start.x + dir.x * s, start.z + dir.z * s);
 const MOUTH_A = RAIL_MOUTHS.a;
 const MOUTH_B = RAIL_MOUTHS.b;
 const DEPTH = BORE - 1.5;
-const inTunnel = (s) => s < MOUTH_A - DEPTH || s > MOUTH_B + DEPTH;
+const inTunnel = (s) => s < MOUTH_A - DEPTH || s > MOUTH_B + PORTAL.back - 0.3;
 
 /** Tunnel head at `x`, the hill on the `side` (-1 toward A, +1 toward B), its vault under a terraced mound. */
 function buildTunnel(line, x, side) {
@@ -83,6 +85,62 @@ function buildTunnel(line, x, side) {
   }
 }
 
+/**
+ * Portal at `x`, cut skew into the cliff of the ridge (terrain.js raises a brow of rock round
+ * it): the face turned with the rock toward the sea, the headwall as deep as the bore, its jambs
+ * down on a ledge of rock, a grassy bench over it and the maquis hanging over the cornice.
+ */
+function buildPortal(line, x) {
+  const { half: W, top: TOP, back: BACK, skew } = PORTAL;
+  const t = Math.tan(skew);
+  // The mass of the headwall, slice by slice across the line from its skew face to the back of
+  // the bore: the jambs down to the rock, the haunches down to the curve of the vault, sooted
+  // underneath; grass over all of it behind the masonry of the face.
+  for (let l = -W; l < W - 0.01; l += 0.3) {
+    const c = l + 0.15;
+    const front = x + c * t;
+    const len = x + BACK - front;
+    const mid = front + len / 2;
+    const inside = Math.abs(c) < VAULT;
+    const bottom = inside ? SPRING + Math.sqrt(VAULT * VAULT - c * c) : Math.min(-1.6, groundBeside(front, c) - LEVEL - 0.4);
+    at(box(len, TOP - bottom, 0.3, STONE), mid, (TOP + bottom) / 2, c, line);
+    at(box(len - 1.6, 0.3, 0.3, PAL.grass), mid + 0.8, TOP + 0.12, c, line);
+    if (inside) {
+      at(box(len - 0.4, 0.2, 0.3, NIGHT), mid + 0.2, bottom, c, line);
+      at(box(len, 0.5, 0.3, NIGHT), mid, -0.45, c, line);
+    }
+  }
+  for (const z of [-1, 1]) {
+    const front = x + z * VAULT * t + 0.4;
+    at(box(x + BACK - front, CROWN + 1.0, 0.2, NIGHT), (front + x + BACK) / 2, (CROWN + 0.2) / 2, z * (VAULT - 0.1), line);
+  }
+  at(box(0.3, CROWN + 1.2, 2 * VAULT, NIGHT), x + BACK - 0.15, (CROWN + 0.2) / 2, 0, line);
+  // On the face, in its own frame: the archivolt on its imposts, the keystone, a tablet, the
+  // cornice, broom and myrtle spilling over it from the bench and ivy down the seaward jamb.
+  const face = at(new THREE.Group(), x, 0, 0, line);
+  face.rotation.y = skew;
+  const k = 1 / Math.cos(skew);
+  // The facing, dressed true to the skew of the face so the steps of the mass behind don't show.
+  for (let z = -W * k; z < W * k - 0.01; z += 0.3) {
+    const c = (z + 0.15) / k;
+    const bottom = Math.abs(c) < VAULT ? SPRING + Math.sqrt(VAULT * VAULT - c * c) : Math.min(-1.6, groundBeside(x + c * t, c) - LEVEL - 0.4);
+    at(box(0.5, TOP - bottom, 0.32, STONE), -0.05, (TOP + bottom) / 2, z + 0.15, face);
+  }
+  const arch = at(ring(VAULT, 0.4, PAL.ochre, Math.PI, 14), -0.4, SPRING, 0, face);
+  arch.rotation.y = Math.PI / 2;
+  arch.scale.x = k;
+  at(box(0.5, 0.9, 0.7, PAL.ochre), -0.45, CROWN + 0.15, 0, face);
+  for (const z of [-1, 1]) at(box(0.5, 0.35, 0.7, PAL.ochre), -0.45, SPRING, z * (VAULT + 0.2) * k, face);
+  at(box(0.1, 0.5, 1.2, 0xf1e6cc), -0.33, CROWN + 1.6, 0, face);
+  at(box(0.5, 0.3, 2 * W * k + 0.3, PAL.ochre), -0.45, TOP - 0.15, 0, face);
+  for (const [d, z, r, color] of [[1.4, -4.6, 0.8, 0x4c7448], [2.2, -1.8, 0.6, 0x5a8a52], [1.0, 2.6, 0.7, 0x5a8a52], [1.8, 5.4, 0.9, 0x4c7448], [2.0, 0.6, 0.5, 0x7aa05c]]) {
+    at(ball(r, color, { flat: true }, 7, 5), d, TOP + 0.3 + r * 0.4, z, face).scale.y = 0.7;
+  }
+  for (const [y, r] of [[TOP - 1.0, 0.5], [TOP - 2.1, 0.4], [TOP - 3.0, 0.3]]) {
+    at(ball(r, 0x4c7448, { flat: true }, 6, 4), -0.45, y, (W - 0.5) * k, face).scale.x = 0.5;
+  }
+}
+
 /** A cypress `h` tall, as the station's: a stub of trunk, a tall ball, a cone on top. */
 function cypress(parent, x, y, z, h) {
   at(cyl(0.1, 0.14, 0.7, 0x7d5a48, 5), x, y + 0.3, z, parent);
@@ -98,9 +156,9 @@ function buildLine() {
   line.rotation.y = Math.atan2(-dir.z, dir.x);
 
   buildTunnel(line, MOUTH_A, -1);
-  buildTunnel(line, MOUTH_B, 1);
+  buildPortal(line, MOUTH_B);
   const open0 = Math.floor(MOUTH_A - DEPTH);
-  const open1 = Math.ceil(MOUTH_B + DEPTH);
+  const open1 = Math.ceil(MOUTH_B + PORTAL.back);
   for (let s = open0; s < open1; s += 1) {
     at(box(1.05, 0.25, 3.2, 0xb8a890), s + 0.5, -0.12, 0, line);
     at(box(0.3, 0.12, 2.6, 0x6a4a3a), s + 0.25, 0.05, 0, line);

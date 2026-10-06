@@ -528,7 +528,12 @@ function landAt(x, z) {
 }
 
 export function heightAt(x, z) {
-  const h = landAt(x, z);
+  let h = landAt(x, z);
+  const brow = browAt(x, z);
+  if (brow) {
+    h += Math.max(0, brow.top - h) * brow.w;
+    h += (RAIL.level + PORTAL.top + 0.25 - h) * brow.bench;
+  }
   return h - Math.max(0, h - (RAIL.level - 0.3)) * boreAt(x, z);
 }
 
@@ -558,11 +563,47 @@ export const RAIL_MOUTHS = (() => {
   while (b > a && railGround(b) > RAIL.level + 0.3) b -= 0.5;
   return { a, b };
 })();
+// The second tunnel goes into the ridge where its flank falls steeply across the line, so the
+// hill closes over the rails on the uphill side only. There the portal is cut skew into a brow
+// of rock, its face turned with the cliff toward the sea so the rails can be seen running into
+// the dark: the rock stands round the headwall and above it, a ledge of rock carries its foot
+// and the end of the viaduct, and a grassy bench lies over the bore, which is no deeper than
+// the headwall (railway.js), so it never opens to the sky.
+// `half` the width of the headwall, `top` its height over the rails, `back` how far the bore
+// runs in from the mouth, `skew` how far its face is turned from square to the line.
+export const PORTAL = { half: 5.5, top: 8.6, back: 6, skew: 0.6 };
+const portalFace = (l) => RAIL_MOUTHS.b + Math.max(-PORTAL.half, Math.min(PORTAL.half, l)) * Math.tan(PORTAL.skew);
+// Nothing grows out of the headwall; the brow behind it is left to the maquis.
+CLEARINGS.push({ ...railPoint(RAIL_MOUTHS.b + 2, 0), r: 7 });
+function browAt(x, z) {
+  const { s, l } = railCoords(x, z);
+  const P = RAIL_MOUTHS.b;
+  if (s < P - 12 || s > P + 34 || l < -20 || l > 18) return null;
+  const n = fbm(x * 0.09 + 2, z * 0.09 - 7, 2) - 0.5;
+  const m = (fbm(x * 0.04 - 5, z * 0.04 + 11, 2) - 0.5) * 2;
+  const W = PORTAL.half;
+  const sf = portalFace(l);
+  const back = P + PORTAL.back;
+  // Over the headwall the rock stands a metre behind its face; beside it the cliff runs on in
+  // the line of the face, raggedly, wrapping round the jambs; toward the sea the brow rounds off
+  // into the slope instead of standing up as a wall.
+  const outer = smoothstep(W + 0.4, W + 1.4, Math.abs(l));
+  const face = sf + (1 - outer) + (P + l * Math.tan(PORTAL.skew) - sf - 0.4 + n * 3 + m * 2) * outer;
+  const top = RAIL.level + 10.5 + (s - P) * 0.25 + n * 3 + (fbm(x * 0.3 - 1, z * 0.3 + 4, 2) - 0.5) * 4 - Math.max(0, l - W - 1.5) * (3.5 + m * 1.5);
+  const foot = RAIL.level - 1.6 - Math.max(0, Math.abs(l) - W - 0.5) * 0.8 + n * 1.5;
+  const w = smoothstep(sf - 3.4 + n * 2, sf - 2.4 + n * 2, s) * smoothstep(P + 32, P + 16, s) * (l > 0 ? smoothstep(W + 6 + m * 3, W + 2.5 + m * 2, l) : smoothstep(W + 12, W + 6, -l));
+  const bench = (1 - outer) * smoothstep(sf + 1, sf + 1.6, s) * smoothstep(back + 1.3, back + 0.3, s);
+  return { top: foot + (top - foot) * smoothstep(face, face + 0.8, s), w, bench };
+}
 function boreAt(x, z) {
   const { s, l } = railCoords(x, z);
   const { a, b } = RAIL_MOUTHS;
-  const along = Math.max(smoothstep(a + 1.5, a + 0.5, s) * smoothstep(a - BORE - 1, a - BORE, s), smoothstep(b - 1.5, b - 0.5, s) * smoothstep(b + BORE + 1, b + BORE, s));
-  return along * smoothstep(3.9, 3.1, Math.abs(l));
+  const skew = b - PORTAL.half * Math.tan(PORTAL.skew);
+  const first = smoothstep(a + 1.5, a + 0.5, s) * smoothstep(a - BORE - 1, a - BORE, s);
+  // The skew portal's cut runs on under its jambs, so the slope of the cut's sides, which the
+  // terrain mesh spreads over more than a metre, stays hidden in the masonry.
+  const second = smoothstep(skew - 2.5, skew - 1.5, s) * smoothstep(b + PORTAL.back, b + PORTAL.back - 0.8, s);
+  return Math.max(first * smoothstep(3.9, 3.1, Math.abs(l)), second * smoothstep(PORTAL.half - 0.3, PORTAL.half - 1.1, Math.abs(l)));
 }
 // The heightfield everything else reads: the land inside the bounds, open sea beyond them.
 export const GRID = new Float32Array((SEGMENTS + 1) ** 2);
