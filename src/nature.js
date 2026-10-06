@@ -451,7 +451,7 @@ export function buildNature(scene, rng) {
   grow(scene, rng, oliveTree, { count: 110, variants: 4, margin: 1, maxSlope: 0.4, where: (x, z) => region(x, z) !== 'shore' && tame(x, z) });
   grow(scene, rng, lemonTree, { count: 40, variants: 3, maxSlope: 0.4, where: (x, z) => region(x, z) !== 'shore' && tame(x, z) });
   grow(scene, rng, almondTree, { count: 64, variants: 4, margin: 1, maxSlope: 0.45, where: (x, z) => region(x, z) !== 'shore' && tame(x, z), size: [0.9, 1.35] });
-  grow(scene, rng, palm, { count: 14, variants: 3, margin: 1.5, maxSlope: 0.3, where: (x, z) => region(x, z) === 'shore' && groundAt(x, z) < 1.5 && toV(x, z) < 60, size: [0.85, 1.2] });
+  grow(scene, rng, palm, { count: 14, variants: 3, margin: 1.5, maxSlope: 0.3, where: (x, z) => region(x, z) === 'shore' && groundAt(x, z) < 1.5 && toV(x, z) < 60 && toU(x, z) > -60, size: [0.85, 1.2] });
 
   // Shrubs: the maquis clings even to the steep slopes.
   grow(scene, rng, maquis, { count: 650, variants: 6, margin: -1, maxSlope: 1.4, size: [0.7, 1.5] });

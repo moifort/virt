@@ -68,6 +68,10 @@ export const VILLAGES = [
 ];
 const hub = { x: toX(VILLAGES[0].u, VILLAGES[0].v), z: toZ(VILLAGES[0].u, VILLAGES[0].v) };
 
+// Out in the bay, well off the shore, a rock stands alone in the sea: the lighthouse islet,
+// steep-sided, its top a few metres above the waves, with a ledge in its lee for the landing.
+export const ISLET = { u: -76, v: -110, r: 12, x: toX(-76, -110), z: toZ(-76, -110) };
+
 /**
  * The main village climbs a steep hillside, as at Manarola: from the hollow of its harbour the
  * ground rises fast toward the mountain, whose flank takes over behind the last houses. On
@@ -99,7 +103,7 @@ export const ESTATE = { u: 80, v: 5, r: 27 };
 export const VILLA = { u: 82, v: 9, r: 9, y: 17, x: toX(82, 9), z: toZ(82, 9) };
 export const estateWeight = (u, v) => smoothstep(ESTATE.r + 8, ESTATE.r - 4, Math.hypot(u - ESTATE.u, v - ESTATE.v));
 /** Built sites kept clear of wild growth ({ x, z, r }); builders add their own. */
-export const CLEARINGS = [{ x: VILLA.x, z: VILLA.z, r: VILLA.r + 3 }, { x: OBSERVATORY.x, z: OBSERVATORY.z, r: OBSERVATORY.r + 4 }];
+export const CLEARINGS = [{ x: VILLA.x, z: VILLA.z, r: VILLA.r + 3 }, { x: OBSERVATORY.x, z: OBSERVATORY.z, r: OBSERVATORY.r + 4 }, { x: ISLET.x, z: ISLET.z, r: 5.5 }];
 
 // The railway crosses the angle between the mountain (a) and the right-hand ridge (b) at a
 // constant level, high enough that its station stands out on the flank, a little way from the
@@ -211,6 +215,11 @@ function landAt(x, z) {
   // main village, whose houses stand with their feet in the water.
   const strand = shore * smoothstep(0.4, 0.48, fbm(u * 0.022 + 31, v * 0.022 - 17, 2)) * smoothstep(44, 62, Math.hypot(u - VILLAGES[0].u, v - VILLAGES[0].v + 14));
   h += (WATER_LEVEL + 0.3 + inland * 0.1 - h) * strand * smoothstep(-1, 1, inland) * smoothstep(16, 9, inland);
+  // The lighthouse islet rises out of the sea bed, its lee ledge level just above the water.
+  const rock = Math.hypot(u - ISLET.u, v - ISLET.v) + (fbm(x * 0.08 + 3, z * 0.08 - 6, 2) - 0.5) * 4;
+  const isletTop = 4.2 + (fbm(x * 0.15, z * 0.15 + 8, 2) - 0.5) * 1.6;
+  h += (isletTop - h) * smoothstep(ISLET.r, ISLET.r * 0.45, rock);
+  h += (WATER_LEVEL + 0.7 - h) * smoothstep(5, 2.5, Math.hypot(u - ISLET.u - 7, v - ISLET.v));
   // Work areas sit on level pads.
   for (const zn of ZONES) if (zn.id !== 'port') h += (0 - h) * smoothstep(zn.r + 7, zn.r + 1, Math.hypot(x - zn.x, z - zn.z));
   h += (VILLA.y - h) * smoothstep(VILLA.r + 4, VILLA.r + 0.5, Math.hypot(x - VILLA.x, z - VILLA.z));
@@ -275,9 +284,14 @@ function shelveShores() {
       const z = iz * CELL - HALF;
       if (!inSquare(x, z, -1.5)) continue;
       let fall = 0.1 + headland(toV(x, z)) * 0.5 + (fbm(x * 0.03 + 17, z * 0.03 - 5, 2) - 0.5) * 0.04;
-      // The harbour lies in the shallowest water of all: pale right out past the piers.
+      // The harbour lies in the shallowest water of all: pale right out past the piers. Round
+      // the lighthouse rock the bottom drops away quickly, so its halo of pale water stays small.
       fall *= 1 - 0.55 * smoothstep(80, 30, Math.hypot(x - zone('port').x, z - zone('port').z));
-      GRID[i] = Math.max(GRID[i], WATER_LEVEL - 0.5 - away[i] * fall);
+      fall *= 1 + 3 * smoothstep(34, 14, Math.hypot(x - ISLET.x, z - ISLET.z));
+      // Toward the open edges of the map the bed dives to the deep, so the water darkens
+      // before the grid ends instead of stepping down at its last cell.
+      const brink = Math.min(toU(x, z) - SQUARE.u0, toV(x, z) - SQUARE.v0);
+      GRID[i] = Math.max(GRID[i], WATER_LEVEL - 0.5 - away[i] * fall - 10 * smoothstep(18, 1, brink));
     }
   }
 }

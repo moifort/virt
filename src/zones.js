@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { mulberry32, pick } from './noise.js';
 import { PAL, WATER_LEVEL, paint, solid } from './style.js';
 import { DARK_WOOD, INK, SCREEN, STONE, WARM_LIGHT, at, bake, ball, box, cone, cyl, lamplight, lantern, live, plant, ring, screen, seat } from './kit.js';
-import { OBSERVATORY, SUN_DIR, ZONES, groundAt, toX, toZ } from './terrain.js';
+import { ISLET, OBSERVATORY, SUN_DIR, ZONES, groundAt, toX, toZ } from './terrain.js';
 
 /** Shelves of books along a wall. axis 'x' runs along x facing +z; axis 'z' runs along z facing +x. */
 export function bookshelf(parent, books, rng, { axis, from, to, at: fixed, y0, rows = 5, rowH = 1.18 }) {
@@ -652,11 +652,6 @@ function mussels(parent, rng, x, z, radius = 0.17) {
 }
 
 /**
- * The lighthouse, out at sea where it has always stood, and the way to it: a boardwalk on
- * timber piles running out from the shore and curving round to its platform. The piles are
- * black with mussels at the waterline.
- */
-/**
  * The observatory on the summit: a whitewashed round tower under a copper dome gone green,
  * its slit open to the sky with the telescope looking out of it, on a flagged terrace with a
  * low parapet, a bench to sit on through the night and a lantern by the door.
@@ -723,67 +718,90 @@ export function buildObservatory(scene, rng) {
   scene.add(bake(g));
 }
 
-export function buildLighthouseWalk(scene, rng) {
+/**
+ * The lighthouse stands alone on its rock out in the bay, with a little harbour of its own in
+ * the lee of the rock: a short jetty of sandstone blocks, black with mussels at the waterline,
+ * steps cut up to the tower, a lantern, a bollard, and the keeper's boat riding at her
+ * mooring. Over on the shore, the landing stage she puts out from.
+ */
+export function buildLighthouseWalk(scene, rng, animated) {
   const g = new THREE.Group();
-  g.position.set(toX(4, -72), 0, toZ(4, -72));
-  g.rotation.y = seaward(g.position.x, g.position.z);
-  const TIMBER = [PAL.wood, 0xa8764f, 0x9a6a48];
-  const Q = 17;
-  const plank = (x, z, yaw, width) => {
-    at(box(width, 0.14, 0.56, pick(rng, TIMBER)), x, 0.05, z, g).rotation.y = yaw;
-  };
-  const pile = (x, z) => {
-    at(cyl(0.14, 0.16, 4.2, DARK_WOOD, 6), x, -1.7, z, g);
-    mussels(g, rng, x, z);
-  };
-  // A point of the walk, in the world, to know whether it is over land or water.
+  g.position.set(ISLET.x, 0, ISLET.z);
+  // Local +z looks from the rock toward the island, up the bay.
+  g.rotation.y = -Math.PI * 0.75;
   const sin = Math.sin(g.rotation.y);
   const cos = Math.cos(g.rotation.y);
   const ground = (x, z) => groundAt(g.position.x + x * cos + z * sin, g.position.z - x * sin + z * cos);
+  const BLOCK = [0xcdc2ab, 0xbcb09c, 0xd8cdb7];
+  const BOULDER = [0x8f8678, 0x9d9484, 0xa99d8e];
+  const TIMBER = [PAL.wood, 0xa8764f, 0x9a6a48];
 
-  // From the shore straight out over the shallows...
-  let shore = Q + 1.6;
-  while (shore > -60 && ground(21, shore) < WATER_LEVEL + 0.9) shore -= 0.62;
-  for (let z = shore; z < Q + 1.6; z += 0.62) {
-    plank(21, z + 0.31, 0, 2.8);
-    if (Math.round((z - shore) / 0.62) % 5 === 2 && ground(21, z) < WATER_LEVEL - 0.2) for (const dx of [-1.3, 1.3]) pile(21 + dx, z);
+  lighthouse(g, 0, ground(0, 0) - 0.4, 0);
+  // Steps cut in the rock, down from the tower to the landing in its lee.
+  for (let z = 3.4; z < 9; z += 0.7) {
+    const y = ground(0, z);
+    if (y < WATER_LEVEL + 0.4) break;
+    at(box(1.7, 0.32, 0.72, STONE), 0, y + 0.1, z, g);
   }
-  lantern(g, 22, 0.13, shore + 1.5);
-  // ...then curving round to the lighthouse, with a handrail on the seaward side.
-  const curve = (t) => [21 - Math.sin(t * 1.3) * 12, Q + 1.6 + t * 27];
-  const steps = 68;
-  for (let i = 0; i <= steps; i++) {
-    const t = i / steps;
-    const [x, z] = curve(t);
-    const [nx, nz] = curve(t + 0.01);
-    const yaw = Math.atan2(nx - x, nz - z);
-    plank(x, z, yaw, 2.8);
-    if (i % 5 === 2) {
-      for (const side of [-1.3, 1.3]) pile(x + Math.cos(yaw) * side, z - Math.sin(yaw) * side);
-      at(cyl(0.05, 0.06, 1.0, DARK_WOOD, 5), x + Math.cos(yaw) * 1.3, 0.6, z - Math.sin(yaw) * 1.3, g);
-      // Cross-beams under the deck, mussels along them too.
-      at(box(3.0, 0.16, 0.16, DARK_WOOD), x, -0.9, z, g).rotation.y = yaw;
-    }
-    if (i % 5 === 2 && i + 5 <= steps) {
-      const [ax, az] = curve((i + 5) / steps);
-      const [bx, bz] = curve((i + 5) / steps + 0.01);
-      const byaw = Math.atan2(bx - ax, bz - az);
-      const x0 = x + Math.cos(yaw) * 1.3;
-      const z0 = z - Math.sin(yaw) * 1.3;
-      const x1 = ax + Math.cos(byaw) * 1.3;
-      const z1 = az - Math.sin(byaw) * 1.3;
-      const rail = at(box(0.06, 0.06, Math.hypot(x1 - x0, z1 - z0), DARK_WOOD), (x0 + x1) / 2, 1.05, (z0 + z1) / 2, g);
-      rail.rotation.y = Math.atan2(x1 - x0, z1 - z0);
-    }
-    if (i % 17 === 8) lantern(g, x - Math.cos(yaw) * 1.1, 0.13, z + Math.sin(yaw) * 1.1);
+  // The jetty: blocks laid out from the landing, a parapet on the open side, mussels where
+  // the tide washes them, a lantern and a bollard at the head.
+  const QUAY = WATER_LEVEL + 0.8;
+  for (let i = 0; i < 5; i++) {
+    const z = 9.1 + i * 2.3;
+    const bottom = Math.min(ground(0, z), WATER_LEVEL) - 0.6;
+    at(box(3.0, QUAY - bottom, 2.3, BLOCK[i % 3]), 0, (QUAY + bottom) / 2, z, g);
+    at(box(0.5, 0.8, 2.3, BLOCK[(i + 1) % 3]), -1.25, QUAY + 0.4, z, g);
+    mussels(g, rng, 1.52, z - 0.7 + rng() * 1.4, 0.12);
+    if (rng() < 0.6) mussels(g, rng, -1.52, z - 0.7 + rng() * 1.4, 0.12);
   }
-  // The lighthouse stands at the end on a timber platform over a cluster of piles.
-  const [lx, lz] = curve(1);
-  at(cyl(4.8, 4.8, 0.3, PAL.wood, 8, { flat: true }), lx, 0.02, lz + 4, g);
-  at(cyl(4.9, 4.9, 0.12, DARK_WOOD, 8, { flat: true }), lx, -0.2, lz + 4, g);
-  for (let k = 0; k < 8; k++) pile(lx + Math.cos((k / 8) * Math.PI * 2) * 4.3, lz + 4 + Math.sin((k / 8) * Math.PI * 2) * 4.3);
-  lighthouse(g, lx, 0.15, lz + 4);
+  at(box(3.1, 0.1, 11.6, 0xd3c7b0), 0, QUAY + 0.05, 13.7, g);
+  lantern(g, -0.85, QUAY + 0.1, 18.6);
+  at(cyl(0.14, 0.18, 0.7, INK, 6), 0.9, QUAY + 0.35, 18.4, g);
+  at(ball(0.18, INK, {}, 6, 4), 0.9, QUAY + 0.72, 18.4, g);
+  at(ring(0.3, 0.07, PAL.cream, Math.PI * 2, 10), 0.6, QUAY + 0.14, 11.6, g).rotation.x = Math.PI / 2;
+  at(cyl(0.36, 0.36, 0.5, 0x5a6a7a, 8), -0.5, QUAY + 0.35, 10.6, g);
+  at(ring(0.36, 0.03, PAL.saffron, Math.PI * 2, 10), -0.5, QUAY + 0.6, 10.6, g).rotation.x = Math.PI / 2;
+  // The keeper's boat alongside, riding the swell.
+  const boat = at(live(gozzo(rng)), 2.9, WATER_LEVEL, 14.5, g);
+  boat.rotation.y = 0.08;
+  animated.push((t) => {
+    boat.position.y = WATER_LEVEL + Math.sin(t * 1.2) * 0.08;
+    boat.rotation.z = Math.sin(t * 0.9) * 0.05;
+  });
+  // Boulders fallen round the foot of the rock, where the swell breaks on them.
+  for (let k = 0; k < 14; k++) {
+    const a = rng() * Math.PI * 2;
+    if (Math.cos(a) > 0.6) continue; // not across the landing
+    const d = ISLET.r * 0.5 + rng() * 5;
+    const rock = at(solid(new THREE.DodecahedronGeometry(0.6 + rng() * 0.9, 0), paint(pick(rng, BOULDER), { flat: true })), Math.sin(a) * d, WATER_LEVEL - 0.5 + rng() * 0.8, Math.cos(a) * d, g);
+    rock.rotation.set(rng() * 3, rng() * 3, rng() * 3);
+    rock.scale.y = 0.7;
+  }
   scene.add(bake(g));
+
+  // On the shore, the landing stage the boat puts out from: planks on piles black with
+  // mussels, a lantern and a bollard at the end.
+  const stage = new THREE.Group();
+  stage.position.set(toX(4, -72), 0, toZ(4, -72));
+  stage.rotation.y = seaward(stage.position.x, stage.position.z);
+  const ssin = Math.sin(stage.rotation.y);
+  const scos = Math.cos(stage.rotation.y);
+  const sground = (x, z) => groundAt(stage.position.x + x * scos + z * ssin, stage.position.z - x * ssin + z * scos);
+  let shore = 12;
+  while (shore > -60 && sground(21, shore) < WATER_LEVEL + 0.9) shore -= 0.62;
+  const DECK = WATER_LEVEL + 1.0;
+  for (let z = shore; z < shore + 11; z += 0.62) {
+    at(box(2.8, 0.14, 0.56, pick(rng, TIMBER)), 21, DECK, z + 0.31, stage);
+    if (Math.round((z - shore) / 0.62) % 5 === 2 && sground(21, z) < WATER_LEVEL - 0.2) {
+      for (const dx of [-1.3, 1.3]) {
+        at(cyl(0.14, 0.16, 4.2, DARK_WOOD, 6), 21 + dx, DECK - 2.0, z, stage);
+        mussels(stage, rng, 21 + dx, z);
+      }
+    }
+  }
+  lantern(stage, 22.2, DECK + 0.08, shore + 1.5);
+  at(cyl(0.14, 0.18, 0.7, INK, 6), 19.9, DECK + 0.4, shore + 10.4, stage);
+  scene.add(bake(stage));
 }
 
 export function buildPort(g, rng, animated) {
