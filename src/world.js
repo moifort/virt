@@ -5,7 +5,7 @@ import { mulberry32 } from './noise.js';
 import { GLOBALS, PATH_COUNT, TRACK_COUNT, TRAIL_COUNT, WATER_LEVEL, paint } from './style.js';
 import { buildLife } from './life.js';
 import { buildNature } from './nature.js';
-import { GRID, HALF, PATHS, SEGMENTS, TRACKS, TRAILS, WORLD_SIZE, ZONES, buildSides, buildTerrain, buildWater, segmentDistance } from './terrain.js';
+import { HALF, PATHS, SEGMENTS, TRACKS, TRAILS, SKIN, WORLD_SIZE, ZONES, buildSides, buildTerrain, buildWater, segmentDistance } from './terrain.js';
 import { buildEstate } from './estate.js';
 import { at, bake, live } from './kit.js';
 import { buildRailway } from './railway.js';
@@ -67,8 +67,8 @@ export function createWorld(scene) {
   for (let i = TRACKS.length; i < TRACK_COUNT; i++) GLOBALS.uTracks.value[i].set(1e4, 1e4, 1e4, 1e4);
   GLOBALS.uWayMap.value = wayMap();
 
-  const halfs = new Uint16Array(GRID.length);
-  for (let i = 0; i < GRID.length; i++) halfs[i] = THREE.DataUtils.toHalfFloat(GRID[i]);
+  const halfs = new Uint16Array(SKIN.length);
+  for (let i = 0; i < SKIN.length; i++) halfs[i] = THREE.DataUtils.toHalfFloat(SKIN[i]);
   const heightTex = new THREE.DataTexture(halfs, SEGMENTS + 1, SEGMENTS + 1, THREE.RedFormat, THREE.HalfFloatType);
   heightTex.minFilter = heightTex.magFilter = THREE.LinearFilter;
   heightTex.needsUpdate = true;

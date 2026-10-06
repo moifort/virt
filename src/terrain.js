@@ -527,13 +527,16 @@ function landAt(x, z) {
   return h + (-12 - h) * smoothstep(11, 2, brink);
 }
 
-export function heightAt(x, z) {
+/** The mountain as it stands, uncut: the land with the brow of rock round the second tunnel on it. */
+export function rockAt(x, z) {
   let h = landAt(x, z);
   const brow = browAt(x, z);
-  if (brow) {
-    h += Math.max(0, brow.top - h) * brow.w;
-    h += (RAIL.level + PORTAL.top + 0.25 - h) * brow.bench;
-  }
+  if (brow) h += Math.max(0, brow.top - h) * brow.w;
+  return h;
+}
+
+export function heightAt(x, z) {
+  const h = rockAt(x, z);
   return h - Math.max(0, h - (RAIL.level - 0.3)) * boreAt(x, z);
 }
 
@@ -564,45 +567,46 @@ export const RAIL_MOUTHS = (() => {
   return { a, b };
 })();
 // The second tunnel goes into the ridge where its flank falls steeply across the line, so the
-// hill closes over the rails on the uphill side only. There the portal is cut skew into a brow
-// of rock, its face turned with the cliff toward the sea so the rails can be seen running into
-// the dark: the rock stands round the headwall and above it, a ledge of rock carries its foot
-// and the end of the viaduct, and a grassy bench lies over the bore, which is no deeper than
-// the headwall (railway.js), so it never opens to the sky.
+// hill closes over the rails on the uphill side only. There the portal is cut square into a
+// brow of rock: the cliff stands round its headwall and climbs on over it to the ridge, so the
+// rails run under the mountain and into the dark; in front, a spur of rock falls from under
+// its foot to the last pier of the viaduct, carrying the end of the deck. The heightfield
+// cannot overhang, so the bore is a cut in it (`boreAt`) and the rock over the bore is a
+// separate piece of ground laid over the cut (`buildPortalRock`).
 // `half` the width of the headwall, `top` its height over the rails, `back` how far the bore
-// runs in from the mouth, `skew` how far its face is turned from square to the line.
-export const PORTAL = { half: 5.5, top: 8.6, back: 6, skew: 0.6 };
-const portalFace = (l) => RAIL_MOUTHS.b + Math.max(-PORTAL.half, Math.min(PORTAL.half, l)) * Math.tan(PORTAL.skew);
+// runs in from the mouth.
+export const PORTAL = { half: 5.5, top: 7.6, back: 6 };
 // Nothing grows out of the headwall; the brow behind it is left to the maquis.
 CLEARINGS.push({ ...railPoint(RAIL_MOUTHS.b + 2, 0), r: 7 });
 function browAt(x, z) {
   const { s, l } = railCoords(x, z);
   const P = RAIL_MOUTHS.b;
-  if (s < P - 12 || s > P + 34 || l < -20 || l > 18) return null;
+  if (s < P - 24 || s > P + 34 || l < -20 || l > 18) return null;
   const n = fbm(x * 0.09 + 2, z * 0.09 - 7, 2) - 0.5;
   const m = (fbm(x * 0.04 - 5, z * 0.04 + 11, 2) - 0.5) * 2;
   const W = PORTAL.half;
-  const sf = portalFace(l);
-  const back = P + PORTAL.back;
-  // Over the headwall the rock stands a metre behind its face; beside it the cliff runs on in
-  // the line of the face, raggedly, wrapping round the jambs; toward the sea the brow rounds off
-  // into the slope instead of standing up as a wall.
+  // The ridge the brow climbs to, rounding off toward the sea instead of standing up as a wall.
+  const ridge = RAIL.level + 12.5 + (s - P) * 0.3 + n * 3 + (fbm(x * 0.3 - 1, z * 0.3 + 4, 2) - 0.5) * 4 - Math.max(0, l - W - 2.5) * (3.0 + m);
+  // The spur under the headwall: a crest just under the deck, falling off to either side and,
+  // toward the viaduct, down the hollow to the foot of its last pier.
+  const foot = RAIL.level - 1.3 - Math.max(0, Math.abs(l) - 1.2) * 2.5 + n * 0.8 - Math.max(0, P - 1.5 - s) * 1.6;
+  // Over the headwall the rock stands on its cornice as a wall up to the ridge; beside it
+  // the cliff runs on in the line of the face, raggedly, wrapping round the jambs.
   const outer = smoothstep(W + 0.4, W + 1.4, Math.abs(l));
-  const face = sf + (1 - outer) + (P + l * Math.tan(PORTAL.skew) - sf - 0.4 + n * 3 + m * 2) * outer;
-  const top = RAIL.level + 10.5 + (s - P) * 0.25 + n * 3 + (fbm(x * 0.3 - 1, z * 0.3 + 4, 2) - 0.5) * 4 - Math.max(0, l - W - 1.5) * (3.5 + m * 1.5);
-  const foot = RAIL.level - 1.6 - Math.max(0, Math.abs(l) - W - 0.5) * 0.8 + n * 1.5;
-  const w = smoothstep(sf - 3.4 + n * 2, sf - 2.4 + n * 2, s) * smoothstep(P + 32, P + 16, s) * (l > 0 ? smoothstep(W + 6 + m * 3, W + 2.5 + m * 2, l) : smoothstep(W + 12, W + 6, -l));
-  const bench = (1 - outer) * smoothstep(sf + 1, sf + 1.6, s) * smoothstep(back + 1.3, back + 0.3, s);
-  return { top: foot + (top - foot) * smoothstep(face, face + 0.8, s), w, bench };
+  const over = Math.min(ridge, RAIL.level + PORTAL.top - 0.2 + Math.max(0, s - P - 1.0) * (6 + n * 2));
+  const inner = foot + (over - foot) * smoothstep(P + 0.6, P + 1.2, s);
+  const face = P - 1.4 + n * 2.4 + m * 1.4;
+  const cliff = foot + (ridge - foot) * smoothstep(face, face + 0.8, s);
+  const w = smoothstep(P + 32, P + 16, s) * (l > 0 ? smoothstep(W + 8 + m * 2, W + 4.5 + m * 1.5, l) : smoothstep(W + 12, W + 6, -l));
+  return { top: inner + (cliff - inner) * outer, w };
 }
 function boreAt(x, z) {
   const { s, l } = railCoords(x, z);
   const { a, b } = RAIL_MOUTHS;
-  const skew = b - PORTAL.half * Math.tan(PORTAL.skew);
   const first = smoothstep(a + 1.5, a + 0.5, s) * smoothstep(a - BORE - 1, a - BORE, s);
-  // The skew portal's cut runs on under its jambs, so the slope of the cut's sides, which the
-  // terrain mesh spreads over more than a metre, stays hidden in the masonry.
-  const second = smoothstep(skew - 2.5, skew - 1.5, s) * smoothstep(b + PORTAL.back, b + PORTAL.back - 0.8, s);
+  // The second bore is cut from the face to a little past the dark back wall of the bore
+  // (railway.js), so that the floor of the cut rises again only where that wall hides it.
+  const second = smoothstep(b - 0.2, b + 0.6, s) * smoothstep(b + PORTAL.back + 2.5, b + PORTAL.back + 1.5, s);
   return Math.max(first * smoothstep(3.9, 3.1, Math.abs(l)), second * smoothstep(PORTAL.half - 0.3, PORTAL.half - 1.1, Math.abs(l)));
 }
 // The heightfield everything else reads: the land inside the bounds, open sea beyond them.
@@ -615,6 +619,17 @@ for (let iz = 0; iz <= SEGMENTS; iz++) {
   }
 }
 shelveShores();
+// The ground as the shader reads it: the mountain as it stands, uncut by the bores, which are
+// roofed over (the first by its mound, the second by `buildPortalRock`), so the rock laid over
+// them is painted as the cliff it continues and not as a thing standing in a trench.
+export const SKIN = GRID.slice();
+for (let iz = 0; iz <= SEGMENTS; iz++) {
+  for (let ix = 0; ix <= SEGMENTS; ix++) {
+    const x = ix * CELL - HALF;
+    const z = iz * CELL - HALF;
+    if (inSquare(x, z, -1.5) && boreAt(x, z) > 0) SKIN[iz * (SEGMENTS + 1) + ix] = Math.max(SEA_FLOOR, rockAt(x, z));
+  }
+}
 
 // The railway, wherever it runs at or within a tree's height over the ground: nothing grows
 // up through the line or the deck of the viaduct.
@@ -754,7 +769,14 @@ export function buildTerrain() {
   }
   // Tells the built terrace walls from the living rock.
   geo.setAttribute('aTerrace', new THREE.BufferAttribute(worked, 1));
-  // Make sure the triangles face up.
+  const group = new THREE.Group();
+  group.add(groundMesh(geo), buildPortalRock());
+  return group;
+}
+
+/** A piece of ground drawn as the terrain, its triangles turned to face up. */
+function groundMesh(geo) {
+  const pos = geo.attributes.position;
   const index = geo.index.array;
   const a = new THREE.Vector3();
   const b = new THREE.Vector3();
@@ -769,6 +791,33 @@ export function buildTerrain() {
   const mesh = new THREE.Mesh(geo, paint(0xffffff, { terrain: true }));
   mesh.receiveShadow = true;
   return mesh;
+}
+
+/**
+ * The mountain over the second tunnel. The heightfield cannot overhang, so its bore is a cut
+ * open to the sky; this piece of ground, the rock as it stands uncut (`rockAt`), is laid over
+ * the cut from the top of the headwall to past the back of the bore. Its edges are sunk a
+ * little under the ground round it, so that no seam opens, and it is drawn with the terrain's
+ * shader, which reads the uncut ground (`SKIN`) and so paints it as the cliff it continues.
+ */
+function buildPortalRock() {
+  const { half: W, top: TOP, back: BACK } = PORTAL;
+  const STEP = 0.5;
+  const across = Math.round((2 * W + 3) / STEP) + 1;
+  const along = Math.round((BACK + 3) / STEP) + 1;
+  const geo = new THREE.PlaneGeometry(1, 1, across - 1, along - 1);
+  const pos = geo.attributes.position;
+  for (let r = 0; r < along; r++) {
+    for (let j = 0; j < across; j++) {
+      const p = railPoint(RAIL_MOUTHS.b + 1.0 + r * STEP, -W - 1.5 + j * STEP);
+      // The front row rests in the top of the headwall; the rock climbs from there.
+      let y = r === 0 ? RAIL.level + TOP - 0.2 : rockAt(p.x, p.z);
+      if (r === along - 1 || j === 0 || j === across - 1) y -= 0.3;
+      pos.setXYZ(r * across + j, p.x, y, p.z);
+    }
+  }
+  geo.setAttribute('aTerrace', new THREE.BufferAttribute(new Float32Array(pos.count), 1));
+  return groundMesh(geo);
 }
 const FAR = 2400;
 // The two cut edges of the tile, each as a run of points from the far-off open sea to the back
