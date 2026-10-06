@@ -281,18 +281,29 @@ const RAIL_LINE = [railStart.x, railStart.z, railEnd.x, railEnd.z];
 export const railPoint = (s, l = 0) => ({ x: railStart.x + railDir.x * s - railDir.z * l, z: railStart.z + railDir.z * s + railDir.x * l });
 /** How much a point lies within an area of the station given along and across the line. */
 function stationArea(x, z, y) {
-  const s = (x - railStart.x) * railDir.x + (z - railStart.z) * railDir.z;
-  const l = -(x - railStart.x) * railDir.z + (z - railStart.z) * railDir.x;
+  const { s, l } = railCoords(x, z);
   return smoothstep(y.s0 - 2.5, y.s0, s) * smoothstep(y.s1 + 2.5, y.s1, s) * smoothstep(y.l0 - 2.5, y.l0, l) * smoothstep(y.l1 + 2, y.l1, l);
 }
 for (const s of [4, 11, 18]) CLEARINGS.push({ ...railPoint(STATION.s0 + s, -8), r: 8 });
+/** A point given along (s) and across (l) the line. */
+const railCoords = (x, z) => ({ s: (x - railStart.x) * railDir.x + (z - railStart.z) * railDir.z, l: -(x - railStart.x) * railDir.z + (z - railStart.z) * railDir.x });
 
 // A single-file trail leaves the observatory terrace by the gap in its parapet and winds down
 // the mountainside in two long S-bends to the back of the station: a bare metre of packed
 // earth, wide enough for one walker.
 const TRAIL = (() => {
   const from = { x: OBSERVATORY.x, z: OBSERVATORY.z + OBSERVATORY.r + 1.5 };
+// Before the station the line runs in a rock cutting, and then into a spur of the mountain
+// thrown across it, so that the train has a hill to go into: the first tunnel's mouth is
+// where the cutting ends and the spur begins.
+export const CUTTING = { s0: -8, s1: STATION.s0 + 2, l0: -3.6, l1: 3.2 };
+function spurAt(x, z) {
+  const { s, l } = railCoords(x, z);
+  return smoothstep(-7, -16, s) * smoothstep(-42, -28, s) * smoothstep(21, 7, Math.abs(l));
+}
   const to = railPoint(STATION.s0 + 12, -15);
+// Nothing grows over the tunnel mouth and the cutting before the station.
+for (const [s, r] of [[-15, 9], [-5, 7], [6, 6], [16, 6]]) CLEARINGS.push({ ...railPoint(s, 0), r });
   const dx = to.x - from.x;
   const dz = to.z - from.z;
   const len = Math.hypot(dx, dz);
@@ -430,6 +441,8 @@ function landAt(x, z) {
 
 export const heightAt = landAt;
 
+  h -= Math.max(0, h - (RAIL.level - 0.3)) * stationArea(x, z, CUTTING);
+  h += Math.max(0, RAIL.level + 9 + (fbm(x * 0.05 + 4, z * 0.05 - 9, 2) - 0.5) * 4 - h) * spurAt(x, z);
 // The level of the observatory terrace: the lie of the crest where it stands, measured once.
 let summit;
 function summitLevel() {

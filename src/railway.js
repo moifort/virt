@@ -23,9 +23,9 @@ const end = new THREE.Vector3(toX(B.u, B.v), 0, toZ(B.u, B.v));
 const LENGTH = start.distanceTo(end);
 const dir = end.clone().sub(start).normalize();
 const groundAlong = (s) => groundAt(start.x + dir.x * s, start.z + dir.z * s);
-// Tunnel mouths: where the slope rises above the rails at each end of the crossing.
-let MOUTH_A = 0;
-while (MOUTH_A < LENGTH && groundAlong(MOUTH_A) > LEVEL + 0.3) MOUTH_A += 0.5;
+// Tunnel mouths: where the slope rises above the rails on either side of the station.
+let MOUTH_A = STATION.s0;
+while (MOUTH_A > -60 && groundAlong(MOUTH_A - 0.5) < LEVEL + 0.3) MOUTH_A -= 0.5;
 let MOUTH_B = LENGTH;
 while (MOUTH_B > MOUTH_A && groundAlong(MOUTH_B) > LEVEL + 0.3) MOUTH_B -= 0.5;
 // The dark back of each mouth: past it the train is underground.
@@ -34,19 +34,25 @@ const inTunnel = (s) => s < MOUTH_A - DEPTH || s > MOUTH_B + DEPTH;
 
 /** Tunnel head at `x`, the hill on the `side` (-1 toward A, +1 toward B), its vault under a terraced mound. */
 function buildTunnel(line, x, side) {
-  // Headwall with a dark mouth, an ochre archivolt, a coping and two stout buttresses.
+  // Headwall with a dark mouth, an ochre archivolt with its keystone, a coping, two stout
+  // buttresses, and wing walls splayed back into the hill on either side.
   for (const z of [-1, 1]) {
     at(box(1.2, 7.4, 2.4, STONE), x + side * 0.6, 2.7, z * 3.8, line);
     at(box(2.2, 3.2, 1.4, STONE), x - side * 0.3, 0.6, z * 4.6, line);
+    const wing = at(box(0.9, 5.2, 4.0, STONE), x + side * 1.9, 1.6, z * 6.6, line);
+    wing.rotation.y = z * side * 0.55;
+    at(box(1.0, 0.4, 4.2, PAL.ochre), x + side * 1.9, 4.3, z * 6.6, line).rotation.y = z * side * 0.55;
   }
   at(box(1.2, 2.6, 5.2, STONE), x + side * 0.6, 5.6, 0, line);
   at(box(DEPTH * 2, 6, 5.2, 0x2b2533), x + side * DEPTH, 1.4, 0, line);
   const arch = at(ring(VAULT, 0.4, PAL.ochre, Math.PI, 14), x - side * 0.05, 1.6, 0, line);
   arch.rotation.y = Math.PI / 2;
+  at(box(0.5, 0.9, 0.7, PAL.ochre), x - side * 0.15, VAULT + 1.75, 0, line);
   at(box(1.6, 0.6, 10.4, PAL.ochre), x + side * 0.6, 7.2, 0, line);
+  at(box(0.1, 0.5, 1.2, 0xf1e6cc), x - side * 0.66, 5.9, 0, line);
   // The vault runs on into the hill under an earth mound, a stone-walled terrace like the slope's.
   const top = VAULT + 2.6;
-  for (let s = x + side * 1.7; s > 0 && s < LENGTH && groundAlong(s) < LEVEL + top; s += side) {
+  for (let s = x + side * 1.7; s > -60 && s < LENGTH && groundAlong(s) < LEVEL + top; s += side) {
     const bottom = Math.min(-1, groundAlong(s) - LEVEL - 0.5);
     at(box(1.02, top - 0.4 - bottom, 8.2, STONE), s, (top - 0.4 + bottom) / 2, 0, line);
     at(box(1.02, 0.4, 8.6, PAL.grass), s, top - 0.2, 0, line);
