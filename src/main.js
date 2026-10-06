@@ -11,6 +11,10 @@ const clamp = THREE.MathUtils.clamp;
 
 const renderer = new THREE.WebGLRenderer({ antialias: false });
 renderer.shadowMap.enabled = true;
+// The shadow map covers the whole island, so drawing it is a third of a frame. It is
+// redrawn every other frame: the sun hardly moves in between, and whatever walks, sails or
+// grazes is never more than a pixel behind its shadow.
+renderer.shadowMap.autoUpdate = false;
 document.body.prepend(renderer.domElement);
 const pixels = new PixelRenderer(renderer, 2);
 const view = new PixelCamera();
@@ -147,6 +151,7 @@ const ahead = new THREE.Vector2();
 const sunSpot = new THREE.Vector3();
 const moonSpot = new THREE.Vector3();
 let t = 0;
+let frames = 0;
 
 // The island as a box, from the base of the tile up over the summit and the tallest tower.
 const ISLAND = LAND_ENDS.flatMap(([x, z]) => [new THREE.Vector3(x, -16, z), new THREE.Vector3(x, 110, z)]);
@@ -229,6 +234,7 @@ renderer.setAnimationLoop(() => {
   scene.fog.far = view.distance + 520 * climate.visibility;
 
   frameShadows();
+  renderer.shadowMap.needsUpdate = frames++ % 2 === 0;
   // The road the low sun, or the moon, lays on the sea runs through the middle of the view.
   const level = Math.hypot(climate.lightDir.x, climate.lightDir.z) || 1;
   const across = { x: -climate.lightDir.z / level, z: climate.lightDir.x / level };
