@@ -257,6 +257,9 @@ function frame() {
   // The last of the sea before that line is drawn without an outline, so no seam shows.
   weather.offing = focus.clone().sub(view.camera.position).dot(view.forward) - view.camera.near - 16;
   weather.horizon = focus.project(view.camera).y * 0.5 + 0.5;
+  // The sky itself is a backdrop: it must not slide when the map is dragged under the view,
+  // so its clouds and stars hang from the horizon as it stands with the view on the avatar.
+  weather.skyline = weather.horizon + pan.dot(view._up) / view.viewHeight;
   // Where the sun and the moon stand in the painted sky: across the screen by their bearing
   // from the way the view looks, above the horizon by their height. The moon is opposite the sun.
   for (const [body, sign, spot] of [['sun', 1, sunSpot], ['moon', -1, moonSpot]]) {

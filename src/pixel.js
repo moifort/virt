@@ -34,6 +34,7 @@ uniform float uSlant;
 uniform float uWind;
 uniform vec2 uLitter;
 uniform float uHorizonY;
+uniform float uSkyY;
 uniform float uOffing;
 uniform float uLine;
 uniform float uLowSun;
@@ -91,6 +92,9 @@ void main() {
     float alt = vUv.y - uHorizonY;
     vec3 band = mix(uSkyHorizon, uSkyTop, 0.42) + uLowSun * vec3(0.16, -0.01, 0.07);
     col = alt < 0.22 ? mix(uSkyHorizon, band, clamp(alt / 0.22, 0.0, 1.0)) : mix(band, uSkyTop, smoothstep(0.22, 0.85, alt));
+    // Everything that hangs in the sky is set out from a line that only turns with the view:
+    // sliding the map under the camera moves the edge of the sea, never the clouds or the stars.
+    alt = vUv.y - uSkyY;
     vec2 sp = floor(vec2(vUv.x, alt) * uRes);
     vec2 sky = vec2(vUv.x * uRes.x / uRes.y, alt);
     // Stars come out with the night: many faint ones, a few bright ones that twinkle.
@@ -286,6 +290,7 @@ export class PixelRenderer {
         uWind: { value: 0.3 },
         uLitter: { value: new THREE.Vector2() },
         uHorizonY: { value: 0.5 },
+        uSkyY: { value: 0.5 },
         uOffing: { value: 1e6 },
         uLine: { value: 0.42 },
         uLowSun: { value: 0 },
@@ -328,8 +333,9 @@ export class PixelRenderer {
    * @param {{skyTop: THREE.Color, skyHorizon: THREE.Color, texelWorld: number, time?: number, weather?: object}} frame
    *   `weather` is `Climate.screen`, plus what depends on the view: `slant`, how far the wind
    *   pushes the rain sideways; `horizon`, the height of the sea horizon on the screen (0 at the
-   *   bottom, 1 at the top) and `offing`, the depth beyond which the sea is drawn without a
-   *   line; `sun` and `moon`, where each stands in the sky as (x across the screen, height
+   *   bottom, 1 at the top), `skyline`, the line the clouds and stars are set out from (the
+   *   horizon as it would stand with the view centred on the avatar) and `offing`, the depth
+   *   beyond which the sea is drawn without a line; `sun` and `moon`, where each stands in the sky as (x across the screen, height
    *   above the horizon in screens, 1 if it is ahead of the view).
    */
   render(scene, camera, { skyTop, skyHorizon, texelWorld, time = 0, weather }) {
@@ -353,6 +359,7 @@ export class PixelRenderer {
       u.uWind.value = weather.wind;
       u.uLitter.value.set(weather.leaves, weather.petals);
       u.uHorizonY.value = weather.horizon ?? 0.5;
+      u.uSkyY.value = weather.skyline ?? u.uHorizonY.value;
       u.uOffing.value = weather.offing ?? 1e6;
       u.uLowSun.value = weather.lowSun;
       if (weather.sun) u.uSun.value.copy(weather.sun);
