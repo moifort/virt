@@ -24,8 +24,9 @@ export const live = (obj) => {
 };
 
 /**
- * Merges every static mesh under `root` into one mesh per material: rich detail, few draw calls.
- * Animated subtrees (see `live`), instanced and textured meshes are kept as they are.
+ * Merges every static mesh under `root` into one mesh per kind of paint: rich detail, few draw
+ * calls. Meshes painted alike but for their colour share a mesh, each keeping its colour in its
+ * vertices. Animated subtrees (see `live`), instanced and textured meshes are kept as they are.
  */
 export function bake(root) {
   root.updateMatrixWorld(true);
@@ -37,10 +38,19 @@ export function bake(root) {
     for (const child of [...obj.children]) visit(child);
     if (!obj.isMesh || obj.isInstancedMesh || obj.material.map || obj === root) return;
     const geo = obj.geometry.index ? obj.geometry.toNonIndexed() : obj.geometry.clone();
-    for (const name of Object.keys(geo.attributes)) if (name !== 'position' && name !== 'normal') geo.deleteAttribute(name);
+    const keep = ['position', 'normal', ...(obj.material.vertexColors ? ['color'] : [])];
+    for (const name of Object.keys(geo.attributes)) if (!keep.includes(name)) geo.deleteAttribute(name);
     geo.applyMatrix4(local.multiplyMatrices(inverse, obj.matrixWorld));
-    if (!buckets.has(obj.material)) buckets.set(obj.material, []);
-    buckets.get(obj.material).push(geo);
+    // A painted material gives way to its white, vertex-coloured twin.
+    const painted = obj.material.userData.paint;
+    let material = obj.material;
+    if (painted && !painted.map && !obj.material.vertexColors) {
+      material = paint(0xffffff, { ...painted.flags, vertexColors: true });
+      const { r, g, b } = obj.material.color;
+      geo.setAttribute('color', new THREE.Float32BufferAttribute(new Float32Array(geo.attributes.position.count * 3).map((_, i) => [r, g, b][i % 3]), 3));
+    }
+    if (!buckets.has(material)) buckets.set(material, []);
+    buckets.get(material).push(geo);
     for (const child of [...obj.children]) obj.parent.attach(child);
     obj.removeFromParent();
   };

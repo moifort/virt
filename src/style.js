@@ -601,7 +601,7 @@ const FLAGS = { terrain: 'TERRAIN', water: 'WATER', sway: 'SWAY', glow: 'GLOW', 
 
 /**
  * @param {number} color sRGB hex
- * @param {{terrain?: boolean, water?: boolean, sway?: boolean, glow?: boolean, leaf?: boolean, blossom?: boolean, deciduous?: boolean, roof?: boolean, wall?: boolean, flow?: boolean, cascade?: boolean, flat?: boolean, doubleSide?: boolean, backSide?: boolean, map?: THREE.Texture}} [opts]
+ * @param {{terrain?: boolean, water?: boolean, sway?: boolean, glow?: boolean, leaf?: boolean, blossom?: boolean, deciduous?: boolean, roof?: boolean, wall?: boolean, flow?: boolean, cascade?: boolean, flat?: boolean, doubleSide?: boolean, backSide?: boolean, vertexColors?: boolean, map?: THREE.Texture}} [opts]
  *   `leaf` is foliage (painted in clumps, rustling, evergreen unless `deciduous`), `blossom` an
  *   orchard crown that flowers and
  *   sheds, `roof` tiles, `wall` aged plaster, `flow` rain water running off a roof, `cascade` a
@@ -618,6 +618,9 @@ export function paint(color, opts = {}) {
     side: opts.doubleSide ? THREE.DoubleSide : opts.backSide ? THREE.BackSide : THREE.FrontSide,
   });
   if (opts.flat) mat.flatShading = true;
+  // Baked meshes carry their colours in their vertices (see `bake` in kit.js).
+  if (opts.vertexColors) mat.vertexColors = true;
+  mat.userData.paint = { flags, map };
   mat.defines = {};
   for (const [flag, define] of Object.entries(FLAGS)) if (opts[flag]) mat.defines[define] = '';
   if (opts.blossom) mat.defines.LEAF = '';

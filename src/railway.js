@@ -296,6 +296,8 @@ function buildTrain(line, animated) {
       at(box(0.1, 0.06, 1.2, INK), 0.45, 3.95, 0, car);
     }
     if (i === cars - 1) at(ball(0.16, PAL.red, { glow: true }, 4, 3), -carLength / 2 - 0.05, 1.0, 0, car);
+    // Each car moves and hides as one piece.
+    bake(car);
   }
   line.add(train);
 

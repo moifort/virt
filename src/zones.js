@@ -553,7 +553,8 @@ export function gozzo(rng, sail = false) {
     canvas.scale.z = 0.08;
     at(canvas, 0.55, 2.1, 0.3, g);
   }
-  return g;
+  // A boat bobs as one piece: baked, it is a few meshes rather than twenty.
+  return bake(g);
 }
 
 /** A gull at rest on a post or a rail, wings folded, looking out to sea. */
