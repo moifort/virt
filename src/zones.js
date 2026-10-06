@@ -725,31 +725,39 @@ export function buildPort(g, rng, animated) {
   const surface = WATER_LEVEL;
   const Q = 17;
   const TIMBER = [PAL.wood, 0xa8764f, 0x9a6a48];
+  // The decks of the harbour ride just over the water, as low as a quay can be.
+  const DECK = surface + 0.5;
 
   // The harbour starts at the foot of the village street: a boardwalk on piles runs straight
-  // out from the last houses over the shallows to the quay.
-  for (let z = 0; z < Q - 1.8; z += 0.62) at(box(3.2, 0.14, 0.56, pick(rng, TIMBER)), 0, 0.12, z + 0.31, g);
+  // out from the last houses over the shallows, easing down to the quay as it goes.
+  const RAMP = Q - 1.8;
+  const rampY = (z) => 0.12 + ((DECK - 0.12) * Math.min(1, Math.max(0, z))) / RAMP;
+  const tilt = Math.atan2(DECK - 0.12, RAMP);
+  for (let z = 0; z < RAMP; z += 0.62) at(box(3.2, 0.14, 0.56, pick(rng, TIMBER)), 0, rampY(z + 0.31), z + 0.31, g).rotation.x = -tilt;
   for (let z = 1.5; z < Q - 2; z += 3) {
     for (const dx of [-1.5, 1.5]) {
-      at(cyl(0.16, 0.18, 4.6, DARK_WOOD, 6), dx, -2.0, z, g);
+      at(cyl(0.16, 0.18, 4.6, DARK_WOOD, 6), dx, rampY(z) - 2.2, z, g);
       mussels(g, rng, dx, z);
     }
   }
-  for (const z of [4, 11]) lantern(g, 1.3, 0.2, z);
+  for (const z of [4, 11]) lantern(g, 1.3, rampY(z) + 0.08, z);
+
+  // Everything from the quay out is built on the low deck.
+  const deck = at(new THREE.Group(), 0, DECK - 0.12, 0, g);
 
   // A timber quay: a plank boardwalk carried on driven piles and faced with boards, with
   // mooring posts and lamps. Everything in the harbour is wood.
-  for (let x = -22.5; x <= 22.5; x += 1.5) at(cyl(0.2, 0.24, 5.2, DARK_WOOD, 6), x, -2.3, Q + 1.35, g);
-  for (let k = 0; k < 4; k++) at(box(45.2, 0.5, 0.12, TIMBER[k % 3]), 0, -0.3 - k * 0.56, Q + 1.15, g);
-  for (let x = -22.5; x < 22.5; x += 0.62) at(box(0.56, 0.14, 3.2, pick(rng, TIMBER)), x + 0.31, 0.12, Q - 0.2, g);
-  for (const z of [Q - 1.6, Q + 1.2]) at(box(45, 0.12, 0.2, DARK_WOOD), 0, 0.02, z, g);
+  for (let x = -22.5; x <= 22.5; x += 1.5) at(cyl(0.2, 0.24, 5.2, DARK_WOOD, 6), x, -2.3, Q + 1.35, deck);
+  for (let k = 0; k < 4; k++) at(box(45.2, 0.5, 0.12, TIMBER[k % 3]), 0, -0.3 - k * 0.56, Q + 1.15, deck);
+  for (let x = -22.5; x < 22.5; x += 0.62) at(box(0.56, 0.14, 3.2, pick(rng, TIMBER)), x + 0.31, 0.12, Q - 0.2, deck);
+  for (const z of [Q - 1.6, Q + 1.2]) at(box(45, 0.12, 0.2, DARK_WOOD), 0, 0.02, z, deck);
   for (let x = -21; x <= 21; x += 4.2) {
-    at(cyl(0.16, 0.2, 1.2, DARK_WOOD, 6), x, 0.5, Q + 1.3, g);
-    at(cyl(0.2, 0.2, 0.06, INK, 6), x, 0.6, Q + 1.3, g);
+    at(cyl(0.16, 0.2, 1.2, DARK_WOOD, 6), x, 0.5, Q + 1.3, deck);
+    at(cyl(0.2, 0.2, 0.06, INK, 6), x, 0.6, Q + 1.3, deck);
   }
-  for (const x of [-18, -6, 6, 18]) lantern(g, x, 0.2, Q - 0.9);
+  for (const x of [-18, -6, 6, 18]) lantern(deck, x, 0.2, Q - 0.9);
   // Strings of little lamps from one quay lantern to the next.
-  for (const x of [-18, -6, 6]) festoon(g, x + 0.6, 3.0, Q - 0.9, x + 12.6, 3.0, Q - 0.9, 0.8);
+  for (const x of [-18, -6, 6]) festoon(deck, x + 0.6, 3.0, Q - 0.9, x + 12.6, 3.0, Q - 0.9, 0.8);
 
   // A red seaplane rides at its buoy off the ends of the piers, its propeller idling.
   const { plane, prop } = seaplane();
@@ -763,17 +771,17 @@ export function buildPort(g, rng, animated) {
 
   // A straight jetty to the left.
   const plank = (x, z, yaw, width) => {
-    at(box(width, 0.14, 0.56, pick(rng, TIMBER)), x, 0.05, z, g).rotation.y = yaw;
+    at(box(width, 0.14, 0.56, pick(rng, TIMBER)), x, 0.05, z, deck).rotation.y = yaw;
   };
-  const pile = (x, z) => at(cyl(0.14, 0.16, 4.2, DARK_WOOD, 6), x, -1.7, z, g);
+  const pile = (x, z) => at(cyl(0.14, 0.16, 4.2, DARK_WOOD, 6), x, -1.7, z, deck);
   for (let z = Q + 1.6; z < Q + 21; z += 0.62) plank(-21, z + 0.31, 0, 3);
   for (let z = Q + 2.4; z < Q + 21; z += 3) for (const dx of [-1.4, 1.4]) pile(-21 + dx, z);
-  lantern(g, -20, 0.13, Q + 20.4);
+  lantern(deck, -20, 0.13, Q + 20.4);
   // Two wooden piers.
   for (const px of [-9, 5]) {
-    for (let i = 0; i < 28; i++) at(box(2.6, 0.16, 0.56, PAL.wood), px, 0.05, Q + 1.6 + i * 0.62, g);
-    for (let z = Q + 2; z < Q + 19; z += 2.8) for (const dx of [-1.2, 1.2]) at(cyl(0.13, 0.13, 3.6, DARK_WOOD, 6), px + dx, -1.7, z, g);
-    lantern(g, px + 1.1, 0.13, Q + 18.6);
+    for (let i = 0; i < 28; i++) at(box(2.6, 0.16, 0.56, PAL.wood), px, 0.05, Q + 1.6 + i * 0.62, deck);
+    for (let z = Q + 2; z < Q + 19; z += 2.8) for (const dx of [-1.2, 1.2]) at(cyl(0.13, 0.13, 3.6, DARK_WOOD, 6), px + dx, -1.7, z, deck);
+    lantern(deck, px + 1.1, 0.13, Q + 18.6);
   }
 
   // Moored boats along the piers, bobbing.
@@ -789,9 +797,9 @@ export function buildPort(g, rng, animated) {
   });
 
   // Two fishmongers' stalls on the quay.
-  for (const x of [-15, 12.5]) fishStall(g, rng, x, Q - 0.5, 0);
-  furnishPort(g, rng);
-  harbourCats(g, rng, animated);
+  for (const x of [-15, 12.5]) fishStall(deck, rng, x, Q - 0.5, 0);
+  furnishPort(deck, rng);
+  harbourCats(deck, rng, animated);
 }
 
 export function buildAgora(g, rng) {
