@@ -1,7 +1,8 @@
-// A little button in the top right corner that shows the weather over the island and, when
-// pressed, unfolds a row of skies to choose from: the real one, sun, wind, rain, storm, snow.
-// The chosen weather rolls in over a few seconds (see Climate.setWeather); the R key, or the
-// first chip, hands the sky back to the forecast.
+// A little button that shows the weather over the island and, when pressed, spreads a fan of
+// skies to choose from: the real one, sun, wind, rain, storm, snow. The chosen weather rolls in
+// over a few seconds (see Climate.setWeather); the R key, or the first chip, hands the sky back
+// to the forecast.
+import { fan } from './fan.js';
 
 const CHOICES = [
   { name: 'real', label: 'Météo réelle' },
@@ -30,46 +31,11 @@ export function weatherSwitch(climate) {
   const button = document.createElement('button');
   button.className = 'weather';
   button.type = 'button';
-  button.setAttribute('aria-haspopup', 'true');
   button.innerHTML = `${icon('clear')}<i class="live"></i>`;
-  const tray = document.createElement('div');
-  tray.className = 'weather-tray';
-  tray.setAttribute('role', 'menu');
-  for (const choice of CHOICES) {
-    const chip = document.createElement('button');
-    chip.type = 'button';
-    chip.className = 'weather-chip';
-    chip.dataset.weather = choice.name;
-    chip.title = choice.label;
-    chip.setAttribute('aria-label', choice.label);
-    chip.setAttribute('role', 'menuitemradio');
-    chip.innerHTML = icon(choice.name);
-    chip.addEventListener('click', () => {
-      climate.setWeather(choice.name);
-      open(false);
-      chip.blur();
-    });
-    tray.append(chip);
-  }
-  document.body.append(button, tray);
-
-  let isOpen = false;
-  const open = (state) => {
-    isOpen = state;
-    tray.classList.toggle('is-open', isOpen);
-    button.setAttribute('aria-expanded', String(isOpen));
-  };
-  button.addEventListener('click', () => {
-    open(!isOpen);
-    // Space and Enter belong to the avatar, not to the button.
-    button.blur();
-  });
-  // A press anywhere else folds the tray away.
-  addEventListener('pointerdown', (e) => {
-    if (isOpen && !tray.contains(e.target) && !button.contains(e.target)) open(false);
-  });
-  addEventListener('keydown', (e) => {
-    if (e.code === 'Escape') open(false);
+  document.body.append(button);
+  const hand = fan(button, CHOICES, {
+    render: (choice) => (choice.name === 'real' ? `${icon('clear')}<i class="live"></i>` : icon(choice.name)),
+    pick: (choice) => climate.setWeather(choice.name),
   });
 
   let shown = null;
@@ -87,9 +53,9 @@ export function weatherSwitch(climate) {
         chosen = weather;
         button.classList.toggle('is-real', weather === 'real');
         const label = CHOICES.find((choice) => choice.name === weather)?.label ?? weather;
-        button.title = weather === 'real' ? 'Météo réelle — choisir le temps' : `${label} — choisir le temps`;
+        button.title = `${label} — choisir le temps`;
         button.setAttribute('aria-label', button.title);
-        for (const chip of tray.children) chip.setAttribute('aria-checked', String(chip.dataset.weather === weather));
+        hand.check(weather);
       }
     },
   };
