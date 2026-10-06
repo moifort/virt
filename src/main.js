@@ -5,6 +5,7 @@ import { GLOBALS, PAL, paint } from './style.js';
 import { Climate } from './climate.js';
 import { dayNightSwitch } from './daynight.js';
 import { seasonSwitch } from './season.js';
+import { weatherSwitch } from './weather.js';
 import { LAND_ENDS, WATER_LEVEL, createWorld, groundAt } from './world.js';
 
 const clamp = THREE.MathUtils.clamp;
@@ -28,6 +29,7 @@ scene.fog = new THREE.Fog(0xffffff, 1, 2);
 const climate = new Climate();
 const dayNight = dayNightSwitch(climate);
 const seasons = seasonSwitch(climate);
+const skies = weatherSwitch(climate);
 
 // The sun casts its shadows over the whole island at once, from a camera fixed in the world:
 // if it followed the view, the mountain would leave its frame as the view slid away and the
@@ -218,6 +220,7 @@ function frame() {
   climate.update(dt);
   dayNight.update();
   seasons.update();
+  skies.update();
   world.update(t, dt, climate);
 
   // The nearest seat within reach, if he is standing still: a little marker bobs over it.

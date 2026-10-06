@@ -34,11 +34,13 @@ const OVERCAST_DAY = new THREE.Color(0x9aa3b2);
 const OVERCAST_NIGHT = new THREE.Color(0x242a40);
 const OVERCAST_LIGHT = new THREE.Color(0xd2d6e0);
 const DAWN_ROSE = new THREE.Color(0xffc0b4);
-const WEATHERS = ['real', 'clear', 'cloudy', 'rain', 'snow', 'mist'];
+const WEATHERS = ['real', 'clear', 'wind', 'cloudy', 'rain', 'storm', 'snow', 'mist'];
 const PRESETS = {
   clear: { cloud: 0.12, rain: 0, snow: 0, mist: 0, wind: 0.3 },
+  wind: { cloud: 0.35, rain: 0, snow: 0, mist: 0, wind: 1 },
   cloudy: { cloud: 0.85, rain: 0, snow: 0, mist: 0.1, wind: 0.5 },
   rain: { cloud: 1, rain: 0.8, snow: 0, mist: 0.3, wind: 0.7 },
+  storm: { cloud: 1, rain: 1, snow: 0, mist: 0.2, wind: 1 },
   snow: { cloud: 1, rain: 0, snow: 0.8, mist: 0.3, wind: 0.25 },
   mist: { cloud: 0.6, rain: 0, snow: 0, mist: 1, wind: 0.1 },
 };
@@ -154,6 +156,16 @@ export class Climate {
       this.trip = null;
       this.calendar = null;
     }
+  }
+
+  /** The weather asked for: one of `WEATHERS`, 'real' when the sky follows the forecast. */
+  get weather() {
+    return WEATHERS[this.override];
+  }
+
+  /** Asks for a weather by name; it rolls in over a few seconds. 'real' hands the sky back to the forecast. */
+  setWeather(name) {
+    this.override = Math.max(0, WEATHERS.indexOf(name));
   }
 
   /**

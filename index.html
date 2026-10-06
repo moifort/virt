@@ -34,33 +34,68 @@
         cursor: grabbing;
       }
 
-      /* The day / night switch (see daynight.js): a strip of sky with the sun or the moon on it. */
-      .daynight {
+      /* The two little controls in the top right corner: the day / night switch (daynight.js), a
+         strip of sky with the sun or the moon on it, and the season switch (season.js), a tree
+         turning with the year. Soft shadows lift them off the picture; no hard ink around them. */
+      .daynight,
+      .season,
+      .weather,
+      .weather-chip {
         position: fixed;
-        top: 12px;
-        left: 50%;
+        top: 14px;
         z-index: 10;
-        width: 64px;
         height: 30px;
         padding: 0;
-        border: 2px solid var(--ink);
+        border: 0;
         border-radius: 15px;
         overflow: hidden;
         background: none;
-        box-shadow: 0 3px 0 var(--ink);
+        box-shadow:
+          0 1px 2px rgba(43, 37, 51, 0.18),
+          0 5px 12px rgba(43, 37, 51, 0.22),
+          inset 0 1px 0 rgba(255, 255, 255, 0.45),
+          inset 0 -1px 0 rgba(43, 37, 51, 0.12);
         cursor: pointer;
-        transform: translateX(-50%);
-        transition: transform 0.12s, box-shadow 0.12s;
+        transition: transform 0.15s, box-shadow 0.15s;
       }
-      .daynight:hover {
-        transform: translate(-50%, -1px);
-        box-shadow: 0 4px 0 var(--ink);
+      .daynight {
+        right: 16px;
+        width: 64px;
       }
-      .daynight:active {
-        transform: translate(-50%, 2px);
-        box-shadow: 0 1px 0 var(--ink);
+      .season {
+        right: 90px;
+        width: 34px;
       }
-      .daynight:focus-visible {
+      .weather {
+        right: 134px;
+        width: 34px;
+      }
+      .daynight:hover,
+      .season:hover,
+      .weather:hover,
+      .weather-chip:hover {
+        transform: translateY(-1px);
+        box-shadow:
+          0 2px 3px rgba(43, 37, 51, 0.16),
+          0 8px 18px rgba(43, 37, 51, 0.26),
+          inset 0 1px 0 rgba(255, 255, 255, 0.45),
+          inset 0 -1px 0 rgba(43, 37, 51, 0.12);
+      }
+      .daynight:active,
+      .season:active,
+      .weather:active,
+      .weather-chip:active {
+        transform: translateY(1px);
+        box-shadow:
+          0 1px 1px rgba(43, 37, 51, 0.18),
+          0 2px 5px rgba(43, 37, 51, 0.2),
+          inset 0 1px 0 rgba(255, 255, 255, 0.45),
+          inset 0 -1px 0 rgba(43, 37, 51, 0.12);
+      }
+      .daynight:focus-visible,
+      .season:focus-visible,
+      .weather:focus-visible,
+      .weather-chip:focus-visible {
         outline: 2px solid var(--paper);
         outline-offset: 2px;
       }
@@ -71,11 +106,11 @@
       .daynight-sky {
         position: absolute;
         inset: 0;
-        background: #8fd6f6;
+        background: linear-gradient(#7fcdf4, #a9e2fa);
         transition: background 0.8s;
       }
       .is-night .daynight-sky {
-        background: #27306a;
+        background: linear-gradient(#1f2656, #3a4486);
       }
       .daynight .star {
         width: 2px;
@@ -161,35 +196,6 @@
         }
       }
 
-      /* The season switch (see season.js): a tree beside the sky strip, turning with the year. */
-      .season {
-        position: fixed;
-        top: 12px;
-        left: calc(50% + 40px);
-        z-index: 10;
-        width: 34px;
-        height: 30px;
-        padding: 0;
-        border: 2px solid var(--ink);
-        border-radius: 15px;
-        overflow: hidden;
-        background: none;
-        box-shadow: 0 3px 0 var(--ink);
-        cursor: pointer;
-        transition: transform 0.12s, box-shadow 0.12s;
-      }
-      .season:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 0 var(--ink);
-      }
-      .season:active {
-        transform: translateY(2px);
-        box-shadow: 0 1px 0 var(--ink);
-      }
-      .season:focus-visible {
-        outline: 2px solid var(--paper);
-        outline-offset: 2px;
-      }
       .season span,
       .season i {
         position: absolute;
@@ -197,14 +203,14 @@
       }
       .season-sky {
         inset: 0;
-        background: #8fd6f6;
+        background: linear-gradient(#7fcdf4, #a9e2fa);
         transition: background 0.8s;
       }
       .is-autumn .season-sky {
-        background: #9fc8e8;
+        background: linear-gradient(#8fbde0, #c9dcea);
       }
       .is-winter .season-sky {
-        background: #c4d6e6;
+        background: linear-gradient(#b7cbdc, #e2ecf3);
       }
       .season-ground {
         left: 0;
@@ -296,7 +302,164 @@
       .is-winter .snowcap {
         opacity: 1;
       }
+
+      /* The weather switch (see weather.js): the sky over the island, and a tray of skies to pick. */
+      .weather-tray {
+        position: fixed;
+        top: 54px;
+        right: 16px;
+        z-index: 10;
+        display: flex;
+        gap: 8px;
+        pointer-events: none;
+        opacity: 0;
+        transform: translateY(-6px);
+        transition: opacity 0.18s, transform 0.18s;
+      }
+      .weather-tray.is-open {
+        pointer-events: auto;
+        opacity: 1;
+        transform: none;
+      }
+      .weather-chip {
+        position: relative;
+        width: 34px;
+      }
+      .weather-chip[aria-checked='true'] {
+        box-shadow:
+          0 0 0 2px var(--paper),
+          0 0 0 3px rgba(43, 37, 51, 0.35),
+          0 5px 12px rgba(43, 37, 51, 0.22);
+      }
+      .weather .live {
+        position: absolute;
+        right: 5px;
+        top: 5px;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: #4fd47a;
+        box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);
+        opacity: 0;
+        transition: opacity 0.4s;
+      }
+      .weather.is-real .live {
+        opacity: 1;
+        animation: weather-pulse 2s ease-in-out infinite;
+      }
+      .sky {
+        position: absolute;
+        inset: 0;
+        display: block;
+        background: linear-gradient(#7fcdf4, #a9e2fa);
+        transition: background 0.6s;
+      }
+      .sky i {
+        position: absolute;
+        display: block;
+        opacity: 0;
+        transition: opacity 0.4s;
+      }
+      .sky .sun {
+        left: 11px;
+        top: 7px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: radial-gradient(circle, #ffd23f 0 4px, transparent 4.5px),
+          repeating-conic-gradient(#ffb703 0 15deg, transparent 15deg 45deg);
+      }
+      .sky .cloud {
+        left: 9px;
+        top: 14px;
+        width: 10px;
+        height: 5px;
+        border-radius: 3px;
+        background: #fff;
+        box-shadow: 4px -3px 0 1px #fff, 8px 0 0 0 #fff;
+      }
+      .sky .drops {
+        left: 12px;
+        top: 22px;
+        width: 2px;
+        height: 4px;
+        border-radius: 1px;
+        background: #4fa3e8;
+        box-shadow: 5px 1px 0 #4fa3e8, 10px -1px 0 #4fa3e8;
+      }
+      .sky .bolt {
+        left: 15px;
+        top: 17px;
+        width: 7px;
+        height: 11px;
+        background: #ffd23f;
+        clip-path: polygon(45% 0, 100% 0, 60% 42%, 95% 42%, 25% 100%, 40% 55%, 0 55%);
+      }
+      .sky .gusts {
+        left: 7px;
+        top: 11px;
+        width: 14px;
+        height: 2px;
+        border-radius: 1px;
+        background: #fff;
+        box-shadow: 6px 5px 0 #fff, -2px 10px 0 #fff, 10px 10px 0 -0.5px #fff;
+      }
+      .sky-clear .sun {
+        opacity: 1;
+      }
+      .sky-wind .gusts {
+        opacity: 1;
+      }
+      .sky-wind {
+        background: linear-gradient(#8fd3f2, #c2e8f8);
+      }
+      .sky-cloudy {
+        background: linear-gradient(#93b5d2, #c3d4e2);
+      }
+      .sky-cloudy .cloud {
+        opacity: 1;
+        top: 11px;
+      }
+      .sky-rain,
+      .sky-snow {
+        background: linear-gradient(#7d93ad, #a7b9cb);
+      }
+      .sky-rain .cloud,
+      .sky-snow .cloud {
+        opacity: 1;
+        top: 9px;
+      }
+      .sky-rain .drops {
+        opacity: 1;
+      }
+      .sky-storm {
+        background: linear-gradient(#3f4766, #6a7490);
+      }
+      .sky-storm .cloud {
+        opacity: 1;
+        top: 7px;
+        background: #cfd4e0;
+        box-shadow: 4px -3px 0 1px #cfd4e0, 8px 0 0 0 #cfd4e0;
+      }
+      .sky-storm .bolt {
+        opacity: 1;
+      }
+      .sky-snow .drops {
+        opacity: 1;
+        width: 3px;
+        height: 3px;
+        border-radius: 50%;
+        background: #fff;
+        box-shadow: 5px 2px 0 #fff, 10px -1px 0 #fff;
+      }
+      @keyframes weather-pulse {
+        50% {
+          box-shadow: 0 0 0 3px rgba(79, 212, 122, 0.3);
+        }
+      }
       @media (prefers-reduced-motion: reduce) {
+        .weather *,
+        .weather-tray,
         .season *,
         .season,
         .daynight *,
