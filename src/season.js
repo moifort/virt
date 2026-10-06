@@ -58,9 +58,15 @@ export function seasonSwitch(climate) {
   };
   show(current());
 
+  let night = null;
   return {
-    /** Keeps the tree in step with the season. */
+    /** Keeps the tree in step with the season, and the sky behind it with the hour. */
     update() {
+      if (climate.nightAhead !== night) {
+        night = climate.nightAhead;
+        button.classList.toggle('is-night', night);
+        hand.mark('is-night', night);
+      }
       if (!climate.calendar) pending = null;
       show(pending ?? current());
     },

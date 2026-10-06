@@ -67,5 +67,9 @@ export function fan(button, choices, { render, pick }) {
     check(name) {
       for (const chip of chips) chip.setAttribute('aria-checked', String(chip.dataset.choice === name));
     },
+    /** Sets or clears a class on the whole hand: `is-night`, for the pictures to follow the sky. */
+    mark(className, state) {
+      tray.classList.toggle(className, state);
+    },
   };
 }

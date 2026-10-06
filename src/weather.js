@@ -14,7 +14,7 @@ const CHOICES = [
 ];
 
 /** The pixel picture of a sky, drawn in CSS (see index.html). */
-const icon = (name) => `<span class="sky sky-${name}"><i class="sun"></i><i class="cloud"></i><i class="drops"></i><i class="bolt"></i><i class="gusts"></i></span>`;
+const icon = (name) => `<span class="sky sky-${name}"><i class="sun"></i><i class="moon"></i><i class="cloud"></i><i class="drops"></i><i class="bolt"></i><i class="gusts"></i></span>`;
 
 /** The chip that best shows the real weather, when the sky follows the forecast. */
 function realLook(climate) {
@@ -40,9 +40,16 @@ export function weatherSwitch(climate) {
 
   let shown = null;
   let chosen = null;
+  let night = null;
   return {
     /** Keeps the picture on the button in step with the sky, and the chosen chip marked. */
     update() {
+      // After dark the pictures show the moon and a night sky, as the day / night switch does.
+      if (climate.nightAhead !== night) {
+        night = climate.nightAhead;
+        button.classList.toggle('is-night', night);
+        hand.mark('is-night', night);
+      }
       const weather = climate.weather;
       const look = weather === 'real' ? realLook(climate) : weather;
       if (look !== shown) {

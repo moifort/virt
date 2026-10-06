@@ -473,6 +473,55 @@
         background: #fff;
         box-shadow: 5px 2px 0 #fff, 10px -1px 0 #fff;
       }
+      /* After dark: the moon instead of the sun, night skies behind the clouds and the trees. */
+      .sky .moon {
+        left: 12px;
+        top: 8px;
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: radial-gradient(circle at 35% 40%, #d9d3b8 0 1.5px, transparent 2px),
+          radial-gradient(circle at 65% 68%, #d9d3b8 0 1px, transparent 1.5px), #fff6d5;
+        box-shadow: 0 0 4px 1px rgba(255, 246, 213, 0.35);
+      }
+      .is-night .sky {
+        background: linear-gradient(#1f2656, #3a4486);
+      }
+      .is-night .sky-cloudy,
+      .is-night .sky-rain,
+      .is-night .sky-snow {
+        background: linear-gradient(#1a1f3a, #343b60);
+      }
+      .is-night .sky-storm {
+        background: linear-gradient(#121527, #262c48);
+      }
+      .is-night .sky .sun {
+        opacity: 0;
+      }
+      .is-night .sky-clear .moon {
+        opacity: 1;
+      }
+      .is-night .sky .cloud {
+        background: #b4bad0;
+        box-shadow: 4px -3px 0 1px #b4bad0, 8px 0 0 0 #b4bad0;
+      }
+      .is-night .sky-storm .cloud {
+        background: #8e95b0;
+        box-shadow: 4px -3px 0 1px #8e95b0, 8px 0 0 0 #8e95b0;
+      }
+      .is-night .sky .gusts {
+        background: #d6dcef;
+        box-shadow: 6px 5px 0 #d6dcef, -2px 10px 0 #d6dcef, 10px 10px 0 -0.5px #d6dcef;
+      }
+      .is-night .season-sky {
+        background: linear-gradient(#1f2656, #3a4486);
+      }
+      .is-night .season-ground {
+        filter: brightness(0.55);
+      }
+      .is-night .season-tree {
+        filter: brightness(0.7);
+      }
       @keyframes weather-pulse {
         50% {
           box-shadow: 0 0 0 3px rgba(79, 212, 122, 0.3);
