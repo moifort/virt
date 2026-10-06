@@ -63,8 +63,9 @@ class Parts {
     this._e = new THREE.Euler();
   }
 
-  at(position, yaw) {
-    this.frame.compose(position, new THREE.Quaternion().setFromAxisAngle(UP, yaw), new THREE.Vector3(1, 1, 1));
+  at(position, yaw, scale = 1) {
+    this.frame.compose(position, new THREE.Quaternion().setFromAxisAngle(UP, yaw), new THREE.Vector3(scale, scale, scale));
+    this.scale = scale;
   }
 
   add(kind, x, y, z, sx, sy, sz, color, rx = 0, ry = 0, rz = 0) {
@@ -161,7 +162,7 @@ function house(parts, rng, w, d, floors, sunk) {
     const side = doorX > 0 ? -1 : 1;
     parts.onFace(0, w, d, 'box', doorX + side * 0.72, 2.1, 0.16, 0.05, 0.05, 0.3, IRON);
     parts.onFace(0, w, d, 'lamp', doorX + side * 0.72, 1.92, 0.3, 0.24, 0.3, 0.24, WARM_LIGHT);
-    parts.lights.push({ p: parts.world(doorX + side * 0.72, 1.9, d / 2 + 1), reach: 3.8 });
+    parts.lights.push({ p: parts.world(doorX + side * 0.72, 1.9, d / 2 + 1), reach: 3.8 * parts.scale });
   }
 
   // Windows on the three visible faces, floor by floor.
@@ -252,7 +253,7 @@ function house(parts, rng, w, d, floors, sunk) {
       parts.add('box', 0, H + 1.86, 0, w - 0.6, 0.06, d - 0.6, WOOD);
       for (let k = 0; k < 7; k++) parts.add('leaf', (rng() - 0.5) * (w - 0.8), H + 1.98, (rng() - 0.5) * (d - 0.8), 0.9, 0.3, 0.9, pick(rng, [0x5f8e4c, 0x6c9a54, 0x54844a]));
       parts.add('lamp', 0, H + 1.6, 0, 0.22, 0.26, 0.22, WARM_LIGHT);
-      parts.lights.push({ p: parts.world(0, H + 1.6, 0), reach: 3.4 });
+      parts.lights.push({ p: parts.world(0, H + 1.6, 0), reach: 3.4 * parts.scale });
     }
     for (let k = 0; k < 3; k++) parts.add('leaf', (rng() - 0.5) * (w - 0.8), H + 0.45, (rng() - 0.5) * (d - 0.8), 0.5, 0.45, 0.5, pick(rng, [0x5a9050, 0x74a862, 0x4f8456]));
   }
@@ -284,7 +285,7 @@ function campanile(parts, rng) {
   parts.add('pyramid', 0, 15.6, 0, 2.6, 2.8, 2.6, rng() < 0.5 ? SLATE : TILE);
   parts.add('box', 0, 17.5, 0, 0.08, 1.0, 0.08, 0x3b3346);
   parts.add('box', 0, 17.7, 0, 0.5, 0.08, 0.08, 0x3b3346);
-  parts.lights.push({ p: parts.world(0, 2, 2.2), reach: 7 });
+  parts.lights.push({ p: parts.world(0, 2, 2.2), reach: 7 * parts.scale });
 }
 
 /**
@@ -329,26 +330,29 @@ export function buildVillages(scene, rng, animated) {
   const placed = [];
   const yaw = Math.PI / 4;
   const SUNK = 1.4; // houses are dug into the slope: their street door is this far up
+  // The houses are drawn in their own units and set in the world at the avatar's scale, with
+  // their doors and floors the height of his.
+  const SCALE = 1.6;
 
   // Houses packed in rows along the slope, as in Manarola, inside an organic blob.
   const villages = VILLAGES.map((village) => ({ cu: village.u, cv: village.v, radius: village.r, up: village.up ?? 1, bell: village.bell, waterfront: village.waterfront }));
   for (const village of villages) {
-    for (let v = village.cv - village.radius - 4; v <= village.cv + village.radius + 4; v += 3.4) {
-      for (let u = village.cu - village.radius * village.up - 4; u <= village.cu + village.radius * village.up + 4; u += 3.2) {
+    for (let v = village.cv - village.radius - 4; v <= village.cv + village.radius + 4; v += 3.4 * SCALE) {
+      for (let u = village.cu - village.radius * village.up - 4; u <= village.cu + village.radius * village.up + 4; u += 3.2 * SCALE) {
         // Ragged outline: the edge of the blob wanders with noise.
         const a = Math.atan2((u - village.cu) / village.up, v - village.cv);
         const edge = village.radius * (0.75 + fbm(Math.cos(a) * 1.5 + village.cv, Math.sin(a) * 1.5, 2) * 0.5);
         const d = Math.hypot((u - village.cu) / village.up, (v - village.cv) * 0.85);
         if (d > edge) continue;
-        const jv = v + (rng() - 0.5) * 0.4;
-        const ju = u + (rng() - 0.5) * 0.3;
+        const jv = v + (rng() - 0.5) * 0.4 * SCALE;
+        const ju = u + (rng() - 0.5) * 0.3 * SCALE;
         const x = toX(ju, jv);
         const z = toZ(ju, jv);
-        if (rng() < 0.05 || (village.bell && Math.hypot(ju - village.cu, jv - village.cv) < 3.5)) continue;
+        if (rng() < 0.05 || (village.bell && Math.hypot(ju - village.cu, jv - village.cv) < 3.5 * SCALE)) continue;
         // The lowest houses of a waterfront village stand in the shallows, the sea at their doors.
         if (!isWild(x, z, -2, WATER_LEVEL + (village.waterfront ? -1.5 : 1.3)) || slopeAt(x, z) > 1.8) continue;
         placed.push([x, z]);
-        parts.at(new THREE.Vector3(x, Math.max(groundAt(x, z), WATER_LEVEL + 0.45) - SUNK, z), yaw);
+        parts.at(new THREE.Vector3(x, Math.max(groundAt(x, z), WATER_LEVEL + 0.45) - SUNK * SCALE, z), yaw, SCALE);
         // Taller houses toward the heart of the village.
         const floors = 2 + Math.floor(rng() * 2) + (d < edge * 0.5 ? 1 : 0);
         house(parts, rng, 2.8 + rng() * 0.6, 2.6 + rng() * 0.5, floors, SUNK);
@@ -357,7 +361,7 @@ export function buildVillages(scene, rng, animated) {
     if (village.bell) {
       const x = toX(village.cu, village.cv);
       const z = toZ(village.cu, village.cv);
-      parts.at(new THREE.Vector3(x, groundAt(x, z) - 0.5, z), yaw);
+      parts.at(new THREE.Vector3(x, groundAt(x, z) - 0.5, z), yaw, SCALE * 0.85);
       campanile(parts, rng);
       placed.push([x, z]);
     }
@@ -372,7 +376,7 @@ export function buildVillages(scene, rng, animated) {
       if (u < footU(v) + 1 || cultivated(u, v) < 0.6) continue;
       if (estateWeight(u, v) > 0.25) continue; // the estate plants its own rows
       if (slopeAt(x, z) > 0.3 || !isWild(x, z, -1)) continue;
-      if (placed.some((p) => Math.hypot(p[0] - x, p[1] - z) < 3)) continue;
+      if (placed.some((p) => Math.hypot(p[0] - x, p[1] - z) < 3 * SCALE)) continue;
       parts.at(new THREE.Vector3(x, groundAt(x, z), z), yaw);
       parts.add('vine', 0, 0.55, 0, 0.85, 0.95 + rng() * 0.3, 0.6, pick(rng, [0x6a9e5e, 0x66a070, 0x82b06a, 0x8ab464]));
       if (Math.round(v / 0.95) % 3 === 0) parts.add('cyl', 0.55, 0.6, 0, 0.06, 1.2, 0.06, WOOD);
