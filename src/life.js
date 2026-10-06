@@ -31,69 +31,94 @@ const OFFING = [[-84, -30], [-88, 20], [-80, 62], [-70, -70], [10, -128], [60, -
 const offing = (k) => OFFING[Math.floor(hash(k, 77) * OFFING.length)];
 
 /**
- * Whales: now and then one surfaces far out, shows its long back, blows three times, lifts its
- * flukes and sounds. Then the sea is empty again for a good while.
+ * A whale, built behind a pivot at its head so that pitching the body nose-down lifts the tail
+ * clear of the water. Returns the parts the choreography moves.
+ */
+function whale(scale) {
+  const SKIN = 0x46536a;
+  const g = live(new THREE.Group());
+  g.scale.setScalar(scale);
+  const body = at(new THREE.Group(), 0, 0, 0, g);
+  at(ball(1, SKIN, {}, 12, 8), 0, -0.5, -4.2, body).scale.set(1.7, 1.15, 6.2);
+  at(ball(1, 0x596780, {}, 8, 6), 0, 0.05, -1.6, body).scale.set(1.2, 0.6, 2.6);
+  at(solid(new THREE.ConeGeometry(0.4, 0.7, 4), paint(SKIN, { flat: true })), 0, 0.75, -6.8, body).rotation.x = -0.5;
+  // The tail stock and the flukes, on a joint that swings them up as the whale sounds.
+  const tail = at(new THREE.Group(), 0, -0.4, -9.8, body);
+  at(ball(1, SKIN, {}, 6, 5), 0, 0, -0.9, tail).scale.set(0.45, 0.4, 1.3);
+  for (const s of [-1, 1]) {
+    const fluke = at(ball(1, SKIN, {}, 6, 4), s * 1.0, 0, -2.1, tail);
+    fluke.scale.set(1.2, 0.14, 0.62);
+    fluke.rotation.y = s * 0.5;
+  }
+  return { g, body, tail };
+}
+
+/**
+ * Whales: now and then a mother surfaces far out with her calf at her side. They show their
+ * long backs, blow a few times, then she arches, lifts her flukes high and sounds, and the
+ * little one follows her down. Then the sea is empty again for a good while.
  */
 function buildWhales(scene, animated) {
-  const SKIN = 0x46536a;
   const BLOW = 6;
-  for (let w = 0; w < 2; w++) {
-    const g = live(new THREE.Group());
-    const body = at(new THREE.Group(), 0, 0, 0, g);
-    at(ball(1, SKIN, {}, 12, 8), 0, -0.5, 0, body).scale.set(1.7, 1.15, 6.2);
-    at(ball(1, 0x596780, {}, 8, 6), 0, 0.05, 2.6, body).scale.set(1.2, 0.6, 2.6);
-    at(solid(new THREE.ConeGeometry(0.4, 0.7, 4), paint(SKIN, { flat: true })), 0, 0.75, -2.6, body).rotation.x = -0.5;
-    // The flukes, on a stalk that swings up out of the water as the whale goes down.
-    const tail = at(new THREE.Group(), 0, -0.4, -5.6, body);
-    at(ball(1, SKIN, {}, 6, 5), 0, 0, -0.9, tail).scale.set(0.45, 0.4, 1.3);
-    for (const s of [-1, 1]) {
-      const fluke = at(ball(1, SKIN, {}, 6, 4), s * 1.0, 0, -2.1, tail);
-      fluke.scale.set(1.2, 0.14, 0.62);
-      fluke.rotation.y = s * 0.5;
+  const EVERY = 95;
+  const SHOW = 28;
+  // One visit: rises, rolls at the surface, blows at `blows`, arches from `dive` on and lifts
+  // the flukes, then slides under from `sink`, flukes last.
+  const visit = (age, { body, tail }, lift, dive, sink, t) => {
+    const up = Math.min(1, age / 2.5) * (1 - Math.max(0, (age - dive - 2.5) / 4));
+    const arch = Math.min(1, Math.max(0, (age - dive) / 3.5));
+    const under = Math.min(1, Math.max(0, (age - sink) / 3.5));
+    body.position.y = -2.4 + up * (2.3 + lift) + Math.sin(t * 1.1 + dive) * 0.12 - under * 8;
+    // Pitching about the head: the nose goes under and the tail stock comes up out of the
+    // water, the flukes swinging on up until they stand clear.
+    body.rotation.x = arch * 0.32;
+    tail.rotation.x = arch * 1.0;
+  };
+  const mother = whale(1);
+  const calf = whale(0.5);
+  at(calf.g, 3.6, 0, -2.5, mother.g);
+  const spout = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.42, 0), paint(0xf4f9ff, { flat: true }), BLOW * 2);
+  spout.frustumCulled = false;
+  spout.castShadow = false;
+  scene.add(mother.g, spout);
+  const m = new THREE.Matrix4();
+  const p = new THREE.Vector3();
+  const q = new THREE.Quaternion();
+  const s = new THREE.Vector3();
+  // A column of mist thrown up from the blowhole, drifting and thinning: `at` is the blowhole
+  // in the frame of the pair, `size` the animal's.
+  const blow = (k, age, blows, origin, size, heading, g) => {
+    let scale = 0.001;
+    for (const blown of blows) {
+      const life = (age - blown - k * 0.09) / 2.6;
+      if (life < 0 || life > 1) continue;
+      const rise = Math.sqrt(life) * (3.2 + (k % 3) * 0.7) * size;
+      p.set(Math.sin(k * 2.4) * life * 0.9 * size, 0.5 * size + rise, Math.cos(k * 2.4) * life * 0.9 * size).add(origin).applyAxisAngle(UP, heading).add(g.position);
+      scale = (0.5 + life * 1.1) * Math.sin(Math.min(1, (1 - life) * 2.4) * Math.PI * 0.5) * size;
     }
-    const spout = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.42, 0), paint(0xf4f9ff, { flat: true }), BLOW);
-    spout.frustumCulled = false;
-    spout.castShadow = false;
-    scene.add(g, spout);
-    const m = new THREE.Matrix4();
-    const p = new THREE.Vector3();
-    const q = new THREE.Quaternion();
-    const s = new THREE.Vector3();
-    const EVERY = 95;
-    const SHOW = 27;
-    animated.push((t) => {
-      const clock = t + w * 47 + 55;
-      const visit = Math.floor(clock / EVERY);
-      const age = clock % EVERY;
-      g.visible = spout.visible = age < SHOW;
-      if (!g.visible) return;
-      // Each visit somewhere else, on a new heading.
-      const [u, v] = offing(visit * 2 + w);
-      const heading = hash(visit, w + 5) * Math.PI * 2;
-      const swum = age * 1.1 - 12;
-      g.position.set(toX(u, v) + Math.sin(heading) * swum, WATER_LEVEL, toZ(u, v) + Math.cos(heading) * swum);
-      g.rotation.y = heading;
-      // It rises, rolls gently at the surface, then arches and slides under, flukes last.
-      const up = Math.min(1, age / 2.5) * (1 - Math.max(0, (age - 21) / 4.5));
-      const dive = Math.min(1, Math.max(0, (age - 19.5) / 3));
-      body.position.y = -2.4 + up * 2.3 + Math.sin(t * 1.1) * 0.12;
-      body.rotation.x = dive * 0.5;
-      tail.rotation.x = -dive * 1.25;
-      // Three blows: a column of mist thrown up, drifting and thinning.
-      for (let k = 0; k < BLOW; k++) {
-        let size = 0.001;
-        for (const blown of [3, 9.5, 16]) {
-          const life = (age - blown - k * 0.09) / 2.6;
-          if (life < 0 || life > 1) continue;
-          const rise = Math.sqrt(life) * (3.2 + (k % 3) * 0.7);
-          p.set(Math.sin(k * 2.4) * life * 0.9, 0.5 + rise, 3.2 + Math.cos(k * 2.4) * life * 0.9).applyAxisAngle(UP, heading).add(g.position);
-          size = (0.5 + life * 1.1) * Math.sin(Math.min(1, (1 - life) * 2.4) * Math.PI * 0.5);
-        }
-        spout.setMatrixAt(k, m.compose(p, q, s.setScalar(size)));
-      }
-      spout.instanceMatrix.needsUpdate = true;
-    });
-  }
+    spout.setMatrixAt(k, m.compose(p, q, s.setScalar(scale)));
+  };
+  const motherBlowhole = new THREE.Vector3(0, 0, -1.0);
+  const calfBlowhole = new THREE.Vector3(3.6, 0, -2.5 - 0.5);
+  animated.push((t) => {
+    const clock = t + 55;
+    const turn = Math.floor(clock / EVERY);
+    const age = clock % EVERY;
+    mother.g.visible = spout.visible = age < SHOW;
+    if (!mother.g.visible) return;
+    // Each visit somewhere else, on a new heading.
+    const [u, v] = offing(turn * 2);
+    const heading = hash(turn, 5) * Math.PI * 2;
+    const swum = age * 1.1 - 12;
+    mother.g.position.set(toX(u, v) + Math.sin(heading) * swum, WATER_LEVEL, toZ(u, v) + Math.cos(heading) * swum);
+    mother.g.rotation.y = heading;
+    visit(age, mother, 0, 19.5, 23.5, t);
+    // The calf comes up a moment after her, blows oftener and shallower, and sounds after her.
+    visit(Math.max(0, age - 1.2), calf, 0.5, 20.8, 24.5, t + 2);
+    for (let k = 0; k < BLOW; k++) blow(k, age, [3, 9.5, 16], motherBlowhole, 1, heading, mother.g);
+    for (let k = 0; k < BLOW; k++) blow(BLOW + k, age - 1.2, [4.5, 8.5, 12.5, 17], calfBlowhole, 0.5, heading, mother.g);
+    spout.instanceMatrix.needsUpdate = true;
+  });
 }
 
 /**
