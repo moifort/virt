@@ -23,8 +23,8 @@ export const PAL = {
   saffron: 0xf6c54f,
   red: 0xc9443c,
   skin: 0xf1c9a3,
-  water: 0x5fd0cc,
-  waterLight: 0x9fe3d6,
+  water: 0x72dfdc,
+  waterLight: 0xa8eee6,
   plum: 0x7d5c9e,
   sky: 0x8fd3e0,
   pink: 0xf2a6c1,
@@ -367,10 +367,10 @@ vec3 waterColor(vec3 w) {
   // Mediterranean ramp, clear to the bottom: pale turquoise over the sand, then deep blue.
   // The bands fray into each other pixel by pixel.
   float d = depth + (fine - 0.5) * min(depth, 1.6) * 0.5;
-  vec3 col = d < 0.9 ? ${lin(0xb6f4e2)}
-    : d < 2.0 ? ${lin(0x84e4d2)}
+  vec3 col = d < 0.9 ? ${lin(0xc6f8f0)}
+    : d < 2.0 ? ${lin(0x9ef0e6)}
     : d < 3.6 ? ${lin(PAL.water)}
-    : d < 5.6 ? ${lin(0x46b2d6)}
+    : d < 5.6 ? ${lin(0x4cc0dc)}
     : d < 7.4 ? ${lin(0x3896d2)}
     : ${lin(0x2f82ca)};
   // The sea bed shows through, as it does from the air: broad dark meadows of posidonia with
@@ -380,7 +380,7 @@ vec3 waterColor(vec3 w) {
     float meadow = pxFbm(w.xz * 0.028 + 31.0) * 0.8 + pxFbm(w.xz * 0.11 - 17.0) * 0.2 + (pxNoise(w.xz * 0.6) - 0.5) * 0.08;
     float hold = smoothstep(0.7, 2.2, depth) * smoothstep(8.0, 5.0, depth);
     if (meadow > 0.56) col = mix(col, ${lin(0x1e5f6a)}, (0.3 + 0.35 * smoothstep(0.56, 0.66, meadow)) * hold);
-    else if (meadow < 0.4 && depth < 3.6) col = mix(col, ${lin(0xbdf6e6)}, 0.35);
+    else if (meadow < 0.4 && depth < 3.6) col = mix(col, ${lin(0xcaf9f2)}, 0.35);
   }
   // A net of light dances on the sand in the shallows.
   if (depth < 2.4 && uNight < 0.5) {
