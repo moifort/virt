@@ -68,6 +68,20 @@ export const VILLAGES = [
 ];
 const hub = { x: toX(VILLAGES[0].u, VILLAGES[0].v), z: toZ(VILLAGES[0].u, VILLAGES[0].v) };
 
+/**
+ * The main village climbs a steep hillside, as at Manarola: from the hollow of its harbour the
+ * ground rises fast toward the mountain, whose flank takes over behind the last houses. On
+ * the plain side it dies away to nothing, and it comes down to the shore in a steep bank
+ * (`inland` is the distance from the water's edge there).
+ */
+function villageClimb(u, v, x, z, inland) {
+  const port = zone('port');
+  const band = smoothstep(0, 38, inland) * smoothstep(-6, -30, v);
+  const up = smoothstep(50, 104, u + (fbm(x * 0.02 + 5, z * 0.02 - 3, 2) - 0.5) * 12);
+  const hollow = smoothstep(6, 40, Math.hypot(u - port.u, v - port.v));
+  return 28 * up * band * hollow * smoothstep(215, 150, u);
+}
+
 // The observatory stands on the summit, on a round terrace cut level into the crest.
 export const OBSERVATORY = { u: 166, v: 94, r: 7, x: toX(166, 94), z: toZ(166, 94) };
 
@@ -155,7 +169,7 @@ function landAt(x, z) {
   // sea in long slopes rather than cliffs: `inland` is how far a point lies from those shores.
   const inland = Math.min(v - leftShore(u), farShore(v) - u, (rightShore(u) - v) * 3);
   const ease = smoothstep(-4, 64, inland + (fbm(x * 0.02 + 9, z * 0.02, 2) - 0.5) * 18);
-  const mountain = Math.max(back, ridge) * ease;
+  const mountain = Math.max(back, ridge) * ease + villageClimb(u, v, x, z, inland);
   const estate = estateWeight(u, v);
   const worked = cultivated(u, v);
   // Its flanks are no smooth ramp: spurs and gullies run down them, outcrops of bare rock break
