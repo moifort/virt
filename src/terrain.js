@@ -480,11 +480,13 @@ function shelveShores() {
       const x = ix * CELL - HALF;
       const z = iz * CELL - HALF;
       if (!inSquare(x, z, -1.5)) continue;
-      let fall = 0.1 + headland(toV(x, z)) * 0.5 + (fbm(x * 0.03 + 17, z * 0.03 - 5, 2) - 0.5) * 0.04;
-      // The harbour lies in the shallowest water of all: pale right out past the piers. Round
-      // the lighthouse rock the bottom drops away quickly, so its halo of pale water stays small.
-      fall *= 1 - 0.55 * smoothstep(80, 30, Math.hypot(x - zone('port').x, z - zone('port').z));
-      fall *= 1 + 3 * smoothstep(34, 14, Math.hypot(x - ISLET.x, z - ISLET.z));
+      // The shelf is wide and uneven, as a sea bed is: the turquoise runs far out in places and
+      // the blue comes close in others, in broad sweeps rather than a band along the shore.
+      let fall = 0.055 + headland(toV(x, z)) * 0.5 + (fbm(x * 0.012 + 17, z * 0.012 - 5, 3) - 0.5) * 0.06;
+      // The harbour lies in the shallowest water of all, and the lighthouse rock stands on a
+      // shoal of its own, pale water all round it.
+      fall *= 1 - 0.4 * smoothstep(90, 30, Math.hypot(x - zone('port').x, z - zone('port').z));
+      fall *= 1 - 0.5 * smoothstep(40, 12, Math.hypot(x - ISLET.x, z - ISLET.z));
       // Toward the open edges of the map the bed dives to the deep, so the water darkens
       // before the grid ends instead of stepping down at its last cell.
       const brink = Math.min(toU(x, z) - SQUARE.u0, toV(x, z) - SQUARE.v0);
