@@ -1,7 +1,7 @@
 // Visual language: the Ligurian coast painted the way a Ghibli background is — layered greens,
 // warm light, cool coloured shadows, weather that leaves its mark — rendered as 3D pixel art.
 // Every world material goes through `paint()`: two-tone cel lighting with hue-shifted shadows,
-// drifting cloud shadows, and a second render target output carrying view-space normals.
+// and a second render target output carrying view-space normals.
 import * as THREE from 'three';
 
 export const PAL = {
@@ -49,11 +49,10 @@ export const GLOBALS = {
   uShadowTint: { value: new THREE.Color(0.6, 0.55, 0.85) },
   uGlow: { value: 0 },
   uNight: { value: 0 },
-  // Cloud shadows: the share of the ground left in the sun.
-  uCloudGap: { value: 0.72 },
+  // How grey the sky is, 0 to 1: the sea greys with it.
+  uOvercast: { value: 0 },
   // Seasons: (autumn, winter, spring, snow cover), each 0 to 1.
   uSeason: { value: new THREE.Vector4() },
-  uCloud: { value: new THREE.Vector2() },
   uPaths: { value: Array.from({ length: PATH_COUNT }, () => new THREE.Vector4()) },
   uTrails: { value: Array.from({ length: TRAIL_COUNT }, () => new THREE.Vector4()) },
   uTracks: { value: Array.from({ length: TRACK_COUNT }, () => new THREE.Vector4()) },
@@ -169,9 +168,8 @@ uniform vec3 uSunTint;
 uniform vec3 uShadowTint;
 uniform float uGlow;
 uniform float uNight;
-uniform float uCloudGap;
+uniform float uOvercast;
 uniform vec4 uSeason;
-uniform vec2 uCloud;
 uniform vec4 uPaths[${PATH_COUNT}];
 uniform vec4 uTrails[${TRAIL_COUNT}];
 uniform vec4 uTracks[${TRACK_COUNT}];
@@ -394,7 +392,7 @@ vec3 waterColor(vec3 w) {
     if (net < 0.03) col = mix(col, ${lin(0xe8fff4)}, 0.55);
   }
   // Under a grey sky the sea greys with it.
-  float overcast = 1.0 - smoothstep(0.3, 0.72, uCloudGap);
+  float overcast = uOvercast;
   col = mix(col, uSkyTint * 0.8, 0.12 + overcast * 0.3);
 
   // The swell: long broken crests running in to the shore.
@@ -540,9 +538,6 @@ float pxNdl = 0.0;
   // On foliage the edge of the light is ragged, leaf by leaf, never a clean curve.
   if (pxNdl < 0.36 && pxBit < (0.36 - pxNdl) * 1.5) pxLit = 0.0;
 #endif
-// The shadows of the clouds, when there are clouds: broad and slow, so they read as weather
-// passing over and never as the shadows of things shifting.
-pxLit *= step(pxFbm(vWorld.xz * 0.012 + uCloud), uCloudGap);
 
 vec3 pxCol;
 if (pxLit > 0.5) {
@@ -552,7 +547,7 @@ if (pxLit > 0.5) {
   pxCol = pxAlb * uShadowTint;
   if (pxNdl < -0.3) pxCol *= 0.84;
   #ifdef WATER
-    // A cloud's shadow only deepens the sea a little.
+    // A shadow only deepens the sea a little.
     pxCol = pxAlb * mix(uShadowTint, uSunTint, 0.5);
   #endif
 }

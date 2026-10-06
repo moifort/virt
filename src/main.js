@@ -159,38 +159,30 @@ let owed = 0;
 
 // The island as a box, from the base of the tile up over the summit and the tallest tower.
 const ISLAND = LAND_ENDS.flatMap(([x, z]) => [new THREE.Vector3(x, -16, z), new THREE.Vector3(x, 110, z)]);
+// The shadow map is the same size whichever way the light comes from: a ball around the island.
+// Were it fitted to the island as the light sees it, its texels would stretch and shrink as
+// the sun goes round, and every shadow edge would crawl with them.
+const islandMid = new THREE.Box3().setFromPoints(ISLAND).getCenter(new THREE.Vector3());
+const islandReach = Math.max(...ISLAND.map((corner) => corner.distanceTo(islandMid))) + 4;
+{
+  const cam = sun.shadow.camera;
+  Object.assign(cam, { left: -islandReach, right: islandReach, top: islandReach, bottom: -islandReach, near: 1, far: 2 * islandReach + 20 });
+  cam.updateProjectionMatrix();
+}
 // The axes of the shadow map in the world: across the light, as three.js lays the map out.
 const sunRight = new THREE.Vector3();
 const sunUp = new THREE.Vector3();
-const extent = { right: [0, 0], up: [0, 0], along: [0, 0] };
+const SHADOW_TEXEL = (2 * islandReach) / sun.shadow.mapSize.x;
 /** Frames the shadow camera on the whole island, whichever way the light comes from. */
 function frameShadows() {
   const dir = climate.lightDir;
   sunRight.set(0, 1, 0).cross(dir).normalize();
   sunUp.crossVectors(dir, sunRight);
-  for (const [axis, span] of [[sunRight, extent.right], [sunUp, extent.up], [dir, extent.along]]) {
-    span[0] = Infinity;
-    span[1] = -Infinity;
-    for (const corner of ISLAND) {
-      const d = corner.dot(axis);
-      span[0] = Math.min(span[0], d);
-      span[1] = Math.max(span[1], d);
-    }
-  }
-  const cam = sun.shadow.camera;
-  const halfW = (extent.right[1] - extent.right[0]) / 2 + 4;
-  const halfH = (extent.up[1] - extent.up[0]) / 2 + 4;
-  const depth = extent.along[1] - extent.along[0];
-  // The target is the middle of the island as the light sees it, held to whole texels of the
-  // map so that a slow drift of the sun never makes the shadow edges crawl.
-  const texel = (2 * halfW) / sun.shadow.mapSize.x;
-  const mid = (span) => Math.round((span[0] + span[1]) / 2 / texel) * texel;
-  sun.target.position.set(0, 0, 0).addScaledVector(sunRight, mid(extent.right)).addScaledVector(sunUp, mid(extent.up));
-  sun.position.copy(sun.target.position).addScaledVector(dir, extent.along[1] + 10);
-  if (cam.right !== halfW || cam.top !== halfH || cam.far !== depth + 20) {
-    Object.assign(cam, { left: -halfW, right: halfW, top: halfH, bottom: -halfH, near: 1, far: depth + 20 });
-    cam.updateProjectionMatrix();
-  }
+  // The target is the middle of the island, held to whole texels of the map across the light
+  // so that a slow drift of the sun never makes the shadow edges crawl.
+  const snap = (axis) => Math.round(islandMid.dot(axis) / SHADOW_TEXEL) * SHADOW_TEXEL;
+  sun.target.position.copy(dir).multiplyScalar(islandMid.dot(dir)).addScaledVector(sunRight, snap(sunRight)).addScaledVector(sunUp, snap(sunUp));
+  sun.position.copy(sun.target.position).addScaledVector(dir, islandReach + 10);
 }
 
 function frame() {
@@ -219,7 +211,6 @@ function frame() {
   if (seatAtHand) seatMark.position.copy(seatAtHand.position).setY(seatAtHand.position.y + 1.9 + Math.sin(t * 4) * 0.12);
 
   GLOBALS.uTime.value = t;
-  GLOBALS.uCloud.value.set(t * 0.035, t * 0.012);
 
   // Seen from far off the pixels are drawn finer, so the picture stays readable instead of
   // breaking up into grain: two screen pixels to an art pixel up close, down to one far out.
