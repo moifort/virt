@@ -71,22 +71,23 @@ const shore = leftShore(HARBOUR_U);
 const sh = (u, dv) => [u, shore + dv];
 export const VILLAGES = [
   {
-    u: HARBOUR_U + 10,
-    v: shore + 24,
-    r: 29,
-    up: 1.5,
+    u: HARBOUR_U + 12,
+    v: shore + 42,
+    r: 34,
+    up: 1.3,
     waterfront: true,
     lanes: [
       // The sea front, along the quay, the harbour in the middle of it: a stone edge a little
       // above the water, held level the whole way along.
       { name: 'marina', width: 3.6, quay: 2.2, level: WATER_LEVEL + 2.0, points: [sh(48, 9), sh(60, 9.5), sh(68, 9), sh(78, 9.5), sh(90, 8.5)] },
       // Three lanes along the contours, each a storey or two above the last.
-      { name: 'bassa', width: 3.4, points: [sh(82, 20.5), sh(75, 23.5), sh(70, 25.5), sh(64, 28.5), sh(63, 33.5), sh(62.5, 38.5), sh(61, 43.5), sh(60.5, 48), sh(60, 52)] },
-      { name: 'mezzo', width: 3.2, points: [sh(95, 17), sh(90, 21), sh(87, 24.5), sh(84, 27), sh(79, 31.5), sh(76.5, 36), sh(73, 41), sh(72, 46), sh(72, 53)] },
-      { name: 'alta', width: 3.0, points: [sh(99, 21), sh(97.5, 24.5), sh(95.5, 27), sh(93, 29.5), sh(89.5, 32.5), sh(88, 37), sh(86.5, 39.5), sh(83.5, 43.5), sh(83, 47.5), sh(82, 52)] },
-      // Stairs, slanting across the slope from one lane up to the next, and the last one
-      // climbing in zigzags from the top lane to the church, on a terrace cut into the brow
-      // of the hill.
+      { name: 'bassa', width: 3.4, points: [sh(82, 20.5), sh(75, 23.5), sh(70, 25.5), sh(64, 28.5), sh(63, 33.5), sh(62.5, 38.5), sh(61, 43.5), sh(60.5, 48), sh(60, 52), sh(59, 58)] },
+      { name: 'mezzo', width: 3.2, points: [sh(95, 17), sh(90, 21), sh(87, 24.5), sh(84, 27), sh(79, 31.5), sh(76.5, 36), sh(73, 41), sh(72, 46), sh(72, 53), sh(71, 58), sh(71, 64), sh(72.5, 70), sh(75, 76)] },
+      { name: 'alta', width: 3.0, points: [sh(99, 21), sh(97.5, 24.5), sh(95.5, 27), sh(93, 29.5), sh(89.5, 32.5), sh(88, 37), sh(86.5, 39.5), sh(83.5, 43.5), sh(83, 47.5), sh(82, 52), sh(81.5, 58), sh(82, 64), sh(83, 70), sh(86, 75), sh(89, 78)] },
+      // The fourth lane leaves the church square along the brow of the hill.
+      { name: 'cima', width: 3.0, points: [sh(96, 51), sh(93, 56), sh(92, 62), sh(94, 68), sh(99, 73), sh(104, 77)] },
+      // Stairs, slanting across the slope from one lane up to the next, and one climbing in
+      // zigzags from the top lane to the church, on a terrace cut into the brow of the hill.
       { stair: true, width: 2.0, points: [sh(78, 9.5), sh(82, 20.5)] },
       { stair: true, width: 2.0, points: [sh(75, 23.5), sh(84, 27)] },
       { stair: true, width: 2.0, points: [sh(63, 33.5), sh(74.5, 33.5)] },
@@ -94,10 +95,16 @@ export const VILLAGES = [
       { stair: true, width: 2.0, points: [sh(76.5, 36), sh(88, 37)] },
       { stair: true, width: 2.0, points: [sh(72, 50), sh(83, 47.5)] },
       { stair: true, width: 2.2, points: [sh(99, 21), sh(102, 24), sh(103, 30), sh(101, 37)] },
+      { stair: true, width: 2.0, points: [sh(60, 56), sh(71, 60)] },
+      { stair: true, width: 2.0, points: [sh(72, 66), sh(83, 68)] },
+      { stair: true, width: 2.0, points: [sh(82, 60), sh(93, 58)] },
+      { stair: true, width: 2.0, points: [sh(74, 73), sh(86, 75)] },
+      { stair: true, width: 2.0, points: [sh(88, 77), sh(100, 74)] },
     ],
     piazzas: [
       { u: 100, v: shore + 44.5, r: 7, level: 38, church: true },
       { u: 80.2, v: shore + 34.7, r: 4, well: true },
+      { u: 89.5, v: shore + 79, r: 4, belvedere: true },
     ],
   },
   {
@@ -279,20 +286,13 @@ const railDir = { x: (railEnd.x - railStart.x) / railLength, z: (railEnd.z - rai
 const RAIL_LINE = [railStart.x, railStart.z, railEnd.x, railEnd.z];
 /** World position of a point given along (s) and across (l) the line. */
 export const railPoint = (s, l = 0) => ({ x: railStart.x + railDir.x * s - railDir.z * l, z: railStart.z + railDir.z * s + railDir.x * l });
+/** A point given along (s) and across (l) the line. */
+const railCoords = (x, z) => ({ s: (x - railStart.x) * railDir.x + (z - railStart.z) * railDir.z, l: -(x - railStart.x) * railDir.z + (z - railStart.z) * railDir.x });
 /** How much a point lies within an area of the station given along and across the line. */
 function stationArea(x, z, y) {
   const { s, l } = railCoords(x, z);
   return smoothstep(y.s0 - 2.5, y.s0, s) * smoothstep(y.s1 + 2.5, y.s1, s) * smoothstep(y.l0 - 2.5, y.l0, l) * smoothstep(y.l1 + 2, y.l1, l);
 }
-for (const s of [4, 11, 18]) CLEARINGS.push({ ...railPoint(STATION.s0 + s, -8), r: 8 });
-/** A point given along (s) and across (l) the line. */
-const railCoords = (x, z) => ({ s: (x - railStart.x) * railDir.x + (z - railStart.z) * railDir.z, l: -(x - railStart.x) * railDir.z + (z - railStart.z) * railDir.x });
-
-// A single-file trail leaves the observatory terrace by the gap in its parapet and winds down
-// the mountainside in two long S-bends to the back of the station: a bare metre of packed
-// earth, wide enough for one walker.
-const TRAIL = (() => {
-  const from = { x: OBSERVATORY.x, z: OBSERVATORY.z + OBSERVATORY.r + 1.5 };
 // Before the station the line runs in a rock cutting, and then into a spur of the mountain
 // thrown across it, so that the train has a hill to go into: the first tunnel's mouth is
 // where the cutting ends and the spur begins.
@@ -301,9 +301,16 @@ function spurAt(x, z) {
   const { s, l } = railCoords(x, z);
   return smoothstep(-7, -16, s) * smoothstep(-42, -28, s) * smoothstep(21, 7, Math.abs(l));
 }
-  const to = railPoint(STATION.s0 + 12, -15);
+for (const s of [4, 11, 18]) CLEARINGS.push({ ...railPoint(STATION.s0 + s, -8), r: 8 });
 // Nothing grows over the tunnel mouth and the cutting before the station.
 for (const [s, r] of [[-15, 9], [-5, 7], [6, 6], [16, 6]]) CLEARINGS.push({ ...railPoint(s, 0), r });
+
+// A single-file trail leaves the observatory terrace by the gap in its parapet and winds down
+// the mountainside in two long S-bends to the back of the station: a bare metre of packed
+// earth, wide enough for one walker.
+const TRAIL = (() => {
+  const from = { x: OBSERVATORY.x, z: OBSERVATORY.z + OBSERVATORY.r + 1.5 };
+  const to = railPoint(STATION.s0 + 12, -15);
   const dx = to.x - from.x;
   const dz = to.z - from.z;
   const len = Math.hypot(dx, dz);
@@ -434,6 +441,8 @@ function landAt(x, z) {
   const summit = summitLevel();
   if (summit > -Infinity) h += (summit - h) * smoothstep(OBSERVATORY.r + 6, OBSERVATORY.r + 1, Math.hypot(x - OBSERVATORY.x, z - OBSERVATORY.z));
   h += (RAIL.level - 0.05 - h) * stationArea(x, z, STATION.yard);
+  h -= Math.max(0, h - (RAIL.level - 0.3)) * stationArea(x, z, CUTTING);
+  h += Math.max(0, RAIL.level + 9 + (fbm(x * 0.05 + 4, z * 0.05 - 9, 2) - 0.5) * 4 - h) * spurAt(x, z);
   // On the open sides the land has sunk under the sea before the bounds of the map.
   const brink = Math.min(u - SQUARE.u0, v - SQUARE.v0) + (fbm(x * 0.05 + 8, z * 0.05, 2) - 0.5) * 8;
   return h + (-12 - h) * smoothstep(11, 2, brink);
@@ -441,8 +450,6 @@ function landAt(x, z) {
 
 export const heightAt = landAt;
 
-  h -= Math.max(0, h - (RAIL.level - 0.3)) * stationArea(x, z, CUTTING);
-  h += Math.max(0, RAIL.level + 9 + (fbm(x * 0.05 + 4, z * 0.05 - 9, 2) - 0.5) * 4 - h) * spurAt(x, z);
 // The level of the observatory terrace: the lie of the crest where it stands, measured once.
 let summit;
 function summitLevel() {

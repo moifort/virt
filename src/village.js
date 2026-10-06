@@ -758,12 +758,24 @@ function buildPiazza(parts, rng, pz, furniture, SCALE) {
     const f = spot(pz.r * 0.3, -1.8);
     fountain(parts, f.x, y, f.z);
   } else {
-    const w = spot(-0.6, 1.2);
-    well(parts, w.x, y, w.z, view + 0.4);
+    if (pz.well) {
+      const w = spot(-0.6, 1.2);
+      well(parts, w.x, y, w.z, view + 0.4);
+    }
     const tree = spot(-(pz.r - 1.6), -0.8);
     lemonTree(parts, rng, tree.x, y, tree.z);
     const b = spot(1.4, -1.8);
     bench(parts, furniture, b.x, y + 0.12, b.z, view);
+    // A belvedere looks out over a parapet, with a second bench for the view.
+    if (pz.belvedere) {
+      const b2 = spot(1.6, 1.6);
+      bench(parts, furniture, b2.x, y + 0.12, b2.z, view);
+      for (let a = -1.1; a <= 1.1; a += 0.14) {
+        const q = spot(Math.cos(a) * (pz.r - 0.3), Math.sin(a) * (pz.r - 0.3));
+        parts.at(new THREE.Vector3(q.x, y, q.z), view - a, 1);
+        parts.add('box', 0, 0.45, 0, 0.6, 0.9, 0.36, WALL_STONE);
+      }
+    }
   }
   for (const a of pz.church ? [0.7, -0.7, 2.4, -2.4] : [0.9, -2.3]) {
     const l = spot(Math.cos(a) * (pz.r - 0.9), Math.sin(a) * (pz.r - 0.9));
@@ -864,7 +876,7 @@ export function buildVillages(scene, rng, animated) {
       if (lane.quay) quayWall(parts, rng, lane, furniture);
     }
     for (const pz of squares) buildPiazza(parts, rng, pz, furniture, SCALE);
-    outliers(parts, rng, village, streets, squares, placed, SCALE, village.r > 20 ? 40 : 6);
+    outliers(parts, rng, village, streets, squares, placed, SCALE, village.r > 20 ? 70 : 6);
   }
 
   // Vineyards: rows of vines on posts, following the terraces.
