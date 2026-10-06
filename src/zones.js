@@ -971,11 +971,15 @@ export function buildPort(g, rng, animated) {
   };
   const pile = (x, z) => at(cyl(0.14, 0.16, 4.2, DARK_WOOD, 6), x, -1.7, z, deck);
   const JETTY = 19;
-  // A red seaplane moored at the head of it, nose out to sea, her tail just off the last
-  // planks and a line from her bow to the end pile, her propeller idling.
+  // A red seaplane rides at anchor off to the side of its head, clear of the planks, nose out
+  // to sea, a line from her bow to the end pile, her propeller idling.
   const { plane, prop } = seaplane();
-  at(live(plane), JETTY, surface + 0.1, Q + 25, g);
-  at(box(0.04, 0.04, 3.6, 0xe6dcc8), JETTY + 1.1, DECK - 0.1, Q + 22.6, g).rotation.x = 0.06;
+  const PLANE = { x: JETTY + 8.5, z: Q + 22 };
+  at(live(plane), PLANE.x, surface + 0.1, PLANE.z, g);
+  const bow = { x: PLANE.x, z: PLANE.z + 3.3 };
+  const endPile = { x: JETTY + 1.4, z: Q + 19.6 };
+  const rope = at(box(0.04, 0.04, Math.hypot(bow.x - endPile.x, bow.z - endPile.z), 0xe6dcc8), (bow.x + endPile.x) / 2, DECK - 0.1, (bow.z + endPile.z) / 2, g);
+  rope.rotation.y = Math.atan2(bow.x - endPile.x, bow.z - endPile.z);
   animated.push((t, dt) => {
     plane.position.y = surface + 0.1 + Math.sin(t * 1.0) * 0.07;
     plane.rotation.z = Math.sin(t * 0.8) * 0.03;
