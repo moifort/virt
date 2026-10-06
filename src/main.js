@@ -126,9 +126,23 @@ addEventListener('pointermove', (e) => {
   pan.y = 0;
   pan.clampLength(0, 320);
 });
-addEventListener('wheel', (e) => (view.viewHeight = clamp(view.viewHeight * (1 + Math.sign(e.deltaY) * 0.1), 24, 260)), {
-  passive: true,
+// The wheel zooms the map, and so does a pinch on the trackpad (a wheel with Ctrl held), which
+// would otherwise blow up the whole page.
+addEventListener(
+  'wheel',
+  (e) => {
+    e.preventDefault();
+    const step = e.ctrlKey ? clamp(e.deltaY * 0.01, -0.1, 0.1) : Math.sign(e.deltaY) * 0.1;
+    view.viewHeight = clamp(view.viewHeight * (1 + step), 24, 260);
+  },
+  { passive: false },
+);
+// Nor do the browser's own zoom keys or Safari's pinch gesture enlarge the page: the picture is
+// pixel art drawn for the window as it is. Cmd/Ctrl 0 still puts a page zoomed earlier back.
+addEventListener('keydown', (e) => {
+  if ((e.metaKey || e.ctrlKey) && ['Equal', 'Minus', 'NumpadAdd', 'NumpadSubtract'].includes(e.code)) e.preventDefault();
 });
+for (const gesture of ['gesturestart', 'gesturechange']) addEventListener(gesture, (e) => e.preventDefault());
 
 /** @param {boolean} consume forget taps once the avatar is free to take them */
 function readInput(consume) {
