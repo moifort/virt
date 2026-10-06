@@ -90,7 +90,7 @@ export const CLEARINGS = [{ x: VILLA.x, z: VILLA.z, r: VILLA.r + 3 }, { x: OBSER
 // The railway crosses the angle between the mountain (a) and the right-hand ridge (b) at a
 // constant level. Its station stands on a shelf cut into the mountain by the first tunnel:
 // `s` runs along the line from a, `l` across it (negative uphill).
-export const RAIL = { a: { u: 108, v: 25 }, b: { u: 35, v: 95 }, level: 34 };
+export const RAIL = { a: { u: 125, v: 9 }, b: { u: 35, v: 95 }, level: 44 };
 export const STATION = { s0: 14, s1: 39, yard: { s0: 14, s1: 33, l0: -13, l1: -3.5 } };
 const railStart = { x: toX(RAIL.a.u, RAIL.a.v), z: toZ(RAIL.a.u, RAIL.a.v) };
 const railEnd = { x: toX(RAIL.b.u, RAIL.b.v), z: toZ(RAIL.b.u, RAIL.b.v) };
