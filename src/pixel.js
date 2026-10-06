@@ -396,6 +396,10 @@ export class PixelCamera {
 
     const texel = this.viewHeight / lowRes.y;
     this.texelWorld = texel;
+    // The camera stands back far enough that the sea at the foot of the frame is still in
+    // front of it, however wide the frame and however low the view: otherwise the near plane
+    // cuts the water off and the sky shows through under it.
+    this.distance = Math.max(220, ((0.5 + this.lift) * this.viewHeight) / Math.tan(this.pitch) + 80);
     cam.position.copy(target).addScaledVector(this.forward, -this.distance).addScaledVector(this._up, this.viewHeight * this.lift);
     const r = cam.position.dot(this.right);
     const u = cam.position.dot(this._up);
