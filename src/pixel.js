@@ -35,7 +35,7 @@ uniform vec3 uCloudTint;
 uniform vec3 uCloudLight;
 uniform float uSlant;
 uniform float uWind;
-uniform vec2 uLitter;
+uniform float uLitter;
 uniform float uHorizonY;
 uniform float uSkyY;
 uniform float uOffing;
@@ -214,8 +214,8 @@ void main() {
       }
     }
   }
-  // Now and then a leaf lets go in autumn, a petal in spring, and flutters across on the wind.
-  float litter = max(uLitter.x, uLitter.y);
+  // Now and then a leaf lets go in autumn and flutters across on the wind.
+  float litter = uLitter;
   if (litter > 0.02) {
     for (int layer = 0; layer < 2; layer++) {
       float fl = float(layer);
@@ -226,9 +226,7 @@ void main() {
         vec2 away = abs(q - cell * 46.0 - vec2(hash2(cell * 1.3 + fl), hash2(cell * 2.9 + 1.0)) * 42.0 - 2.0);
         if (away.x < 1.1 && away.y < 0.6) {
           float tint = hash2(cell + 9.0);
-          vec3 leaf = uLitter.x > uLitter.y
-            ? (tint < 0.4 ? vec3(0.8, 0.3, 0.08) : tint < 0.75 ? vec3(0.9, 0.55, 0.1) : vec3(0.55, 0.14, 0.08))
-            : (tint < 0.5 ? vec3(1.0, 0.62, 0.72) : vec3(1.0, 0.9, 0.92));
+          vec3 leaf = tint < 0.4 ? vec3(0.8, 0.3, 0.08) : tint < 0.75 ? vec3(0.9, 0.55, 0.1) : vec3(0.55, 0.14, 0.08);
           col = mix(col, leaf, 0.9);
         }
       }
@@ -297,7 +295,7 @@ export class PixelRenderer {
         uCloudLight: { value: new THREE.Color(1, 1, 1) },
         uSlant: { value: 0 },
         uWind: { value: 0.3 },
-        uLitter: { value: new THREE.Vector2() },
+        uLitter: { value: 0 },
         uHorizonY: { value: 0.5 },
         uSkyY: { value: 0.5 },
         uOffing: { value: 1e6 },
@@ -359,7 +357,7 @@ export class PixelRenderer {
       u.uCloudLight.value.copy(weather.cloudLight);
       u.uSlant.value = weather.slant ?? 0;
       u.uWind.value = weather.wind;
-      u.uLitter.value.set(weather.leaves, weather.petals);
+      u.uLitter.value = weather.leaves;
       u.uHorizonY.value = weather.horizon ?? 0.5;
       u.uSkyY.value = weather.skyline ?? u.uHorizonY.value;
       u.uOffing.value = weather.offing ?? 1e6;

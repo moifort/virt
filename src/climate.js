@@ -53,13 +53,13 @@ const smooth = (a, b, x) => {
 };
 
 /**
- * Where the maples stand in their year, from the turn of the year (0 at the summer solstice,
+ * Where the broadleaf trees stand in their year, from the turn of the year (0 at the summer solstice,
  * 0.25 at the autumn equinox): (crowns turned red, leaves falling, leaves lying, leaves on the
  * boughs). Green from the buds of March through the summer; from the end of September an
  * Indian summer turns them scarlet and the leaves let go and fly; by mid-December the boughs
  * are bare, and the leaves on the ground are gone by the new year.
  */
-function maple(year) {
+function leafYear(year) {
   const turned = year < 0.6 ? smooth(0.19, 0.27, year) : 0;
   const falling = smooth(0.21, 0.26, year) * (1 - smooth(0.41, 0.44, year));
   const lying = smooth(0.23, 0.31, year) * (1 - smooth(0.47, 0.53, year));
@@ -405,7 +405,7 @@ export class Climate {
     GLOBALS.uOvercast.value = smooth(0.5, 1.2, cloud);
     GLOBALS.uStorm.value = this.storm;
     GLOBALS.uSeason.value.set(autumn, winter, spring, snowCover);
-    GLOBALS.uMaple.value.set(...maple(year));
+    GLOBALS.uLeaves.value.set(...leafYear(year));
     GLOBALS.uWet.value.set(this.wetness, this.puddles, rain, this.runoff);
     GLOBALS.uWind.value.set(this.wind.x, this.wind.y, wind);
     GLOBALS.uSkyTint.value.copy(this.skyHorizon).lerp(this.skyTop, 0.45);
@@ -427,9 +427,8 @@ export class Climate {
       bolt: this.bolt,
       cloudTint: this.cloudTint,
       cloudLight: this.cloudLight,
-      // Leaves fall in autumn and petals in spring, on fair days only.
+      // Leaves fall in autumn, on fair days only.
       leaves: this.season.autumn * (1 - this.now.rain) * this.daylight,
-      petals: this.season.spring * (1 - this.now.rain) * this.daylight,
     };
   }
 }

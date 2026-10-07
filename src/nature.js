@@ -1,7 +1,8 @@
 // Mediterranean flora and rock, as on the Ligurian coast: stone pines, cypresses, olive and
-// lemon trees, holm oaks, almond trees in blossom, palms on the front, maquis, broom, oleander
-// and lavender, agaves and prickly pears among limestone boulders. And maples lining the walks
-// from the agora, that blaze red in autumn and let their leaves fly. Trees gather in groves and
+// lemon trees, holm oaks, almond trees, palms on the front, maquis, broom, oleander and
+// lavender, agaves and prickly pears among limestone boulders, and maples lining the walks from
+// the agora. In autumn every broadleaf tree blazes red, an Indian summer, and lets its leaves
+// fly; the pines, the cypresses and the palms stay green. Trees gather in groves and
 // leave meadows open between them. Each species is modelled in detail once, baked, then
 // instanced across the bay.
 import * as THREE from 'three';
@@ -24,8 +25,8 @@ const ORCHARD = [0x4a9250, 0x62aa56, 0x86c260];
 const PALM = [0x357e48, 0x4f9a54, 0x78b85c];
 const ROCK = [0xcfc3b0, 0xb9ad9c, 0xa99d8e, 0xd8cdb8];
 const LEAF = { leaf: true };
-const BLOSSOM = { blossom: true };
-const MAPLE = { maple: true };
+// Broadleaf crowns, which turn red in autumn and stand bare in winter (see `uLeaves`).
+const TURNING = { turning: true };
 const MAPLE_BARK = 0x5e4e48;
 const MAPLE_LEAF = [0x3f7a48, 0x58964e, 0x7cb45a];
 
@@ -119,9 +120,9 @@ export function oliveTree(rng) {
   for (const s of [-1, 1]) {
     const limb = at(cyl(0.1, 0.18, 1.5, OLIVE_BARK, 5, { flat: true }), s * 0.42, H + 0.5, s * 0.1, g);
     limb.rotation.z = -s * (0.55 + rng() * 0.3);
-    foliage(g, rng, s * 0.95, H + 1.25 + rng() * 0.3, s * 0.2, 1.0 + rng() * 0.25, OLIVE, 5, 0.72);
+    foliage(g, rng, s * 0.95, H + 1.25 + rng() * 0.3, s * 0.2, 1.0 + rng() * 0.25, OLIVE, 5, 0.72, TURNING);
   }
-  foliage(g, rng, 0, H + 1.6, -0.2, 1.05, OLIVE, 4, 0.7);
+  foliage(g, rng, 0, H + 1.6, -0.2, 1.05, OLIVE, 4, 0.7, TURNING);
   return g;
 }
 
@@ -129,7 +130,9 @@ export function oliveTree(rng) {
 export function lemonTree(rng) {
   const g = new THREE.Group();
   at(cyl(0.11, 0.16, 1.3, BARK, 5), 0, 0.65, 0, g);
-  foliage(g, rng, 0, 1.95, 0, 1.1, LEMON, 5, 0.85);
+  // Three twigs, for the winter, when the crown is gone.
+  for (let k = 0; k < 3; k++) at(cyl(0.03, 0.06, 1.0, BARK, 4), Math.cos(k * 2.1) * 0.3, 1.6, Math.sin(k * 2.1) * 0.3, g).rotation.set(Math.sin(k * 2.1) * 0.6, 0, -Math.cos(k * 2.1) * 0.6);
+  foliage(g, rng, 0, 1.95, 0, 1.1, LEMON, 5, 0.85, TURNING);
   for (let k = 0; k < 9; k++) {
     const a = rng() * Math.PI * 2;
     const p = 0.6 + rng() * 1.6;
@@ -146,15 +149,12 @@ function holmOak(rng) {
   at(cyl(0.4, 0.52, 0.4, DARK_BARK, 6, { flat: true }), 0, 0.15, 0, g);
   for (const s of [-1, 1]) at(cyl(0.1, 0.18, 1.6, BARK, 5), s * 0.5, H + 0.4, 0, g).rotation.z = -s * 0.7;
   const R = 2.0 + rng() * 0.5;
-  foliage(g, rng, 0, H + 1.6, 0, R, OAK, 6, 0.78);
-  foliage(g, rng, (rng() - 0.5) * 0.8, H + 2.5, (rng() - 0.5) * 0.8, R * 0.62, [OAK[1], OAK[2], OAK[2]], 3, 0.75);
+  foliage(g, rng, 0, H + 1.6, 0, R, OAK, 6, 0.78, TURNING);
+  foliage(g, rng, (rng() - 0.5) * 0.8, H + 2.5, (rng() - 0.5) * 0.8, R * 0.62, [OAK[1], OAK[2], OAK[2]], 3, 0.75, TURNING);
   return g;
 }
 
-/**
- * Almond tree of the old orchards: a cloud of pink and white blossom in spring, green in
- * summer, gold in autumn, bare black boughs in the dead of winter.
- */
+/** Almond tree of the old orchards: a low spreading crown on a few black boughs. */
 function almondTree(rng) {
   const g = new THREE.Group();
   const H = 1.3 + rng() * 0.5;
@@ -167,17 +167,16 @@ function almondTree(rng) {
     limb.rotation.set(Math.sin(a) * 0.75, 0, -Math.cos(a) * 0.75);
     at(cyl(0.05, 0.1, reach * 1.7, DARK_BARK, 4), 0, reach * 0.85, 0, limb);
     g.add(limb);
-    foliage(g, rng, Math.cos(a) * reach, H + 0.9 + rng() * 0.3, Math.sin(a) * reach, 0.75 + rng() * 0.2, ORCHARD, 3, 0.8, BLOSSOM);
+    foliage(g, rng, Math.cos(a) * reach, H + 0.9 + rng() * 0.3, Math.sin(a) * reach, 0.75 + rng() * 0.2, ORCHARD, 3, 0.8, TURNING);
   }
-  foliage(g, rng, 0, H + 1.5, 0, 0.9, ORCHARD, 4, 0.8, BLOSSOM);
+  foliage(g, rng, 0, H + 1.5, 0, 0.9, ORCHARD, 4, 0.8, TURNING);
   return g;
 }
 
 /**
  * Montpellier maple (acero minore), wild on the Ligurian hills: a short trunk that splits low
  * into a few long limbs reaching out and up, and over them a crown far wider than it is tall,
- * a heaped cloud with its edges drooping. The crown's season is in the shader (`uMaple`):
- * green, then scarlet, then bare.
+ * a heaped cloud with its edges drooping.
  */
 function mapleTree(rng) {
   const g = new THREE.Group();
@@ -201,47 +200,72 @@ function mapleTree(rng) {
   }
   // The cloud of leaves: a broad heap over the middle, a puff over each limb's
   // end hanging a little lower, so the crown droops at its edges.
-  foliage(g, rng, 0, H + 2.1, 0, 1.7, MAPLE_LEAF, 6, 0.6, MAPLE);
-  for (const [x, y, z] of tips) foliage(g, rng, x * 1.05, y + 0.15, z * 1.05, 1.05 + rng() * 0.3, MAPLE_LEAF, 3, 0.62, MAPLE);
+  foliage(g, rng, 0, H + 2.1, 0, 1.7, MAPLE_LEAF, 6, 0.6, TURNING);
+  for (const [x, y, z] of tips) foliage(g, rng, x * 1.05, y + 0.15, z * 1.05, 1.05 + rng() * 0.3, MAPLE_LEAF, 3, 0.62, TURNING);
   for (let k = 0; k < 4; k++) {
     const a = rng() * Math.PI * 2;
     const d = 1.0 + rng() * 0.8;
-    foliage(g, rng, Math.cos(a) * d, H + 2.5 + rng() * 0.4, Math.sin(a) * d, 0.9 + rng() * 0.25, MAPLE_LEAF, 2, 0.65, MAPLE);
+    foliage(g, rng, Math.cos(a) * d, H + 2.5 + rng() * 0.4, Math.sin(a) * d, 0.9 + rng() * 0.25, MAPLE_LEAF, 2, 0.65, TURNING);
   }
   return g;
 }
 
 /**
- * The maples' fallen leaves, all in one instanced mesh: for each tree, leaves that let go of
- * its crown and fall or fly off, and leaves that lie in a red ring on the ground under it.
- * What shows of each, and when, is the shader's (see `LEAFFALL` in style.js).
+ * Each broadleaf species' crown, in its own metres: how far out from the trunk the leaves
+ * hang, how high its lowest and highest leaves are, and how many leaves fall from it and lie
+ * under it at the height of the autumn.
  */
-function mapleLeaves(scene, rng, trees) {
-  const leaf = new THREE.PlaneGeometry(0.4, 0.32);
-  const FALLING = 140;
-  const LYING = 360;
-  const mesh = new THREE.InstancedMesh(leaf, paint(0xffffff, { leaffall: true, doubleSide: true }), trees.length * (FALLING + LYING));
+const CROWNS = {
+  mapleTree: { reach: 3.2, low: 2.4, high: 3.8, falling: 140, lying: 360 },
+  holmOak: { reach: 2.2, low: 3.2, high: 5.0, falling: 45, lying: 110 },
+  oliveTree: { reach: 1.4, low: 2.4, high: 3.4, falling: 25, lying: 60 },
+  almondTree: { reach: 1.4, low: 1.9, high: 2.9, falling: 25, lying: 60 },
+  lemonTree: { reach: 1.1, low: 1.5, high: 2.6, falling: 15, lying: 40 },
+};
+
+/**
+ * The fallen leaves of every broadleaf tree on the island, all in one instanced mesh: leaves
+ * that let go of each crown and fall or fly off, and leaves that lie in a red ring on the
+ * ground under it. What shows of each, and when, is the shader's (see `LEAFFALL` in style.js).
+ */
+function fallenLeaves(scene, rng) {
+  // Every broadleaf tree once: a species is drawn as one mesh per paint, all at the same spots.
+  const trees = new Map();
   const m = new THREE.Matrix4();
+  const at3 = new THREE.Vector3();
+  for (const obj of scene.children) {
+    const crown = obj.isInstancedMesh && CROWNS[obj.userData.plant];
+    if (!crown) continue;
+    for (let i = 0; i < obj.count; i++) {
+      obj.getMatrixAt(i, m);
+      at3.setFromMatrixPosition(m);
+      trees.set(`${at3.x.toFixed(2)},${at3.z.toFixed(2)}`, { x: at3.x, y: at3.y, z: at3.z, s: m.getMaxScaleOnAxis(), crown });
+    }
+  }
+  let total = 0;
+  for (const { crown } of trees.values()) total += crown.falling + crown.lying;
+  const leaf = new THREE.PlaneGeometry(0.4, 0.32);
+  const mesh = new THREE.InstancedMesh(leaf, paint(0xffffff, { leaffall: true, doubleSide: true }), total);
   const flat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
   const turn = new THREE.Quaternion();
   const p = new THREE.Vector3();
   const one = new THREE.Vector3(1, 1, 1);
   const data = new THREE.Color();
   let n = 0;
-  for (const { x, y, z, s } of trees) {
-    for (let k = 0; k < FALLING; k++) {
+  for (const { x, y, z, s, crown } of trees.values()) {
+    for (let k = 0; k < crown.falling; k++) {
       const a = rng() * Math.PI * 2;
-      const d = Math.sqrt(rng()) * 3.2 * s;
-      p.set(x + Math.cos(a) * d, y + (2.4 + rng() * 1.4) * s, z + Math.sin(a) * d);
+      const d = Math.sqrt(rng()) * crown.reach * s;
+      p.set(x + Math.cos(a) * d, y + (crown.low + rng() * (crown.high - crown.low)) * s, z + Math.sin(a) * d);
       const drop = Math.max(1, p.y - groundAt(p.x, p.z));
       mesh.setMatrixAt(n, m.compose(p, turn.identity(), one));
       // Raw numbers, not a colour: set in the working space so they reach the shader unchanged.
       mesh.setColorAt(n++, data.setRGB(drop / 20, rng(), 0));
     }
-    for (let k = 0; k < LYING; k++) {
+    for (let k = 0; k < crown.lying; k++) {
       // Thickest under the crown, thinning out beyond, a few blown further.
       const a = rng() * Math.PI * 2;
-      const d = (0.3 + Math.sqrt(rng()) * 3.4 + (rng() < 0.2 ? rng() * 2.5 : 0)) * s;
+      const d = (0.3 + Math.sqrt(rng()) * crown.reach * 1.1 + (rng() < 0.2 ? rng() * 2.5 : 0)) * s;
       p.set(x + Math.cos(a) * d, 0, z + Math.sin(a) * d);
       p.y = groundAt(p.x, p.z) + 0.04;
       if (p.y < WATER_LEVEL + 0.1) continue;
@@ -313,11 +337,11 @@ function plantMaples(scene, animated) {
     placements[t.variant].push(new THREE.Matrix4().compose(new THREE.Vector3(t.x, t.y - 0.1 - t.slope * 0.7, t.z), q, new THREE.Vector3(t.s, t.s, t.s)));
   }
   instance(scene, mapleTree, placements.map(() => prototype(mapleTree(rng))), placements);
-  mapleLeaves(scene, rng, trees);
+  fallenLeaves(scene, rng);
   // A crown the shader has emptied for the winter must not go on shading the ground.
-  const crowns = scene.children.filter((obj) => obj.userData.plant === 'mapleTree' && 'MAPLE' in obj.material.defines);
+  const crowns = scene.children.filter((obj) => obj.isInstancedMesh && 'TURNING' in obj.material.defines);
   animated.push(() => {
-    const full = GLOBALS.uMaple.value.w > 0.4;
+    const full = GLOBALS.uLeaves.value.w > 0.4;
     for (const crown of crowns) crown.castShadow = full;
   });
 }
