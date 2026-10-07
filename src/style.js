@@ -74,8 +74,6 @@ export const GLOBALS = {
   uLamps: { value: new THREE.Vector2() },
   // Pools of lamplight over the map, laid out like the heightmap.
   uLampMap: { value: blank },
-  // The beam of the lighthouse: where it stands (x, z), where it points, how bright it is.
-  uBeam: { value: new THREE.Vector4() },
   // Where the endless sea meets the sky: the direction the view looks in on the ground (x, z)
   // and how far along it the horizon lies; and the haze the far water pales into.
   uHorizon: { value: new THREE.Vector3(0, -1, 1e4) },
@@ -182,7 +180,6 @@ uniform vec3 uWind;
 uniform vec3 uSkyTint;
 uniform vec2 uLamps;
 uniform sampler2D uLampMap;
-uniform vec4 uBeam;
 uniform vec3 uHeightMap;
 varying vec3 vWorld;
 varying float vGust;
@@ -599,15 +596,6 @@ float pxLamp = texture2D(uLampMap, (vWorld.xz + uHeightMap.x) / uHeightMap.y).r 
 // Each flame breathes a little, on its own.
 pxLamp *= 0.93 + 0.07 * sin(uTime * 5.0 + pxHash(floor(vWorld.xz / 7.0)) * 40.0);
 if (pxLamp > 0.12) pxCol += (pxAlb * 0.75 + 0.03) * vec3(1.0, 0.72, 0.36) * (pxLamp > 0.5 ? 0.85 : pxLamp > 0.27 ? 0.5 : 0.22);
-// The lighthouse sweeps its beam round over the sea and the shore: a bright core in a paler wedge.
-if (uBeam.w > 0.01 && vWorld.y < 6.0) {
-  vec2 pxTo = vWorld.xz - uBeam.xy;
-  vec2 pxAim = vec2(cos(uBeam.z), sin(uBeam.z));
-  float pxOut = dot(pxTo, pxAim);
-  float pxOff = abs(pxTo.x * pxAim.y - pxTo.y * pxAim.x);
-  // The pool begins where the cone from the lantern comes down to the water (see world.js).
-  if (pxOut > 30.0 && pxOut < 170.0 && pxOff < 1.5 + pxOut * 0.06) pxCol += (pxAlb * 0.5 + 0.02) * vec3(1.0, 0.92, 0.7) * uBeam.w * (pxOff < 0.6 + pxOut * 0.025 ? 0.9 : 0.4) * (1.0 - pxOut / 170.0) * smoothstep(30.0, 60.0, pxOut);
-}
 #ifdef FLOW
   // Rain water: gutters pour while it rains and drip long afterwards; when it freezes the
   // spouts grow icicles instead. The instance colour says how much water each one carries.

@@ -2,12 +2,12 @@
 // Ghibli background is.
 import * as THREE from 'three';
 import { mulberry32 } from './noise.js';
-import { GLOBALS, PATH_COUNT, TRACK_COUNT, TRAIL_COUNT, WATER_LEVEL, paint } from './style.js';
+import { GLOBALS, PATH_COUNT, TRACK_COUNT, TRAIL_COUNT, paint } from './style.js';
 import { buildLife } from './life.js';
 import { buildNature } from './nature.js';
 import { HALF, PATHS, SEGMENTS, TRACKS, TRAILS, SKIN, WORLD_SIZE, ZONES, buildSides, buildTerrain, buildWater, segmentDistance } from './terrain.js';
 import { buildEstate } from './estate.js';
-import { at, bake, live } from './kit.js';
+import { bake, live } from './kit.js';
 import { buildRailway } from './railway.js';
 import { buildVillages } from './village.js';
 import { buildAgora, buildAtelier, buildLibrary, buildLighthouseWalk, buildMoot, buildObservatory, buildPods, buildPort, buildPub } from './zones.js';
@@ -17,41 +17,43 @@ export { LAND_ENDS, SQUARE, SUN_DIR, WATER_LEVEL, ZONES, groundAt, inSquare, toX
 // ---------------------------------------------------------------- World
 
 /**
- * The beam of the lighthouse as a thing seen: a cone of warm light from the lantern, brightest
- * at its root and thinning away, long enough to come down to the sea far out. Returns the pivot
- * that turns it and the material that dims it.
+ * The beam of the lighthouse as a thing seen: a shaft of warm light from the lantern, levelled
+ * on the horizon as a real one is, never dipping to the sea. It is brightest at the lantern and
+ * thins away over the water until it is lost in the distance. Returns the pivot that turns it
+ * and the material that dims it.
  */
 function lightCone(scene, lamp) {
-  const LENGTH = 160;
-  const REACH = 120; // where the axis of the cone meets the water
-  const geo = new THREE.ConeGeometry(9, LENGTH, 18, 1, true);
-  const pos = geo.attributes.position;
-  const colors = new Float32Array(pos.count * 3);
-  for (let i = 0; i < pos.count; i++) {
-    // From the tip (y = +LENGTH / 2) to the base: warm and bright, then dim.
-    const k = 0.5 + pos.getY(i) / LENGTH;
-    colors.set([0.12 + 0.88 * k, 0.1 + 0.82 * k, 0.06 + 0.64 * k], i * 3);
-  }
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const LENGTH = 460;
   const material = paint(0xffffff, { unlit: true, volume: true, vertexColors: true, doubleSide: true });
   material.transparent = true;
   material.blending = THREE.AdditiveBlending;
   material.depthWrite = false;
+  // It fades out of itself; the haze would only add its own colour to it.
+  material.fog = false;
   material.opacity = 0;
-  const cone = new THREE.Mesh(geo, material);
-  cone.castShadow = cone.receiveShadow = false;
-  cone.frustumCulled = false;
-  // Drawn after the sea, which is translucent too and would otherwise paint over it.
-  cone.renderOrder = 10;
-  // Tip at the lantern, base far out along +x, then leaned down toward the water; the pivot turns it.
-  cone.rotation.z = Math.PI / 2;
-  cone.position.x = LENGTH / 2;
-  const lean = at(new THREE.Group(), 0, 0, 0);
-  lean.rotation.z = -Math.atan2(lamp.y - WATER_LEVEL, REACH);
-  lean.add(cone);
   const pivot = live(new THREE.Group());
   pivot.position.copy(lamp);
-  pivot.add(lean);
+  // A wide pale shaft and a narrow bright core inside it.
+  for (const [radius, glow, fade] of [[9, 0.6, 1.4], [2.4, 1, 2.2]]) {
+    const geo = new THREE.ConeGeometry(radius, LENGTH, 18, 12, true);
+    const pos = geo.attributes.position;
+    const colors = new Float32Array(pos.count * 3);
+    for (let i = 0; i < pos.count; i++) {
+      // From the tip (y = +LENGTH / 2) to the far end: warm and bright, then lost in the dark.
+      const k = (0.5 + pos.getY(i) / LENGTH) ** fade * glow;
+      colors.set([k, 0.92 * k, 0.72 * k], i * 3);
+    }
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const cone = new THREE.Mesh(geo, material);
+    cone.castShadow = cone.receiveShadow = false;
+    cone.frustumCulled = false;
+    // Drawn after the sea, which is translucent too and would otherwise paint over it.
+    cone.renderOrder = 10;
+    // Tip at the lantern, the shaft laid level along +x; the pivot turns it.
+    cone.rotation.z = Math.PI / 2;
+    cone.position.x = LENGTH / 2;
+    pivot.add(cone);
+  }
   scene.add(pivot);
   return { pivot, material };
 }
@@ -101,8 +103,7 @@ export function createWorld(scene) {
   buildRailway(scene, animated);
   GLOBALS.uLampMap.value = lampMap(scene);
   // The lighthouse turns its beam once every quarter of a minute, as long as the lamps are lit:
-  // a long cone of light from the lantern room, leaning down to the sea, and the pool it lays
-  // on the water out where it comes down (see `uBeam` in style.js).
+  // a long shaft of light from the lantern room, level with the horizon.
   scene.updateMatrixWorld(true);
   let beacon = null;
   scene.traverse((obj) => {
@@ -111,10 +112,9 @@ export function createWorld(scene) {
   const beam = beacon ? lightCone(scene, beacon) : null;
   animated.push((t) => {
     const lit = GLOBALS.uLamps.value.x;
-    GLOBALS.uBeam.value.set(beacon?.x ?? 0, beacon?.z ?? 0, t * 0.42, lit);
     if (beam) {
       beam.pivot.rotation.y = -t * 0.42;
-      beam.material.opacity = 0.26 * lit;
+      beam.material.opacity = 0.34 * lit;
       beam.pivot.visible = lit > 0.01;
     }
   });
