@@ -53,18 +53,18 @@ const smooth = (a, b, x) => {
 };
 
 /**
- * Where the cherry trees stand in their year, from the turn of the year (0 at the summer
- * solstice, 0.75 at the spring equinox): (blossom, petals falling, petals lying, leaves).
- * They come into flower at the end of February and are at their fullest around the equinox,
- * a few petals drifting down already; through April the blossom snows down and carpets the
- * ground while the leaves come out; the leaves turn in autumn and are down by mid-December.
+ * Where the maples stand in their year, from the turn of the year (0 at the summer solstice,
+ * 0.25 at the autumn equinox): (crowns turned red, leaves falling, leaves lying, leaves on the
+ * boughs). Green from the buds of March through the summer; from the end of September an
+ * Indian summer turns them scarlet and the leaves let go and fly; by mid-December the boughs
+ * are bare, and the leaves on the ground are gone by the new year.
  */
-function sakura(year) {
-  const blossom = smooth(0.67, 0.72, year) * (1 - smooth(0.79, 0.85, year));
-  const falling = Math.max(0.35 * smooth(0.7, 0.74, year), smooth(0.76, 0.8, year)) * (1 - smooth(0.84, 0.87, year));
-  const lying = smooth(0.73, 0.8, year) * (1 - smooth(0.86, 0.9, year));
-  const leaves = year > 0.6 ? smooth(0.78, 0.84, year) : 1 - smooth(0.35, 0.42, year);
-  return [blossom, falling, lying, leaves];
+function maple(year) {
+  const turned = year < 0.6 ? smooth(0.19, 0.27, year) : 0;
+  const falling = smooth(0.21, 0.26, year) * (1 - smooth(0.41, 0.44, year));
+  const lying = smooth(0.23, 0.31, year) * (1 - smooth(0.47, 0.53, year));
+  const leaves = year > 0.6 ? smooth(0.7, 0.77, year) : 1 - smooth(0.33, 0.42, year);
+  return [turned, falling, lying, leaves];
 }
 
 /** Where the sun stands: east, north and up components for a date and a place on Earth. */
@@ -405,7 +405,7 @@ export class Climate {
     GLOBALS.uOvercast.value = smooth(0.5, 1.2, cloud);
     GLOBALS.uStorm.value = this.storm;
     GLOBALS.uSeason.value.set(autumn, winter, spring, snowCover);
-    GLOBALS.uSakura.value.set(...sakura(year));
+    GLOBALS.uMaple.value.set(...maple(year));
     GLOBALS.uWet.value.set(this.wetness, this.puddles, rain, this.runoff);
     GLOBALS.uWind.value.set(this.wind.x, this.wind.y, wind);
     GLOBALS.uSkyTint.value.copy(this.skyHorizon).lerp(this.skyTop, 0.45);

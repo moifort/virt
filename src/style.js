@@ -55,9 +55,9 @@ export const GLOBALS = {
   uStorm: { value: 0 },
   // Seasons: (autumn, winter, spring, snow cover), each 0 to 1.
   uSeason: { value: new THREE.Vector4() },
-  // The cherry trees' year, each 0 to 1: (blossom on the boughs, petals in the air, petals
-  // lying under the trees, leaves on the boughs).
-  uSakura: { value: new THREE.Vector4() },
+  // The maples' year, each 0 to 1: (crowns turned red, leaves in the air, leaves lying under
+  // the trees, leaves on the boughs).
+  uMaple: { value: new THREE.Vector4() },
   uPaths: { value: Array.from({ length: PATH_COUNT }, () => new THREE.Vector4()) },
   uTrails: { value: Array.from({ length: TRAIL_COUNT }, () => new THREE.Vector4()) },
   uTracks: { value: Array.from({ length: TRACK_COUNT }, () => new THREE.Vector4()) },
@@ -103,7 +103,7 @@ const gradientMap = (() => {
 const VERTEX_HEAD = /* glsl */ `
 uniform float uTime;
 uniform vec3 uWind;
-uniform vec4 uSakura;
+uniform vec4 uMaple;
 varying vec3 vWorld;
 varying float vGust;
 #if defined(FLOW) || defined(CASCADE)
@@ -147,26 +147,36 @@ vGust = 0.0;
     transformed += pxLean * (vGust * 0.035 + pxRustle * (0.6 + uWind.z)) * pxBend;
   #endif
 #endif
-#if defined(PETAL) && defined(USE_INSTANCING_COLOR)
-  // Cherry petals. The instance colour carries no colour but where each one is in its fall:
-  // (height of the fall / 20 m, a seed, 1 if it lies on the ground). As many show as the
+#if defined(LEAFFALL) && defined(USE_INSTANCING_COLOR)
+  // Fallen maple leaves. The instance colour carries no colour but where each one is in its
+  // fall: (height of the fall / 20 m, a seed, 1 if it lies on the ground). As many show as the
   // season allows; the others shrink to nothing.
   float pxSeed = instanceColor.g;
   bool pxLying = instanceColor.b > 0.5;
-  if (pxSeed > (pxLying ? uSakura.z : uSakura.y)) transformed = vec3(0.0);
+  if (pxSeed > (pxLying ? uMaple.z : uMaple.y)) transformed = vec3(0.0);
   else if (!pxLying) {
-    // Each petal tumbles down from the crown at a petal's pace, flutters, and is carried off
-    // downwind; a gust sends a flurry further. Then it starts again from the boughs.
+    // Each leaf lets go of its bough and see-saws down, carried off downwind. One in three is
+    // caught by the wind instead: it drifts down slowly and flies far off over the island,
+    // lifted again by every gust. Then another lets go of the same bough.
     float pxDrop = instanceColor.r * 20.0;
-    float pxFall = fract(uTime * (0.55 + 0.35 * pxSeed) / max(pxDrop, 1.0) + pxSeed * 17.0);
-    float pxSpin = uTime * (2.0 + 3.0 * pxSeed) + pxSeed * 40.0;
+    bool pxFlies = fract(pxSeed * 13.7) < 0.35;
+    float pxPace = pxFlies ? 0.32 : 0.75 + 0.4 * fract(pxSeed * 5.3);
+    float pxFall = fract(uTime * pxPace / max(pxDrop, 1.0) + pxSeed * 17.0);
+    float pxSpin = uTime * (1.6 + 2.4 * pxSeed) + pxSeed * 40.0;
     transformed.xy = mat2(cos(pxSpin), sin(pxSpin), -sin(pxSpin), cos(pxSpin)) * transformed.xy;
     transformed.yz = mat2(cos(pxSpin * 0.7), sin(pxSpin * 0.7), -sin(pxSpin * 0.7), cos(pxSpin * 0.7)) * transformed.yz;
     transformed *= smoothstep(0.0, 0.05, pxFall) * smoothstep(1.0, 0.93, pxFall);
-    float pxGustHere = smoothstep(0.42, 0.78, pxVNoise((instanceMatrix[3].xz - uWind.xy * uTime * 5.0) * 0.055)) * uWind.z;
+    vec2 pxAt = instanceMatrix[3].xz + uWind.xy * pxFall * 12.0;
+    float pxGustHere = smoothstep(0.42, 0.78, pxVNoise((pxAt - uWind.xy * uTime * 5.0) * 0.055)) * uWind.z;
     transformed.y -= pxFall * pxDrop;
-    transformed.xz += uWind.xy * pxFall * pxDrop * (0.35 + 0.8 * uWind.z + 1.2 * pxGustHere);
-    transformed.xz += vec2(sin(pxSpin * 0.45), cos(pxSpin * 0.31)) * 0.4 * pxFall;
+    if (pxFlies) {
+      transformed.xz += uWind.xy * pxFall * (7.0 + 14.0 * uWind.z + 8.0 * pxGustHere);
+      transformed.y += sin(pxFall * 3.1416) * (1.2 + 3.5 * pxGustHere) + sin(pxSpin * 0.3) * 0.4 * pxFall;
+    } else {
+      transformed.xz += uWind.xy * pxFall * pxDrop * (0.3 + 0.7 * uWind.z + 1.2 * pxGustHere);
+    }
+    // The see-saw of a leaf falling through still air.
+    transformed.xz += vec2(sin(pxSpin * 0.45), cos(pxSpin * 0.31)) * 0.6 * pxFall;
   }
 #endif
 `;
@@ -197,7 +207,7 @@ uniform float uNight;
 uniform float uOvercast;
 uniform float uStorm;
 uniform vec4 uSeason;
-uniform vec4 uSakura;
+uniform vec4 uMaple;
 uniform vec4 uPaths[${PATH_COUNT}];
 uniform vec4 uTrails[${TRAIL_COUNT}];
 uniform vec4 uTracks[${TRACK_COUNT}];
@@ -522,11 +532,14 @@ bool pxGlass = max(max(abs(pxBase.r - 0.040), abs(pxBase.g - 0.032)), abs(pxBase
       pxTurns = 1.0;
       pxFades = 0.75;
     #endif
-    #ifdef CHERRY
-      // A cherry tree in autumn blazes scarlet and orange, then drops everything.
+    #ifdef MAPLE
+      // A maple's Indian summer: its crown turns scarlet and crimson patch by patch, a few
+      // patches orange, a few still green to the last.
       pxTurns = 0.0;
       pxFades = 0.0;
-      pxAlb = mix(pxAlb, (pxPatch < 0.45 ? ${lin(0xd23a2e)} : pxPatch < 0.75 ? ${lin(0xb82a3c)} : ${lin(0xe8803a)}) * (0.45 + 2.2 * pxLum), uSeason.x * 0.9);
+      float pxBlot = pxNoise(vWorld.xz * 0.8 + vWorld.y * 0.6 + 17.0) * 0.85 + pxBit * 0.15;
+      float pxRed = clamp(uMaple.x * 1.5 - pxBlot * 0.5, 0.0, 1.0) * step(pxBlot, 0.86);
+      pxAlb = mix(pxAlb, (pxBlot < 0.42 ? ${lin(0xd23a2e)} : pxBlot < 0.68 ? ${lin(0xb82a3c)} : ${lin(0xe8803a)}) * (0.45 + 2.2 * pxLum), pxRed * 0.92);
     #endif
     pxAlb = mix(pxAlb, pxFall, uSeason.x * 0.85 * pxTurns);
     pxAlb = mix(pxAlb, vec3(pxLum) * vec3(0.98, 1.0, 0.94), uSeason.y * pxFades);
@@ -540,19 +553,15 @@ bool pxGlass = max(max(abs(pxBase.r - 0.040), abs(pxBase.g - 0.032)), abs(pxBase
     // A gust turns the leaves over, pale side up.
     pxAlb *= 1.0 + 0.14 * vGust;
   #endif
-  #ifdef CHERRY
-    // Japanese cherry: bare boughs all winter, then a cloud of pink blossom before a single
-    // leaf; as the petals go the leaves come through, tuft by tuft.
-    if (pxBit > max(uSakura.x, uSakura.w)) discard;
-    float pxTuft = pxNoise(vWorld.xz * 2.2 + vWorld.y * 1.9 + 31.0) * 0.75 + pxBit * 0.25;
-    if (pxTuft < uSakura.x / max(max(uSakura.x, uSakura.w), 0.001)) {
-      pxAlb = pxClump > 0.6 || pxBit > 0.88 ? ${lin(0xffe6ee)} : pxClump < 0.36 || pxBit < 0.08 ? ${lin(0xe991b0)} : ${lin(0xf8bfd2)};
-    }
+  #ifdef MAPLE
+    // The crown thins as the leaves let go, and the boughs stand bare all winter.
+    if (pxBit > uMaple.w) discard;
   #endif
-  #ifdef PETAL
-    // Petals: the pinks of the blossom.
+  #ifdef LEAFFALL
+    // Fallen leaves: the reds of the crown, a few still green; on the ground they go russet.
     float pxShade = fract(pxBase.g * 7.0);
-    pxAlb = pxShade < 0.3 ? ${lin(0xffe2ec)} : pxShade < 0.7 ? ${lin(0xf8b2cb)} : ${lin(0xec8db0)};
+    pxAlb = pxShade < 0.35 ? ${lin(0xd23a2e)} : pxShade < 0.65 ? ${lin(0xb82a3c)} : pxShade < 0.9 ? ${lin(0xe8803a)} : ${lin(0x7cb45a)};
+    if (pxBase.b > 0.5) pxAlb = mix(pxAlb, ${lin(0x8a4634)}, 0.3);
   #endif
   #ifdef BLOSSOM
     // Orchard trees: a cloud of blossom in spring, bare boughs in the dead of winter.
@@ -663,15 +672,15 @@ outgoingLight = pxCol;
 `;
 
 const cache = new Map();
-const FLAGS = { terrain: 'TERRAIN', water: 'WATER', sway: 'SWAY', glow: 'GLOW', unlit: 'UNLIT', volume: 'VOLUME', leaf: 'LEAF', blossom: 'BLOSSOM', cherry: 'CHERRY', petal: 'PETAL', deciduous: 'DECIDUOUS', roof: 'ROOF', wall: 'WALL', flow: 'FLOW', cascade: 'CASCADE', carriage: 'CARRIAGE' };
+const FLAGS = { terrain: 'TERRAIN', water: 'WATER', sway: 'SWAY', glow: 'GLOW', unlit: 'UNLIT', volume: 'VOLUME', leaf: 'LEAF', blossom: 'BLOSSOM', maple: 'MAPLE', leaffall: 'LEAFFALL', deciduous: 'DECIDUOUS', roof: 'ROOF', wall: 'WALL', flow: 'FLOW', cascade: 'CASCADE', carriage: 'CARRIAGE' };
 
 /**
  * @param {number} color sRGB hex
- * @param {{terrain?: boolean, water?: boolean, sway?: boolean, glow?: boolean, leaf?: boolean, blossom?: boolean, cherry?: boolean, petal?: boolean, deciduous?: boolean, roof?: boolean, wall?: boolean, flow?: boolean, cascade?: boolean, carriage?: boolean, unlit?: boolean, volume?: boolean, flat?: boolean, doubleSide?: boolean, backSide?: boolean, vertexColors?: boolean, map?: THREE.Texture}} [opts]
+ * @param {{terrain?: boolean, water?: boolean, sway?: boolean, glow?: boolean, leaf?: boolean, blossom?: boolean, maple?: boolean, leaffall?: boolean, deciduous?: boolean, roof?: boolean, wall?: boolean, flow?: boolean, cascade?: boolean, carriage?: boolean, unlit?: boolean, volume?: boolean, flat?: boolean, doubleSide?: boolean, backSide?: boolean, vertexColors?: boolean, map?: THREE.Texture}} [opts]
  *   `leaf` is foliage (painted in clumps, rustling, evergreen unless `deciduous`), `blossom` an
  *   orchard crown that flowers and
- *   sheds, `cherry` the crown of a Japanese cherry (see `uSakura`), `petal` its falling and
- *   lying petals, data in the instance colours, `roof` tiles, `wall` aged plaster, `flow` rain water running off a roof, `cascade` a
+ *   sheds, `maple` the crown of a maple that reddens and drops its leaves (see `uMaple`),
+ *   `leaffall` its leaves falling and lying, data in the instance colours, `roof` tiles, `wall` aged plaster, `flow` rain water running off a roof, `cascade` a
  *   stream or a waterfall, `carriage` the panes of a vehicle, all lit after dark wherever it goes,
  *   `unlit` spray that stays white whichever way the light falls, `volume` a translucent volume
  *   of light added over the picture (with `unlit`), which draws no outline.
@@ -692,7 +701,7 @@ export function paint(color, opts = {}) {
   mat.userData.paint = { flags, map };
   mat.defines = {};
   for (const [flag, define] of Object.entries(FLAGS)) if (opts[flag]) mat.defines[define] = '';
-  if (opts.blossom || opts.cherry) mat.defines.LEAF = '';
+  if (opts.blossom || opts.maple) mat.defines.LEAF = '';
   mat.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, GLOBALS);
     shader.vertexShader = VERTEX_HEAD + shader.vertexShader

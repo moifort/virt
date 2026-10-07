@@ -1,7 +1,7 @@
 // Mediterranean flora and rock, as on the Ligurian coast: stone pines, cypresses, olive and
 // lemon trees, holm oaks, almond trees in blossom, palms on the front, maquis, broom, oleander
-// and lavender, agaves and prickly pears among limestone boulders. And Japanese cherry trees,
-// lining the walks from the agora, that flower pink in spring and snow their petals down. Trees gather in groves and
+// and lavender, agaves and prickly pears among limestone boulders. And maples lining the walks
+// from the agora, that blaze red in autumn and let their leaves fly. Trees gather in groves and
 // leave meadows open between them. Each species is modelled in detail once, baked, then
 // instanced across the bay.
 import * as THREE from 'three';
@@ -25,9 +25,9 @@ const PALM = [0x357e48, 0x4f9a54, 0x78b85c];
 const ROCK = [0xcfc3b0, 0xb9ad9c, 0xa99d8e, 0xd8cdb8];
 const LEAF = { leaf: true };
 const BLOSSOM = { blossom: true };
-const CHERRY = { cherry: true };
-const CHERRY_BARK = 0x4f3c40;
-const CHERRY_LEAF = [0x3f7a48, 0x58964e, 0x7cb45a];
+const MAPLE = { maple: true };
+const MAPLE_BARK = 0x5e4e48;
+const MAPLE_LEAF = [0x3f7a48, 0x58964e, 0x7cb45a];
 
 /** Where a point sits in the bay: up the mountain, along the shore, or on the plain. */
 function region(x, z) {
@@ -174,15 +174,16 @@ function almondTree(rng) {
 }
 
 /**
- * Japanese cherry (Somei Yoshino): a short dark trunk that splits low into a few long limbs
- * reaching out and up, and over them a crown far wider than it is tall, a heaped cloud with
- * its edges drooping. The crown's season is in the shader (`uSakura`): bare, pink, green, red.
+ * Montpellier maple (acero minore), wild on the Ligurian hills: a short trunk that splits low
+ * into a few long limbs reaching out and up, and over them a crown far wider than it is tall,
+ * a heaped cloud with its edges drooping. The crown's season is in the shader (`uMaple`):
+ * green, then scarlet, then bare.
  */
-function cherryTree(rng) {
+function mapleTree(rng) {
   const g = new THREE.Group();
   const H = 1.3 + rng() * 0.4;
-  at(cyl(0.2, 0.3, H, CHERRY_BARK, 6, { flat: true }), 0, H / 2, 0, g).rotation.z = (rng() - 0.5) * 0.15;
-  at(cyl(0.34, 0.42, 0.35, CHERRY_BARK, 6, { flat: true }), 0, 0.12, 0, g);
+  at(cyl(0.2, 0.3, H, MAPLE_BARK, 6, { flat: true }), 0, H / 2, 0, g).rotation.z = (rng() - 0.5) * 0.15;
+  at(cyl(0.34, 0.42, 0.35, MAPLE_BARK, 6, { flat: true }), 0, 0.12, 0, g);
   const limbs = 4 + Math.floor(rng() * 2);
   const tips = [];
   for (let k = 0; k < limbs; k++) {
@@ -192,34 +193,34 @@ function cherryTree(rng) {
     const limb = new THREE.Group();
     limb.position.set(0, H - 0.15, 0);
     limb.rotation.set(Math.sin(a) * tilt, 0, -Math.cos(a) * tilt);
-    at(cyl(0.06, 0.13, reach, CHERRY_BARK, 5, { flat: true }), 0, reach / 2, 0, limb);
+    at(cyl(0.06, 0.13, reach, MAPLE_BARK, 5, { flat: true }), 0, reach / 2, 0, limb);
     // A twig forking off near the end, out over the edge of the crown.
-    at(cyl(0.03, 0.06, reach * 0.55, CHERRY_BARK, 4), 0.2, reach * 0.95, 0, limb).rotation.z = -0.7;
+    at(cyl(0.03, 0.06, reach * 0.55, MAPLE_BARK, 4), 0.2, reach * 0.95, 0, limb).rotation.z = -0.7;
     g.add(limb);
     tips.push([Math.cos(a) * Math.sin(tilt) * reach, H + Math.cos(tilt) * reach, Math.sin(a) * Math.sin(tilt) * reach]);
   }
-  // The cloud of blossom (or leaves): a broad heap over the middle, a puff over each limb's
+  // The cloud of leaves: a broad heap over the middle, a puff over each limb's
   // end hanging a little lower, so the crown droops at its edges.
-  foliage(g, rng, 0, H + 2.1, 0, 1.7, CHERRY_LEAF, 6, 0.6, CHERRY);
-  for (const [x, y, z] of tips) foliage(g, rng, x * 1.05, y + 0.15, z * 1.05, 1.05 + rng() * 0.3, CHERRY_LEAF, 3, 0.62, CHERRY);
+  foliage(g, rng, 0, H + 2.1, 0, 1.7, MAPLE_LEAF, 6, 0.6, MAPLE);
+  for (const [x, y, z] of tips) foliage(g, rng, x * 1.05, y + 0.15, z * 1.05, 1.05 + rng() * 0.3, MAPLE_LEAF, 3, 0.62, MAPLE);
   for (let k = 0; k < 4; k++) {
     const a = rng() * Math.PI * 2;
     const d = 1.0 + rng() * 0.8;
-    foliage(g, rng, Math.cos(a) * d, H + 2.5 + rng() * 0.4, Math.sin(a) * d, 0.9 + rng() * 0.25, CHERRY_LEAF, 2, 0.65, CHERRY);
+    foliage(g, rng, Math.cos(a) * d, H + 2.5 + rng() * 0.4, Math.sin(a) * d, 0.9 + rng() * 0.25, MAPLE_LEAF, 2, 0.65, MAPLE);
   }
   return g;
 }
 
 /**
- * The cherry trees' petals, all in one instanced mesh: for each tree, petals that tumble down
- * out of its crown and petals that lie in a pink ring on the ground under it. What shows of
- * each, and when, is the shader's (see `PETAL` in style.js).
+ * The maples' fallen leaves, all in one instanced mesh: for each tree, leaves that let go of
+ * its crown and fall or fly off, and leaves that lie in a red ring on the ground under it.
+ * What shows of each, and when, is the shader's (see `LEAFFALL` in style.js).
  */
-function cherryPetals(scene, rng, trees) {
-  const petal = new THREE.PlaneGeometry(0.34, 0.26);
-  const FALLING = 120;
-  const LYING = 320;
-  const mesh = new THREE.InstancedMesh(petal, paint(0xffffff, { petal: true, doubleSide: true }), trees.length * (FALLING + LYING));
+function mapleLeaves(scene, rng, trees) {
+  const leaf = new THREE.PlaneGeometry(0.4, 0.32);
+  const FALLING = 140;
+  const LYING = 360;
+  const mesh = new THREE.InstancedMesh(leaf, paint(0xffffff, { leaffall: true, doubleSide: true }), trees.length * (FALLING + LYING));
   const m = new THREE.Matrix4();
   const flat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
   const turn = new THREE.Quaternion();
@@ -256,16 +257,16 @@ function cherryPetals(scene, rng, trees) {
   scene.add(mesh);
 }
 
-/** The trees grown before the cherries, which these keep clear of. */
+/** The trees grown before the maples, which these keep clear of. */
 const TREES = new Set(['stonePine', 'holmOak', 'cypress', 'oliveTree', 'lemonTree', 'almondTree', 'palm']);
 
 /**
- * Cherry trees along the walks out of the agora, as along a Japanese canal: one every dozen
- * metres or so on either side, set back from the path wherever the ground is free and no
- * other tree stands; and a few groves in the meadows. They are planted last, from their own
- * seed, so the rest of the island grows as it always has.
+ * Maples along the walks out of the agora: one every dozen metres or so on either side, set
+ * back from the path wherever the ground is free and no other tree stands; and a few groves in
+ * the meadows. They are planted last, from their own seed, so the rest of the island grows as
+ * it always has.
  */
-function plantCherries(scene, animated) {
+function plantMaples(scene, animated) {
   const rng = mulberry32(20261007);
   const standing = [];
   const m = new THREE.Matrix4();
@@ -295,7 +296,7 @@ function plantCherries(scene, animated) {
       }
     }
   }
-  // And a few groves out in the meadows of the plain, for sitting under in April.
+  // And a few groves out in the meadows of the plain.
   const p = new THREE.Vector3();
   for (let i = 0, grove = 0; i < 6000 && grove < 26; i++) {
     anywhere(rng, p);
@@ -311,13 +312,12 @@ function plantCherries(scene, animated) {
     q.setFromAxisAngle(UP, t.yaw);
     placements[t.variant].push(new THREE.Matrix4().compose(new THREE.Vector3(t.x, t.y - 0.1 - t.slope * 0.7, t.z), q, new THREE.Vector3(t.s, t.s, t.s)));
   }
-  instance(scene, cherryTree, placements.map(() => prototype(cherryTree(rng))), placements);
-  cherryPetals(scene, rng, trees);
+  instance(scene, mapleTree, placements.map(() => prototype(mapleTree(rng))), placements);
+  mapleLeaves(scene, rng, trees);
   // A crown the shader has emptied for the winter must not go on shading the ground.
-  const crowns = scene.children.filter((obj) => obj.userData.plant === 'cherryTree' && 'CHERRY' in obj.material.defines);
+  const crowns = scene.children.filter((obj) => obj.userData.plant === 'mapleTree' && 'MAPLE' in obj.material.defines);
   animated.push(() => {
-    const { x: blossom, w: leaves } = GLOBALS.uSakura.value;
-    const full = Math.max(blossom, leaves) > 0.4;
+    const full = GLOBALS.uMaple.value.w > 0.4;
     for (const crown of crowns) crown.castShadow = full;
   });
 }
@@ -654,5 +654,5 @@ export function buildNature(scene, rng, animated) {
   }
   scene.add(bake(lamps));
 
-  plantCherries(scene, animated);
+  plantMaples(scene, animated);
 }
