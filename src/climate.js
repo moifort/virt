@@ -355,7 +355,11 @@ export class Climate {
     this.season = { autumn, winter, spring, summer: clamp01(Math.cos(year * 2 * Math.PI) * 1.4 - 0.2) };
     // Snow settles while it falls and melts afterwards; in a cold winter it lingers on the peaks.
     this.snowLying = clamp01(this.snowLying + (snow > 0.05 ? snow * 0.06 : -0.02) * dt);
-    const cold = this.override ? winter : winter * clamp01((6 - this.real.temperature) / 6);
+    // Snow lingers on the peaks only in the heart of winter, the cold a month behind the
+    // solstice: from December, deepest from Christmas to early February, gone by mid-March.
+    // The season is already a third winter by mid-October, and that left snow on the pines.
+    const deepWinter = smooth(0.7, 0.92, -Math.cos((year - 0.07) * 2 * Math.PI));
+    const cold = this.override ? deepWinter : deepWinter * clamp01((6 - this.real.temperature) / 6);
     const snowCover = Math.max(cold * 0.3, this.snowLying);
 
     // Rain soaks surfaces within seconds and fills the hollows in a minute; when it stops the
