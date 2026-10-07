@@ -98,7 +98,7 @@ export function createWorld(scene) {
   buildObservatory(scene, rng);
   buildVillages(scene, rng, animated);
   buildEstate(scene, rng);
-  buildNature(scene, rng);
+  buildNature(scene, rng, animated);
   buildLife(scene, rng, animated);
   buildRailway(scene, animated);
   GLOBALS.uLampMap.value = lampMap(scene);

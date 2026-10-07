@@ -1,12 +1,13 @@
 // Mediterranean flora and rock, as on the Ligurian coast: stone pines, cypresses, olive and
 // lemon trees, holm oaks, almond trees in blossom, palms on the front, maquis, broom, oleander
-// and lavender, agaves and prickly pears among limestone boulders. Trees gather in groves and
+// and lavender, agaves and prickly pears among limestone boulders. And Japanese cherry trees,
+// lining the walks from the agora, that flower pink in spring and snow their petals down. Trees gather in groves and
 // leave meadows open between them. Each species is modelled in detail once, baked, then
 // instanced across the bay.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { fbm, pick } from './noise.js';
-import { PAL, WATER_LEVEL, paint, solid } from './style.js';
+import { fbm, mulberry32, pick } from './noise.js';
+import { GLOBALS, PAL, WATER_LEVEL, paint, solid } from './style.js';
 import { at, bake, ball, box, cone, cyl, lantern } from './kit.js';
 import { PATHS, SPUR_END, UP, ZONES, anywhere, coastU, cultivated, footU, groundAt, isWild, occupy, railPoint, scatterInstanced, slopeAt, toU, toV, toX, toZ } from './terrain.js';
 
@@ -24,6 +25,9 @@ const PALM = [0x357e48, 0x4f9a54, 0x78b85c];
 const ROCK = [0xcfc3b0, 0xb9ad9c, 0xa99d8e, 0xd8cdb8];
 const LEAF = { leaf: true };
 const BLOSSOM = { blossom: true };
+const CHERRY = { cherry: true };
+const CHERRY_BARK = 0x4f3c40;
+const CHERRY_LEAF = [0x3f7a48, 0x58964e, 0x7cb45a];
 
 /** Where a point sits in the bay: up the mountain, along the shore, or on the plain. */
 function region(x, z) {
@@ -167,6 +171,155 @@ function almondTree(rng) {
   }
   foliage(g, rng, 0, H + 1.5, 0, 0.9, ORCHARD, 4, 0.8, BLOSSOM);
   return g;
+}
+
+/**
+ * Japanese cherry (Somei Yoshino): a short dark trunk that splits low into a few long limbs
+ * reaching out and up, and over them a crown far wider than it is tall, a heaped cloud with
+ * its edges drooping. The crown's season is in the shader (`uSakura`): bare, pink, green, red.
+ */
+function cherryTree(rng) {
+  const g = new THREE.Group();
+  const H = 1.3 + rng() * 0.4;
+  at(cyl(0.2, 0.3, H, CHERRY_BARK, 6, { flat: true }), 0, H / 2, 0, g).rotation.z = (rng() - 0.5) * 0.15;
+  at(cyl(0.34, 0.42, 0.35, CHERRY_BARK, 6, { flat: true }), 0, 0.12, 0, g);
+  const limbs = 4 + Math.floor(rng() * 2);
+  const tips = [];
+  for (let k = 0; k < limbs; k++) {
+    const a = (k / limbs) * Math.PI * 2 + rng() * 0.6;
+    const tilt = 0.75 + rng() * 0.3;
+    const reach = 2.0 + rng() * 0.7;
+    const limb = new THREE.Group();
+    limb.position.set(0, H - 0.15, 0);
+    limb.rotation.set(Math.sin(a) * tilt, 0, -Math.cos(a) * tilt);
+    at(cyl(0.06, 0.13, reach, CHERRY_BARK, 5, { flat: true }), 0, reach / 2, 0, limb);
+    // A twig forking off near the end, out over the edge of the crown.
+    at(cyl(0.03, 0.06, reach * 0.55, CHERRY_BARK, 4), 0.2, reach * 0.95, 0, limb).rotation.z = -0.7;
+    g.add(limb);
+    tips.push([Math.cos(a) * Math.sin(tilt) * reach, H + Math.cos(tilt) * reach, Math.sin(a) * Math.sin(tilt) * reach]);
+  }
+  // The cloud of blossom (or leaves): a broad heap over the middle, a puff over each limb's
+  // end hanging a little lower, so the crown droops at its edges.
+  foliage(g, rng, 0, H + 2.1, 0, 1.7, CHERRY_LEAF, 6, 0.6, CHERRY);
+  for (const [x, y, z] of tips) foliage(g, rng, x * 1.05, y + 0.15, z * 1.05, 1.05 + rng() * 0.3, CHERRY_LEAF, 3, 0.62, CHERRY);
+  for (let k = 0; k < 4; k++) {
+    const a = rng() * Math.PI * 2;
+    const d = 1.0 + rng() * 0.8;
+    foliage(g, rng, Math.cos(a) * d, H + 2.5 + rng() * 0.4, Math.sin(a) * d, 0.9 + rng() * 0.25, CHERRY_LEAF, 2, 0.65, CHERRY);
+  }
+  return g;
+}
+
+/**
+ * The cherry trees' petals, all in one instanced mesh: for each tree, petals that tumble down
+ * out of its crown and petals that lie in a pink ring on the ground under it. What shows of
+ * each, and when, is the shader's (see `PETAL` in style.js).
+ */
+function cherryPetals(scene, rng, trees) {
+  const petal = new THREE.PlaneGeometry(0.34, 0.26);
+  const FALLING = 120;
+  const LYING = 320;
+  const mesh = new THREE.InstancedMesh(petal, paint(0xffffff, { petal: true, doubleSide: true }), trees.length * (FALLING + LYING));
+  const m = new THREE.Matrix4();
+  const flat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+  const turn = new THREE.Quaternion();
+  const p = new THREE.Vector3();
+  const one = new THREE.Vector3(1, 1, 1);
+  const data = new THREE.Color();
+  let n = 0;
+  for (const { x, y, z, s } of trees) {
+    for (let k = 0; k < FALLING; k++) {
+      const a = rng() * Math.PI * 2;
+      const d = Math.sqrt(rng()) * 3.2 * s;
+      p.set(x + Math.cos(a) * d, y + (2.4 + rng() * 1.4) * s, z + Math.sin(a) * d);
+      const drop = Math.max(1, p.y - groundAt(p.x, p.z));
+      mesh.setMatrixAt(n, m.compose(p, turn.identity(), one));
+      // Raw numbers, not a colour: set in the working space so they reach the shader unchanged.
+      mesh.setColorAt(n++, data.setRGB(drop / 20, rng(), 0));
+    }
+    for (let k = 0; k < LYING; k++) {
+      // Thickest under the crown, thinning out beyond, a few blown further.
+      const a = rng() * Math.PI * 2;
+      const d = (0.3 + Math.sqrt(rng()) * 3.4 + (rng() < 0.2 ? rng() * 2.5 : 0)) * s;
+      p.set(x + Math.cos(a) * d, 0, z + Math.sin(a) * d);
+      p.y = groundAt(p.x, p.z) + 0.04;
+      if (p.y < WATER_LEVEL + 0.1) continue;
+      turn.setFromAxisAngle(UP, rng() * Math.PI).multiply(flat);
+      mesh.setMatrixAt(n, m.compose(p, turn, one));
+      mesh.setColorAt(n++, data.setRGB(0, rng(), 1));
+    }
+  }
+  mesh.count = n;
+  mesh.castShadow = false;
+  mesh.receiveShadow = true;
+  mesh.frustumCulled = false;
+  scene.add(mesh);
+}
+
+/** The trees grown before the cherries, which these keep clear of. */
+const TREES = new Set(['stonePine', 'holmOak', 'cypress', 'oliveTree', 'lemonTree', 'almondTree', 'palm']);
+
+/**
+ * Cherry trees along the walks out of the agora, as along a Japanese canal: one every dozen
+ * metres or so on either side, set back from the path wherever the ground is free and no
+ * other tree stands; and a few groves in the meadows. They are planted last, from their own
+ * seed, so the rest of the island grows as it always has.
+ */
+function plantCherries(scene, animated) {
+  const rng = mulberry32(20261007);
+  const standing = [];
+  const m = new THREE.Matrix4();
+  const v = new THREE.Vector3();
+  for (const obj of scene.children) {
+    if (!obj.isInstancedMesh || !TREES.has(obj.userData.plant)) continue;
+    for (let i = 0; i < obj.count; i++) {
+      obj.getMatrixAt(i, m);
+      v.setFromMatrixPosition(m);
+      standing.push([v.x, v.z]);
+    }
+  }
+  const trees = [];
+  const free = (x, z) => standing.every(([sx, sz]) => Math.hypot(x - sx, z - sz) > 3.4) && trees.every((t) => Math.hypot(x - t.x, z - t.z) > 8);
+  for (const [ax, az, bx, bz] of PATHS.slice(0, 5)) {
+    const len = Math.hypot(bx - ax, bz - az);
+    const nx = -(bz - az) / len;
+    const nz = (bx - ax) / len;
+    for (let d = 14 + rng() * 3; d < len - 12; d += 12 + rng() * 3) {
+      for (const side of [-1, 1]) {
+        const off = side * (5.4 + rng() * 0.8);
+        const x = ax + ((bx - ax) * d) / len + nx * off;
+        const z = az + ((bz - az) * d) / len + nz * off;
+        const slope = slopeAt(x, z);
+        if (!isWild(x, z) || slope > 0.45 || !free(x, z)) continue;
+        trees.push({ x, z, y: groundAt(x, z), slope, s: 1.4 + rng() * 0.3, yaw: rng() * Math.PI * 2, variant: Math.floor(rng() * 3) });
+      }
+    }
+  }
+  // And a few groves out in the meadows of the plain, for sitting under in April.
+  const p = new THREE.Vector3();
+  for (let i = 0, grove = 0; i < 6000 && grove < 26; i++) {
+    anywhere(rng, p);
+    if (region(p.x, p.z) !== 'plain' || fbm(p.x * 0.03 + 50, p.z * 0.03 - 20, 2) < 0.56) continue;
+    const slope = slopeAt(p.x, p.z);
+    if (!isWild(p.x, p.z, 1) || slope > 0.4 || !free(p.x, p.z)) continue;
+    trees.push({ x: p.x, z: p.z, y: p.y, slope, s: 1.3 + rng() * 0.4, yaw: rng() * Math.PI * 2, variant: Math.floor(rng() * 3) });
+    grove++;
+  }
+  const placements = [[], [], []];
+  const q = new THREE.Quaternion();
+  for (const t of trees) {
+    q.setFromAxisAngle(UP, t.yaw);
+    placements[t.variant].push(new THREE.Matrix4().compose(new THREE.Vector3(t.x, t.y - 0.1 - t.slope * 0.7, t.z), q, new THREE.Vector3(t.s, t.s, t.s)));
+  }
+  instance(scene, cherryTree, placements.map(() => prototype(cherryTree(rng))), placements);
+  cherryPetals(scene, rng, trees);
+  // A crown the shader has emptied for the winter must not go on shading the ground.
+  const crowns = scene.children.filter((obj) => obj.userData.plant === 'cherryTree' && 'CHERRY' in obj.material.defines);
+  animated.push(() => {
+    const { x: blossom, w: leaves } = GLOBALS.uSakura.value;
+    const full = Math.max(blossom, leaves) > 0.4;
+    for (const crown of crowns) crown.castShadow = full;
+  });
 }
 
 /** Date palm of the Riviera sea fronts: a rough leaning stem and a fountain of arching fronds. */
@@ -352,6 +505,11 @@ function grow(scene, rng, build, { count, variants = 3, margin = 0, maxSlope = 0
     placements[Math.floor(rng() * variants)].push(new THREE.Matrix4().compose(p, q, s));
     n++;
   }
+  instance(scene, build, protos, placements);
+}
+
+/** Instances baked variants of a species, one list of placements for each variant. */
+function instance(scene, build, protos, placements) {
   protos.forEach((meshes, v) => {
     const list = placements[v];
     if (!list.length) return;
@@ -365,7 +523,7 @@ function grow(scene, rng, build, { count, variants = 3, margin = 0, maxSlope = 0
   });
 }
 
-export function buildNature(scene, rng) {
+export function buildNature(scene, rng, animated) {
   const on = (...regions) => (x, z) => regions.includes(region(x, z));
   buildBeach(scene, rng);
 
@@ -495,4 +653,6 @@ export function buildNature(scene, rng) {
     }
   }
   scene.add(bake(lamps));
+
+  plantCherries(scene, animated);
 }
