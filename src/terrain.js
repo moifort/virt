@@ -511,16 +511,26 @@ function landAt(x, z) {
   // each stair an even ramp, with a short shoulder up or down to the natural ground on either
   // side; the squares are levelled whole. Off the quay the bed is dug out so the water laps
   // at its wall.
+  // Where two cuts overlap, the one the point lies closest in wins: a stair leaving a square
+  // keeps its treads instead of being levelled away by the square's skirt.
   const streets = villagePlan();
   if (streets) {
+    const cuts = [];
+    for (const pz of streets.piazzas) {
+      const w = smoothstep(pz.r + 3, pz.r + 0.5, Math.hypot(x - pz.x, z - pz.z));
+      if (w > 0) cuts.push([pz.level, w]);
+    }
+    let dredge = Infinity;
     for (const lane of streets.lanes) {
       const near = laneAt(lane, x, z);
       const sea = lane.quay && near.side === lane.seaSide;
       const flat = lane.half + (sea ? lane.quay : 0);
-      if (near.d < flat + 1.5) h += (near.level - h) * smoothstep(flat + 1.5, flat + 0.4, near.d);
-      if (sea && near.d > flat + 0.2 && near.d < flat + 9) h = Math.min(h, near.level + (WATER_LEVEL - 1.6 - near.level) * smoothstep(flat + 0.2, flat + 1.4, near.d));
+      if (near.d < flat + 1.5) cuts.push([near.level, smoothstep(flat + 1.5, flat + 0.4, near.d)]);
+      if (sea && near.d > flat + 0.2 && near.d < flat + 9) dredge = Math.min(dredge, near.level + (WATER_LEVEL - 1.6 - near.level) * smoothstep(flat + 0.2, flat + 1.4, near.d));
     }
-    for (const pz of streets.piazzas) h += (pz.level - h) * smoothstep(pz.r + 3, pz.r + 0.5, Math.hypot(x - pz.x, z - pz.z));
+    cuts.sort((a, b) => a[1] - b[1]);
+    for (const [level, w] of cuts) h += (level - h) * w;
+    h = Math.min(h, dredge);
   }
   // Work areas sit on level pads.
   for (const zn of ZONES) if (zn.id !== 'port') h += (0 - h) * smoothstep(zn.r + 7, zn.r + 1, Math.hypot(x - zn.x, z - zn.z));
