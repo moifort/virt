@@ -10,7 +10,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { fbm, mulberry32, pick } from './noise.js';
 import { GLOBALS, PAL, WATER_LEVEL, paint, solid } from './style.js';
 import { at, bake, ball, box, cone, cyl, lantern } from './kit.js';
-import { PATHS, SPUR_END, UP, ZONES, anywhere, coastU, cultivated, footU, groundAt, isWild, occupy, railPoint, scatterInstanced, slopeAt, toU, toV, toX, toZ } from './terrain.js';
+import { PATHS, SPUR_END, UP, ZONES, anywhere, coastU, cultivated, footU, groundAt, isWild, occupy, railPoint, scatterInstanced, segmentDistance, slopeAt, toU, toV, toX, toZ, villagePlan } from './terrain.js';
 
 const BARK = 0x7d5a48;
 const DARK_BARK = 0x5e463c;
@@ -617,13 +617,16 @@ export function buildNature(scene, rng, animated) {
 
   // Rocks standing in the shallows, with the swell breaking white around them.
   const port = ZONES.find((zn) => zn.id === 'port');
+  const quays = villagePlan().lanes.filter((lane) => lane.quay).flatMap((lane) => lane.segs.map(({ a, b }) => [a.x, a.z, b.x, b.z]));
   scatterInstanced(scene, rng, new THREE.DodecahedronGeometry(1, 0), paint(0xffffff, { flat: true }), 170, (r, p, s, c) => {
     anywhere(r, p);
     const u = toU(p.x, p.z);
     const v = toV(p.x, p.z);
-    // In the shallows off the rocky shores and the coves; the bay beach and the harbour stay clear.
+    // In the shallows off the rocky shores and the coves; the bay beach and the harbour stay
+    // clear, and so does the basin off the village quay, where the boats are moored.
     if (p.y > WATER_LEVEL - 0.3 || p.y < WATER_LEVEL - 2.6 || (v > -32 && v < 52 && u < 0)) return false;
     if (Math.hypot(p.x - port.x, p.z - port.z) < port.r + 10) return false;
+    if (quays.some((seg) => segmentDistance(p.x, p.z, seg) < 32)) return false;
     s.set(0.5 + r() * 1.3, 0.6 + r() * 1.1, 0.5 + r() * 1.3);
     p.y = WATER_LEVEL - 0.3;
     c.setHex(pick(r, [0x8f8678, 0x9d9484, 0x7f7a70]));
