@@ -179,7 +179,29 @@ function house(parts, rng, w, d, floors, { plinth = 0, terrace = false, door = 0
   parts.shutter = pick(rng, SHUTTER);
   parts.add('box', 0, H / 2, 0, w, H, d, wall);
   parts.add('box', 0, 0.6, 0, w + 0.12, 1.2, d + 0.12, STONE);
-  if (plinth > 0.15) parts.add('box', 0, 0.02 - plinth / 2, 0, w + 0.16, plinth + 0.04, d + 0.16, pick(rng, PLINTH));
+  // Where the ground falls away a storey or more below the street, the house goes on down the
+  // slope: the floors under the street are lived in too, with windows wherever they stand
+  // clear of the ground, over a stone footing. A shallower drop is only the footing.
+  const below = Math.floor((plinth - 0.5) / 1.7);
+  if (below >= 1) {
+    parts.add('box', 0, -plinth / 2, 0, w, plinth, d, wall);
+    parts.add('box', 0, 0.52 - plinth, 0, w + 0.16, 1.04, d + 0.16, pick(rng, PLINTH));
+    for (let f = 1; f <= below; f++) {
+      parts.add('box', 0, 0.06 - f * 1.7, 0, w + 0.1, 0.12, d + 0.1, parts.trim);
+      const y = 0.85 - f * 1.7;
+      for (const face of [0, 1, 2, 3]) {
+        const span = face === 0 || face === 3 ? w : d;
+        const n = Math.max(1, Math.floor(span / 1.35));
+        for (let k = 0; k < n; k++) {
+          const across = -span / 2 + (span * (k + 0.5)) / n;
+          const [x, z] = [[across, d / 2 + 0.3], [w / 2 + 0.3, -across], [-w / 2 - 0.3, across], [-across, -d / 2 - 0.3]][face];
+          const sill = parts.world(x, y - 0.6, z);
+          if (groundAt(sill.x, sill.z) > sill.y || rng() < 0.15) continue;
+          windowOn(parts, rng, face, w, d, across, y);
+        }
+      }
+    }
+  } else if (plinth > 0.15) parts.add('box', 0, 0.02 - plinth / 2, 0, w + 0.16, plinth + 0.04, d + 0.16, pick(rng, PLINTH));
   for (let f = 1; f < floors; f++) parts.add('box', 0, 1.2 + f * 1.7 - 0.1, 0, w + 0.1, 0.12, d + 0.1, parts.trim);
   parts.add('box', 0, H + 0.09, 0, w + 0.26, 0.18, d + 0.26, parts.trim);
 
@@ -200,7 +222,7 @@ function house(parts, rng, w, d, floors, { plinth = 0, terrace = false, door = 0
   for (let f = 0; f < floors; f++) {
     const y = 1.2 + f * 1.7 + 0.75;
     for (const face of [0, 1, 2, 3]) {
-      const span = face === 0 ? w : d;
+      const span = face === 0 || face === 3 ? w : d;
       const n = Math.max(1, Math.floor(span / 1.35));
       for (let k = 0; k < n; k++) {
         const across = -span / 2 + (span * (k + 0.5)) / n;
