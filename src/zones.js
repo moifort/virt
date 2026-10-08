@@ -948,6 +948,10 @@ export function buildPort(g, rng, animated) {
   // across it, local x runs along it (toward the plain).
   const front = villagePlan().lanes.find((l) => l.quay);
   const along = lanePoint(front, laneAt(front, g.position.x, g.position.z).s);
+  // Everything is measured from the axis of the quay's lane: the frame is set on it, or the
+  // stalls, the cats and the steps down to the piers stand out past the edge, in the air.
+  g.position.x = along.x;
+  g.position.z = along.z;
   const sea = front.seaSide;
   g.rotation.y = Math.atan2(-along.tz * sea, along.tx * sea);
   const surface = WATER_LEVEL;
@@ -959,10 +963,20 @@ export function buildPort(g, rng, animated) {
   const DECK = surface + 0.5;
   // Everything from the quay out is built on the low deck.
   const deck = at(new THREE.Group(), 0, DECK - 0.12, 0, g);
-  // Stone steps down from the quay onto each pier.
+  // The quay is not quite straight: where its edge stands, out across the frame, at each
+  // point along it. Whatever stands on it or leaves from it follows that line.
+  const turn = g.rotation.y;
+  const edgeAt = (x) => {
+    const p = lanePoint(front, laneAt(front, g.position.x + x * Math.cos(turn), g.position.z - x * Math.sin(turn)).s);
+    const dx = p.x - p.tz * sea * Q - g.position.x;
+    const dz = p.z + p.tx * sea * Q - g.position.z;
+    return dx * Math.sin(turn) + dz * Math.cos(turn);
+  };
+  // Stone steps down from the edge of the quay onto each pier.
   const steps = (x, width) => {
     const n = Math.ceil((quayTop - DECK - 0.2) / 0.3);
-    for (let k = 0; k < n; k++) at(box(width, 0.3, 0.62, k % 2 ? 0xd8cdb7 : 0xcdc2ab), x, quayTop - 0.15 - k * 0.3, Q + 0.31 + k * 0.62, g);
+    const z0 = edgeAt(x);
+    for (let k = 0; k < n; k++) at(box(width, 0.3, 0.62, k % 2 ? 0xd8cdb7 : 0xcdc2ab), x, quayTop - 0.15 - k * 0.3, z0 + 0.31 + k * 0.62, g);
   };
 
   // A straight wooden jetty at the plain end of the quay, the pontoon farthest from the mole.
@@ -985,13 +999,13 @@ export function buildPort(g, rng, animated) {
     plane.rotation.z = Math.sin(t * 0.8) * 0.03;
     prop.rotation.z += dt * 3;
   });
-  for (let z = Q + 0.4; z < Q + 21; z += 0.62) plank(JETTY, z + 0.31, 0, 3);
-  for (let z = Q + 1.2; z < Q + 21; z += 3) for (const dx of [-1.4, 1.4]) pile(JETTY + dx, z);
+  for (let z = edgeAt(JETTY) + 0.4; z < Q + 21; z += 0.62) plank(JETTY, z + 0.31, 0, 3);
+  for (let z = edgeAt(JETTY) + 1.2; z < Q + 21; z += 3) for (const dx of [-1.4, 1.4]) pile(JETTY + dx, z);
   lantern(deck, JETTY + 1, 0.13, Q + 20.4, { toward: [JETTY, Q + 20.4] });
   steps(JETTY, 3);
   // Two wooden piers.
   for (const px of [-8, 6]) {
-    for (let i = 0; i < 30; i++) at(box(2.6, 0.16, 0.56, PAL.wood), px, 0.05, Q + 0.4 + i * 0.62, deck);
+    for (let i = 0; i < 30; i++) at(box(2.6, 0.16, 0.56, PAL.wood), px, 0.05, edgeAt(px) + 0.4 + i * 0.62, deck);
     for (let z = Q + 1; z < Q + 19; z += 2.8) for (const dx of [-1.2, 1.2]) at(cyl(0.13, 0.13, 3.6, DARK_WOOD, 6), px + dx, -1.7, z, deck);
     lantern(deck, px + 1.1, 0.13, Q + 18.6, { toward: [px, Q + 18.6] });
     steps(px, 2.6);
@@ -1107,11 +1121,12 @@ export function buildPort(g, rng, animated) {
   // A slipway beside the jetty, where the boats are hauled up out of the water on rollers.
   const SLIP = 13;
   const lean = 0.2;
-  const rampAt = (z) => quayTop - (DECK - 0.12) - Math.tan(lean) * (z - Q);
-  const slip = at(box(4.6, 0.5, 10, 0xd3c7b0), SLIP, rampAt(Q + 5) - 0.25, Q + 5, deck);
+  const slipTop = edgeAt(SLIP);
+  const rampAt = (z) => quayTop - (DECK - 0.12) - Math.tan(lean) * (z - slipTop);
+  const slip = at(box(4.6, 0.5, 10, 0xd3c7b0), SLIP, rampAt(slipTop + 5) - 0.25, slipTop + 5, deck);
   slip.rotation.x = lean;
-  for (const sx of [-1, 1]) at(box(0.3, 0.7, 10, BLOCK[1]), SLIP + sx * 2.45, rampAt(Q + 5) - 0.1, Q + 5, deck).rotation.x = lean;
-  for (const [dx, z] of [[-1.15, Q + 1.8], [1.15, Q + 3.1], [-0.2, Q + 6.6]]) {
+  for (const sx of [-1, 1]) at(box(0.3, 0.7, 10, BLOCK[1]), SLIP + sx * 2.45, rampAt(slipTop + 5) - 0.1, slipTop + 5, deck).rotation.x = lean;
+  for (const [dx, z] of [[-1.15, slipTop + 1.8], [1.15, slipTop + 3.1], [-0.2, slipTop + 6.6]]) {
     for (const dz of [-1.2, 1.2]) at(cyl(0.1, 0.1, 1.9, DARK_WOOD, 6), SLIP + dx, rampAt(z + dz) + 0.1, z + dz, deck).rotation.z = Math.PI / 2;
     const boat = at(gozzo(rng), SLIP + dx, rampAt(z) + 0.2, z, deck);
     boat.rotation.x = lean;
@@ -1133,7 +1148,9 @@ export function buildPort(g, rng, animated) {
   const quay = at(new THREE.Group(), 0, quayTop - 0.1, Q - 1.1, g);
   for (const x of [-13, 10.5]) fishStall(quay, rng, x, 0, 0);
   furnishPort(quay, g, rng, Q);
-  harbourCats(quay, deck, rng, animated, Q);
+  const inset = (x) => edgeAt(x) - Q;
+  for (const thing of quay.children) thing.position.z += inset(thing.position.x);
+  harbourCats(quay, deck, rng, animated, Q, inset);
 }
 
 export function buildAgora(g, rng) {
@@ -1370,23 +1387,24 @@ export function harbourCat(rng, animated, pose = 'sit') {
 }
 
 /** The cats of the harbour: begging at the fish stalls, dozing in the sun, patrolling the planks. */
-function harbourCats(quay, deck, rng, animated, Q) {
+function harbourCats(quay, deck, rng, animated, Q, inset) {
   const put = (parent, pose, x, y, z, yaw) => {
     const cat = at(harbourCat(rng, animated, pose), x, y, z, parent);
     cat.rotation.y = yaw;
     return cat;
   };
   // Waiting for scraps by the fishmongers.
-  put(quay, 'sit', -11.4, 0.1, -0.2, Math.PI + 0.5);
-  put(quay, 'sit', -8.8, 0.1, -0.4, Math.PI - 0.4);
-  put(quay, 'sit', 8.4, 0.1, -0.3, Math.PI + 0.3);
-  put(quay, 'sit', 12.6, 0.1, -0.1, Math.PI - 0.5);
+  // (Those on the quay keep to its edge as it curves: `inset`.)
+  put(quay, 'sit', -11.4, 0.1, -0.2 + inset(-11.4), Math.PI + 0.5);
+  put(quay, 'sit', -8.8, 0.1, -0.4 + inset(-8.8), Math.PI - 0.4);
+  put(quay, 'sit', 8.4, 0.1, -0.3 + inset(8.4), Math.PI + 0.3);
+  put(quay, 'sit', 12.6, 0.1, -0.1 + inset(12.6), Math.PI - 0.5);
   // Watching the water from the end of a pier, and from the jetty.
   put(deck, 'sit', -8.4, 0.13, Q + 18.4, 0.2);
   put(deck, 'sit', 19.6, 0.12, Q + 19.6, -0.3);
   // Asleep in the last of the sun.
-  put(quay, 'sleep', 15.2, 0.1, 0.4, 0.8);
-  put(quay, 'sleep', -4.8, 0.1, 0.5, 2.2);
+  put(quay, 'sleep', 15.2, 0.1, 0.4 + inset(15.2), 0.8);
+  put(quay, 'sleep', -4.8, 0.1, 0.5 + inset(-4.8), 2.2);
   put(deck, 'sleep', 6.6, 0.13, Q + 9, -0.6);
   // On patrol: back and forth along the quay and a pier, pausing at each end.
   for (const [parent, ax, az, bx, bz, y, speed] of [[quay, -18, 0.3, 18, 0.3, 0.1, 1.1], [deck, 6.4, Q + 2, 6.4, Q + 17, 0.13, 0.9]]) {
@@ -1401,7 +1419,8 @@ function harbourCats(quay, deck, rng, animated, Q) {
       const local = back ? clock - travel - rest : clock;
       const k = Math.min(1, local / travel);
       const p = back ? 1 - k : k;
-      cat.position.set(ax + (bx - ax) * p, y, az + (bz - az) * p);
+      const x = ax + (bx - ax) * p;
+      cat.position.set(x, y, az + (bz - az) * p + (parent === quay ? inset(x) : 0));
       cat.rotation.y = Math.atan2(bx - ax, bz - az) + (back ? Math.PI : 0);
       cat.userData.moving = k < 1;
     });
