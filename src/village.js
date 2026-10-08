@@ -33,6 +33,7 @@ const KINDS = {
   leaf: { shape: ballShape, paint: { leaf: true } },
   vine: { shape: ballShape, paint: { leaf: true, deciduous: true } },
   lamp: { shape: ballShape, paint: { glow: true } },
+  drystone: { shape: boxShape, paint: { stones: true } },
   flow: { shape: boxShape, paint: { flow: true }, shadow: false },
 };
 
@@ -51,6 +52,8 @@ const PAVING = [0xbfb4a0, 0xb4a995, 0xc9bea9, 0xaba08c];
 const PLINTH = [0xc4b59c, 0xb9aa92, 0xcdbfa6];
 const WALL_STONE = 0xc9bca4;
 const BLOCK = [0xcdc2ab, 0xbcb09c, 0xd8cdb7];
+// The terrace walls of the gardens, the same sandstone gone grey with weather and lichen.
+const DRYSTONE = [0xb9ad97, 0xb0a48e, 0xc2b7a0, 0xaa9f8b];
 // How much water a spout or a dripping eave carries, as the red of its instance colour.
 const POURING = 0xffffff;
 const DRIPPING = 0x8c8c8c;
@@ -532,7 +535,7 @@ function paveLane(parts, rng, lane, piazzas) {
  * them. If the way up runs into a wall of rock or out over a drop, the alley is left without
  * steps rather than given a stair that leads nowhere.
  */
-function alleySteps(parts, rng, lane, s, side, width) {
+function alleySteps(parts, rng, lane, s, side, width, placed) {
   const p = lanePoint(lane, s);
   const nx = -p.tz * side;
   const nz = p.tx * side;
@@ -552,10 +555,13 @@ function alleySteps(parts, rng, lane, s, side, width) {
     parts.at(new THREE.Vector3(x, 0, z), Math.atan2(nx, nz), 1);
     parts.add('box', 0, (top + below - 0.2) / 2, 0, width, top - below + 0.2, TREAD + 0.05, pick(rng, PAVING));
   }
+  const run = (treads.length * TREAD) / 2;
+  const mid = lane.half + 0.4 + run;
+  placed.push(footprint(p.x + nx * mid, p.z + nz * mid, Math.atan2(nx, nz), width / 2 + 0.2, run + 0.3));
 }
 
 /** A little walled garden in a gap of the row: a lemon tree and some shrubs behind a low wall. */
-function garden(parts, rng, lane, s, side, width) {
+function garden(parts, rng, lane, s, side, width, placed) {
   const p = lanePoint(lane, s);
   const nx = -p.tz * side;
   const nz = p.tx * side;
@@ -574,6 +580,8 @@ function garden(parts, rng, lane, s, side, width) {
     parts.at(new THREE.Vector3(x, groundAt(x, z), z), 0, 1);
     parts.add('leaf', 0, 0.5, 0, 1.0 + rng() * 0.5, 0.9, 1.0 + rng() * 0.5, pick(rng, [0x5a9050, 0x4f8456, 0x74a862]));
   }
+  const mid = lane.half + 2.2;
+  placed.push(footprint(p.x + nx * mid, p.z + nz * mid, Math.atan2(nx, nz), width / 2, 2.1));
 }
 
 /**
@@ -648,8 +656,8 @@ function houseRows(parts, rng, lane, lanes, piazzas, placed, village, SCALE) {
       placed.push(site.foot);
       const g = gap(rng);
       covered[side].push([s - 0.3, s + len + (g < 1.2 ? g : 0) + 0.3]);
-      if (uphill && g >= 1.4 && g < 3) alleySteps(parts, rng, lane, s + len + g / 2, side, g - 0.5);
-      else if (uphill && g >= 3) garden(parts, rng, lane, s + len + g / 2, side, g - 0.6);
+      if (uphill && g >= 1.4 && g < 3) alleySteps(parts, rng, lane, s + len + g / 2, side, g - 0.5, placed);
+      else if (uphill && g >= 3) garden(parts, rng, lane, s + len + g / 2, side, g - 0.6, placed);
       s += len + g;
     }
   }
@@ -860,6 +868,158 @@ function outliers(parts, rng, village, lanes, piazzas, placed, SCALE, count) {
   }
 }
 
+// What a terrace is planted with, and how likely: a kitchen garden, a patch of meadow, a few
+// rows of vines, lemon trees.
+const PLOTS = [['orto', 0.4], ['prato', 0.25], ['vigna', 0.2], ['limoni', 0.15]];
+const PLOT_GROUND = { orto: [0x8a6a4c, 0x7e5f44], prato: [0x86b060, 0x7aa85a], vigna: [0x93a862, 0x8a9c5c], limoni: [0x7f9e58, 0x86a45e] };
+const GREENS = [0x5f9a4c, 0x76a856, 0x4f8a48, 0x8ab85e];
+
+/**
+ * The hillside between the lanes, wherever no house, stair or square stands, is worked as it
+ * is above every Ligurian harbour: narrow terraces held up by dry-stone walls, each with its
+ * kitchen garden, its few vines or lemon trees or its patch of meadow. They are laid on a grid
+ * along the shore, each cell raised to the next course above the ground it covers, so cells
+ * at the same height run together into one shelf and a wall stands wherever the shelf steps
+ * down. They are gardens, not ways: nobody walks over them.
+ */
+function orti(parts, rng, village, lanes, piazzas, placed) {
+  const C = 1.25;
+  const STEP = 1.8;
+  const YAW = Math.PI / 4; // local x runs along the shore (v), local -z up the hill (u)
+  const up = village.up ?? 1;
+  const reach = village.r + 4;
+  // How far (x, z) lies outside the paving of the nearest lane, and that lane's level there.
+  const street = (x, z) => {
+    let best = { d: Infinity, level: 0 };
+    for (const lane of lanes) {
+      const q = laneAt(lane, x, z);
+      const d = q.d - lane.half - (lane.quay && q.side === lane.seaSide ? lane.quay : 0);
+      if (d < best.d) best = { d, level: q.level };
+    }
+    return best;
+  };
+  const cells = new Map();
+  for (let i = -Math.ceil((reach * up) / C); i <= Math.ceil((reach * up) / C); i++) {
+    for (let j = -Math.ceil(reach / C); j <= Math.ceil(reach / C); j++) {
+      const u = village.u + i * C;
+      const v = village.v + j * C;
+      if (Math.hypot((u - village.u) / up, v - village.v) > reach) continue;
+      const x = toX(u, v);
+      const z = toZ(u, v);
+      const foot = footprint(x, z, YAW, C / 2, C / 2);
+      if (placed.some((f) => Math.abs(f.x - x) < 9 && Math.abs(f.z - z) < 9 && overlap(foot, f, 0.05))) continue;
+      let lo = Infinity;
+      let hi = -Infinity;
+      let lane = { d: Infinity };
+      let free = true;
+      for (const [a, b] of [[0, 0], [-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        const p = { x: toX(u + (a * C) / 2, v + (b * C) / 2), z: toZ(u + (a * C) / 2, v + (b * C) / 2) };
+        const g = groundAt(p.x, p.z);
+        const near = street(p.x, p.z);
+        if (!inSquare(p.x, p.z, 3) || g < WATER_LEVEL + 1.2 || near.d < 0.3) free = false;
+        else if (ZONES.some((zn) => Math.hypot(p.x - zn.x, p.z - zn.z) < zn.r + 3)) free = false;
+        else if (PATHS.some((path) => segmentDistance(p.x, p.z, path) < 2.2)) free = false;
+        else if (piazzas.some((pz) => Math.hypot(p.x - pz.x, p.z - pz.z) < pz.r + 0.3)) free = false;
+        else if (CLEARINGS.some((c) => Math.hypot(p.x - c.x, p.z - c.z) < c.r)) free = false;
+        if (!free) break;
+        if (near.d < lane.d) lane = near;
+        lo = Math.min(lo, g);
+        hi = Math.max(hi, g);
+      }
+      // Only the slopes in among the lanes: beyond, the hillside is the vineyards' and the wild's.
+      if (!free || lane.d > 11) continue;
+      let top = Math.ceil((hi + 0.15) / STEP) * STEP;
+      // Just under a lane the garden comes up no higher than a parapet beside it.
+      if (lane.d < 2.5 && top > lane.level + 0.5) top = Math.max(hi + 0.1, lane.level + 0.5);
+      cells.set(`${i},${j}`, { i, j, x, z, top, lo });
+    }
+  }
+  // A cell or two caught alone between the houses would stand up as a pillar: a garden
+  // takes a few cells together or none.
+  const seen = new Set();
+  for (const start of [...cells.keys()]) {
+    if (seen.has(start)) continue;
+    const group = [start];
+    seen.add(start);
+    for (let k = 0; k < group.length; k++) {
+      const { i, j } = cells.get(group[k]);
+      for (const key of [`${i + 1},${j}`, `${i - 1},${j}`, `${i},${j + 1}`, `${i},${j - 1}`]) {
+        if (cells.has(key) && !seen.has(key)) {
+          seen.add(key);
+          group.push(key);
+        }
+      }
+    }
+    if (group.length < 4) for (const key of group) cells.delete(key);
+  }
+
+  const plots = new Map();
+  const plotOf = (i, j) => {
+    const key = `${Math.floor(i / 3)},${Math.floor((j + (Math.floor(i / 3) % 2) * 2) / 4)}`;
+    if (!plots.has(key)) {
+      let r = rng();
+      const kind = PLOTS.find(([, p]) => (r -= p) < 0)?.[0] ?? 'prato';
+      plots.set(key, { kind, ground: pick(rng, PLOT_GROUND[kind]) });
+    }
+    return plots.get(key);
+  };
+  // Each edge of a cell: the neighbour across it, where the edge lies, and the strip along it.
+  const EDGES = [
+    [1, 0, 0, -C / 2, C, 0.24],
+    [-1, 0, 0, C / 2, C, 0.24],
+    [0, 1, C / 2, 0, 0.24, C],
+    [0, -1, -C / 2, 0, 0.24, C],
+  ];
+  for (const c of cells.values()) {
+    const { i, j, top } = c;
+    const bottom = c.lo - 0.5;
+    const plot = plotOf(i, j);
+    parts.at(new THREE.Vector3(c.x, 0, c.z), YAW, 1);
+    parts.add('drystone', 0, (top + bottom) / 2, 0, C + 0.02, top - bottom, C + 0.02, pick(rng, DRYSTONE));
+    parts.add('box', 0, top + 0.03, 0, C + 0.02, 0.06, C + 0.02, plot.ground);
+    occupy(c.x, c.z, YAW, C / 2, C / 2, top);
+    // Where the shelf steps down, a coping of flat stones along the top of the wall, capers
+    // and ivy spilling over it.
+    for (const [di, dj, ex, ez, sx, sz] of EDGES) {
+      const next = cells.get(`${i + di},${j + dj}`);
+      if (next && next.top > top - 0.3) continue;
+      parts.add('box', ex, top + 0.07, ez, sx, 0.1, sz, 0xd3c8b2);
+      if (rng() < 0.22) {
+        const along = (rng() - 0.5) * (C - 0.4);
+        parts.add('leaf', ex + (sx > sz ? along : 0), top - 0.25, ez + (sx > sz ? 0 : along), 0.55, 0.7, 0.55, pick(rng, [0x4f8a52, 0x5f9a58, 0x46784c]));
+      }
+    }
+    // What grows on the shelf.
+    const y = top + 0.06;
+    if (plot.kind === 'orto') {
+      for (const rz of [-0.3, 0.3]) {
+        if (rng() < 0.2) {
+          // Tomatoes tied up to canes.
+          for (const rx of [-0.4, 0, 0.4]) {
+            parts.add('cyl', rx, y + 0.45, rz, 0.04, 0.9, 0.04, WOOD);
+            parts.add('leaf', rx, y + 0.5, rz, 0.3, 0.7, 0.3, 0x5a9050);
+            parts.add('ball', rx + 0.08, y + 0.45, rz + 0.08, 0.12, 0.12, 0.12, 0xd9483a);
+          }
+        } else {
+          const green = pick(rng, GREENS);
+          for (const rx of [-0.4, 0, 0.4]) parts.add('leaf', rx, y + 0.12, rz, 0.34, 0.26, 0.3, green);
+        }
+      }
+    } else if (plot.kind === 'prato') {
+      if (rng() < 0.35) parts.add('ball', (rng() - 0.5) * 0.8, y + 0.08, (rng() - 0.5) * 0.8, 0.22, 0.14, 0.22, pick(rng, [0xfbf6e4, 0xf6d24a, 0xa890d8]));
+      if (rng() < 0.12) parts.add('leaf', (rng() - 0.5) * 0.5, y + 0.4, (rng() - 0.5) * 0.5, 0.9, 0.8, 0.9, pick(rng, [0x5a9050, 0x4f8456]));
+    } else if (plot.kind === 'vigna') {
+      parts.add('vine', 0, y + 0.55, 0, C, 0.95, 0.5, pick(rng, [0x6a9e5e, 0x66a070, 0x82b06a]));
+      if ((i + j) % 2 === 0) parts.add('cyl', C / 2 - 0.05, y + 0.6, 0, 0.06, 1.2, 0.06, WOOD);
+      if (rng() < 0.3) parts.add('ball', (rng() - 0.5) * 0.8, y + 0.4, 0.28, 0.14, 0.14, 0.14, 0x6d4a8f);
+    } else if ((i * 7 + j * 3) % 5 === 0) {
+      lemonTree(parts, rng, c.x, y - 0.2, c.z);
+    } else if (rng() < 0.5) {
+      parts.add('leaf', 0, y + 0.35, 0, 0.8, 0.7, 0.8, pick(rng, [0x357a44, 0x4f9a50]));
+    }
+  }
+}
+
 /**
  * Wood smoke from the chimneys: a few puffs rising, swelling and thinning on the wind. Fires
  * are lit when it is cold, and for supper every evening.
@@ -919,6 +1079,8 @@ export function buildVillages(scene, rng, animated) {
     }
     for (const pz of squares) buildPiazza(parts, rng, pz, furniture, SCALE);
     outliers(parts, rng, village, streets, squares, placed, SCALE, village.r > 20 ? 70 : 6);
+    // The hamlet on the headland keeps its hillside as it is.
+    if (village.waterfront) orti(parts, rng, village, streets, squares, placed);
   }
 
   // Vineyards: rows of vines on posts, following the terraces.

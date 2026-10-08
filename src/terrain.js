@@ -779,6 +779,8 @@ export function buildTerrain() {
   const geo = new THREE.PlaneGeometry(1, 1, nv, nu);
   const pos = geo.attributes.position;
   const worked = new Float32Array(pos.count);
+  const village = new Float32Array(pos.count);
+  const main = VILLAGES[0];
   for (let iu = 0; iu <= nu; iu++) {
     for (let iv = 0; iv <= nv; iv++) {
       const i = iu * (nv + 1) + iv;
@@ -786,10 +788,12 @@ export function buildTerrain() {
       const z = toZ(u0 + iu, v0 + iv);
       pos.setXYZ(i, x, groundAt(x, z), z);
       worked[i] = cultivated(u0 + iu, v0 + iv);
+      village[i] = smoothstep(main.r + 6, main.r + 2, Math.hypot((u0 + iu - main.u) / main.up, v0 + iv - main.v));
     }
   }
-  // Tells the built terrace walls from the living rock.
+  // Tells the built terrace walls from the living rock, and the walls of the village streets.
   geo.setAttribute('aTerrace', new THREE.BufferAttribute(worked, 1));
+  geo.setAttribute('aVillage', new THREE.BufferAttribute(village, 1));
   const group = new THREE.Group();
   group.add(groundMesh(geo), buildPortalRock());
   return group;
@@ -838,6 +842,7 @@ function buildPortalRock() {
     }
   }
   geo.setAttribute('aTerrace', new THREE.BufferAttribute(new Float32Array(pos.count), 1));
+  geo.setAttribute('aVillage', new THREE.BufferAttribute(new Float32Array(pos.count), 1));
   return groundMesh(geo);
 }
 const FAR = 2400;

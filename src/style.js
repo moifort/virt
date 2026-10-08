@@ -112,7 +112,9 @@ varying float vTree;
 #endif
 #ifdef TERRAIN
   attribute float aTerrace;
+  attribute float aVillage;
   varying float vTerrace;
+  varying float vVillage;
 #endif
 float pxVHash(vec2 p) {
   vec3 p3 = fract(vec3(p.xyx) * 0.1031);
@@ -197,6 +199,7 @@ vWorld = (modelMatrix * pxW).xyz;
 #endif
 #ifdef TERRAIN
   vTerrace = aTerrace;
+  vVillage = aVillage;
 #endif
 `;
 
@@ -264,6 +267,8 @@ float pxGroundAt(vec2 xz) {
 
 #ifdef TERRAIN
 varying float vTerrace;
+// 1 in among the lanes of the main village.
+varying float vVillage;
 // Dry-stone terrace walls and cliffs: weathered Ligurian sandstone, grey to warm ochre.
 const vec3 STRATA[6] = vec3[6](${[0xcbbfa8, 0xb7ab98, 0xd8ccb4, 0xc0b29a, 0xa99f90, 0xcdbca2].map(lin).join(', ')});
 // 1 inside a puddle.
@@ -302,6 +307,18 @@ vec3 terrainColor(vec3 w, vec3 n) {
     if (slope < 0.8 && pxFbm(face * vec2(0.17, 0.26) + 13.0) > 0.57) cliff = fine > 0.6 ? ${lin(0x7aa05c)} : fine > 0.25 ? ${lin(0x55865a)} : ${lin(0x8fb468)};
   }
   if (fine > 0.9) cliff *= 0.88;
+  // In the village every bank is a wall built of stones, its joints dark between them.
+  if (vVillage > 0.5 && vTerrace > 0.5) {
+    float joints = (w.y + wobble) / 0.55;
+    vec2 across = normalize(n.xz + vec2(1e-4));
+    float stone = dot(w.xz, vec2(-across.y, across.x)) / 0.7 + pxHash(vec2(floor(joints), 3.0)) * 3.0;
+    cliff *= 0.86 + pxHash(vec2(floor(joints), floor(stone))) * 0.26;
+    if (fract(joints) < 0.18 || fract(stone) < 0.12) cliff *= 0.7;
+    // Capers and wall pennywort take root in the joints, in clumps.
+    float clump = pxNoise(vec2(dot(w.xz, vec2(-across.y, across.x)), w.y) * 0.85 + 70.0);
+    if (clump > 0.74) cliff = fine > 0.7 ? ${lin(0x8fb468)} : kind > 0.5 ? ${lin(0x4f8a52)} : ${lin(0x5f9a58)};
+    if (clump > 0.8 && fine > 0.93) cliff = ${lin(0xf2e6f0)};
+  }
   // Every rock face is alive: grass and moss spill over its top, ivy hangs down it in places,
   // tufts cling to its ledges, and its foot stays damp. The height of the ground just uphill
   // tells how much of the face is left above.
@@ -504,6 +521,20 @@ bool pxGlass = max(max(abs(pxBase.r - 0.040), abs(pxBase.g - 0.032)), abs(pxBase
   if (pxTile > 0.86) pxAlb = pxAlb * 1.13 + 0.01;
   else if (pxTile < 0.1) pxAlb *= vec3(0.8, 0.86, 0.78);
 #endif
+
+#ifdef STONES
+  // Dry stone: courses of rough stones laid without mortar, each its own shade, the joints
+  // dark, a stone here and there green with moss.
+  if (abs(pxUp.y) < 0.5) {
+    vec2 pxFace = normalize(pxUp.xz + vec2(1e-4));
+    float pxCourse = floor(vWorld.y / 0.42);
+    float pxAlong = dot(vWorld.xz, vec2(-pxFace.y, pxFace.x)) / 0.62 + pxHash(vec2(pxCourse, 5.0)) * 3.0;
+    float pxShade = pxHash(vec2(pxCourse, floor(pxAlong)));
+    pxAlb *= 0.84 + pxShade * 0.3;
+    if (pxShade > 0.92) pxAlb *= vec3(0.82, 0.96, 0.78);
+    if (fract(vWorld.y / 0.42) < 0.2 || fract(pxAlong) < 0.13) pxAlb *= 0.66;
+  }
+#endif
 #ifdef WALL
   // Old plaster: rain streaks down the facades, paler patches where it was mended.
   if (abs(pxUp.y) < 0.4 && !pxGlass) {
@@ -675,14 +706,14 @@ outgoingLight = pxCol;
 `;
 
 const cache = new Map();
-const FLAGS = { terrain: 'TERRAIN', water: 'WATER', sway: 'SWAY', glow: 'GLOW', unlit: 'UNLIT', volume: 'VOLUME', leaf: 'LEAF', turning: 'TURNING', leaffall: 'LEAFFALL', deciduous: 'DECIDUOUS', roof: 'ROOF', wall: 'WALL', flow: 'FLOW', cascade: 'CASCADE', carriage: 'CARRIAGE' };
+const FLAGS = { terrain: 'TERRAIN', water: 'WATER', sway: 'SWAY', glow: 'GLOW', unlit: 'UNLIT', volume: 'VOLUME', leaf: 'LEAF', turning: 'TURNING', leaffall: 'LEAFFALL', deciduous: 'DECIDUOUS', roof: 'ROOF', wall: 'WALL', stones: 'STONES', flow: 'FLOW', cascade: 'CASCADE', carriage: 'CARRIAGE' };
 
 /**
  * @param {number} color sRGB hex
- * @param {{terrain?: boolean, water?: boolean, sway?: boolean, glow?: boolean, leaf?: boolean, turning?: boolean, leaffall?: boolean, deciduous?: boolean, roof?: boolean, wall?: boolean, flow?: boolean, cascade?: boolean, carriage?: boolean, unlit?: boolean, volume?: boolean, flat?: boolean, doubleSide?: boolean, backSide?: boolean, vertexColors?: boolean, map?: THREE.Texture}} [opts]
+ * @param {{terrain?: boolean, water?: boolean, sway?: boolean, glow?: boolean, leaf?: boolean, turning?: boolean, leaffall?: boolean, deciduous?: boolean, roof?: boolean, wall?: boolean, stones?: boolean, flow?: boolean, cascade?: boolean, carriage?: boolean, unlit?: boolean, volume?: boolean, flat?: boolean, doubleSide?: boolean, backSide?: boolean, vertexColors?: boolean, map?: THREE.Texture}} [opts]
  *   `leaf` is foliage (painted in clumps, rustling, evergreen unless `deciduous`), `turning` a
  *   broadleaf crown that reddens and drops its leaves (see `uLeaves`), `leaffall` those leaves
- *   falling and lying, data in the instance colours, `roof` tiles, `wall` aged plaster, `flow`
+ *   falling and lying, data in the instance colours, `roof` tiles, `wall` aged plaster, `stones` a dry-stone wall, `flow`
  *   rain water running off a roof, `cascade` a stream or a waterfall, `carriage` the panes of a vehicle, all lit after dark wherever it goes,
  *   `unlit` spray that stays white whichever way the light falls, `volume` a translucent volume
  *   of light added over the picture (with `unlit`), which draws no outline.
