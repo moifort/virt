@@ -198,6 +198,19 @@ export function villagePlan() {
     const streets = (village.lanes ?? []).slice().sort((a, b) => (a.stair ? 1 : 0) - (b.stair ? 1 : 0));
     for (const street of streets) {
       const pts = street.points.map(([u, v]) => ({ x: toX(u, v), z: toZ(u, v) }));
+      // A stair that leaves from inside a square, or arrives in one, climbs from its edge: a
+      // vertex is set where it crosses the edge, and it runs level across the square to it.
+      if (street.stair) {
+        for (const pz of squares) {
+          const edge = pz.r + 0.5;
+          for (const end of [0, 1]) {
+            const i = end ? pts.length - 1 : 0;
+            const j = end ? i - 1 : 1;
+            const q = crossing(pts[i], pts[j], pz, edge);
+            if (q) pts.splice(end ? i : 1, 0, q);
+          }
+        }
+      }
       const segs = [];
       let length = 0;
       for (let i = 1; i < pts.length; i++) {
@@ -238,8 +251,16 @@ export function villagePlan() {
         for (const pz of squares) if (Math.hypot(p.x - pz.x, p.z - pz.z) < pz.r + 2) lane.levels[i] = pz.level;
       });
       if (lane.stair) {
-        const [l0, l1] = [lane.levels[0], lane.levels[pts.length - 1]];
-        lane.levels = pts.map((p, i) => (i === 0 ? l0 : i === pts.length - 1 ? l1 : l0 + ((l1 - l0) * (segs[i - 1].s0 + segs[i - 1].len)) / length));
+        // The flight runs evenly between the last vertex on the square it leaves and the
+        // first on the one it reaches (its ends, if it leaves from or reaches a lane).
+        const onSquare = pts.map((p) => squares.some((pz) => Math.hypot(p.x - pz.x, p.z - pz.z) < pz.r + 0.6));
+        let a = 0;
+        while (a + 1 < pts.length - 1 && onSquare[a] && onSquare[a + 1]) a++;
+        let b = pts.length - 1;
+        while (b - 1 > a && onSquare[b] && onSquare[b - 1]) b--;
+        const at = (i) => (i === 0 ? 0 : segs[i - 1].s0 + segs[i - 1].len);
+        const [l0, l1] = [lane.levels[a], lane.levels[b]];
+        lane.levels = pts.map((p, i) => (i <= a ? l0 : i >= b ? l1 : l0 + ((l1 - l0) * (at(i) - at(a))) / (at(b) - at(a))));
       }
       if (lane.quay) {
         // The sea lies on the side where the ground falls away.
@@ -254,6 +275,20 @@ export function villagePlan() {
   }
   plan = { lanes, piazzas };
   return plan;
+}
+
+/** Where the segment from `a`, inside the circle of radius `r` round `c`, leaves it toward `b`; null if `a` is outside or `b` inside. */
+function crossing(a, b, c, r) {
+  const dx = b.x - a.x;
+  const dz = b.z - a.z;
+  const fx = a.x - c.x;
+  const fz = a.z - c.z;
+  const A = dx * dx + dz * dz;
+  const B = 2 * (fx * dx + fz * dz);
+  const C = fx * fx + fz * fz - r * r;
+  if (C >= 0 || Math.hypot(b.x - c.x, b.z - c.z) <= r) return null;
+  const t = (-B + Math.sqrt(B * B - 4 * A * C)) / (2 * A);
+  return { x: a.x + dx * t, z: a.z + dz * t };
 }
 
 /** The nearest point of a lane to (x, z): its distance, how far along the lane it lies, and the level of the paving there. */
@@ -511,24 +546,28 @@ function landAt(x, z) {
   // each stair an even ramp, with a short shoulder up or down to the natural ground on either
   // side; the squares are levelled whole. Off the quay the bed is dug out so the water laps
   // at its wall.
-  // Where two cuts overlap, the one the point lies closest in wins: a stair leaving a square
-  // keeps its treads instead of being levelled away by the square's skirt.
+  // Where two cuts overlap, the one the point lies most squarely in wins: a stair leaving a
+  // square keeps its treads instead of being levelled away by the square's skirt, and the
+  // square itself stays level wall to wall.
   const streets = villagePlan();
   if (streets) {
     const cuts = [];
     for (const pz of streets.piazzas) {
       const w = smoothstep(pz.r + 3, pz.r + 0.5, Math.hypot(x - pz.x, z - pz.z));
-      if (w > 0) cuts.push([pz.level, w]);
+      if (w > 0) cuts.push([pz.level, w, w > 0.999 ? 2 : w]);
     }
     let dredge = Infinity;
     for (const lane of streets.lanes) {
       const near = laneAt(lane, x, z);
       const sea = lane.quay && near.side === lane.seaSide;
       const flat = lane.half + (sea ? lane.quay : 0);
-      if (near.d < flat + 1.5) cuts.push([near.level, smoothstep(flat + 1.5, flat + 0.4, near.d)]);
+      if (near.d < flat + 1.5) {
+        const w = smoothstep(flat + 1.5, flat + 0.4, near.d);
+        cuts.push([near.level, w, w]);
+      }
       if (sea && near.d > flat + 0.2 && near.d < flat + 9) dredge = Math.min(dredge, near.level + (WATER_LEVEL - 1.6 - near.level) * smoothstep(flat + 0.2, flat + 1.4, near.d));
     }
-    cuts.sort((a, b) => a[1] - b[1]);
+    cuts.sort((a, b) => a[2] - b[2]);
     for (const [level, w] of cuts) h += (level - h) * w;
     h = Math.min(h, dredge);
   }
