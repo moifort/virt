@@ -788,7 +788,7 @@ function quayWall(parts, rng, lane, furniture) {
 }
 
 /** A square: flagstones, the church with its campanile or a well, trees for shade, benches, lamps. */
-function buildPiazza(parts, rng, pz, furniture, SCALE) {
+function buildPiazza(parts, rng, pz, furniture, SCALE, placed) {
   const y = pz.level;
   for (let row = -Math.ceil(pz.r / 0.8); row <= Math.ceil(pz.r / 0.8); row++) {
     const z = row * 0.8;
@@ -820,6 +820,9 @@ function buildPiazza(parts, rng, pz, furniture, SCALE) {
     const tower = parts.world(-3.6, 0, 1.6);
     parts.at(new THREE.Vector3(tower.x, y - 0.5, tower.z), view, SCALE * 0.85);
     campanile(parts, rng);
+    // The church and its tower stand clear: no garden is terraced up against them.
+    placed.push(footprint(nave.x, nave.z, view, 2.1 * SCALE + 1.2, 2.8 * SCALE + 1.2));
+    placed.push(footprint(tower.x, tower.z, view, 1.3 * SCALE + 1.2, 1.3 * SCALE + 1.2));
     for (const side of [-1, 1]) {
       const tree = spot(-1.2, side * (pz.r - 2.3));
       planeTree(parts, rng, tree.x, y, tree.z, 1 + rng() * 0.2);
@@ -1099,7 +1102,7 @@ export function buildVillages(scene, rng, animated) {
       laneEnds(parts, rng, lane, streets, squares);
       if (lane.quay) quayWall(parts, rng, lane, furniture);
     }
-    for (const pz of squares) buildPiazza(parts, rng, pz, furniture, SCALE);
+    for (const pz of squares) buildPiazza(parts, rng, pz, furniture, SCALE, placed);
     outliers(parts, rng, village, streets, squares, placed, SCALE, village.r > 20 ? 70 : 6);
     // The hamlet on the headland keeps its hillside as it is.
     if (village.waterfront) orti(parts, rng, village, streets, squares, placed);
