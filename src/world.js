@@ -12,7 +12,7 @@ import { buildRailway } from './railway.js';
 import { buildVillages } from './village.js';
 import { buildAgora, buildAtelier, buildLibrary, buildLighthouseWalk, buildMoot, buildObservatory, buildPods, buildPort, buildPub } from './zones.js';
 
-export { LAND_ENDS, SQUARE, SUN_DIR, WATER_LEVEL, ZONES, groundAt, inSquare, toX, toZ } from './terrain.js';
+export { LAND_ENDS, SQUARE, SUN_DIR, WATER_LEVEL, ZONES, groundAt, inSquare, isSolid, toX, toZ } from './terrain.js';
 
 // ---------------------------------------------------------------- World
 

@@ -86,11 +86,12 @@ class Parts {
     this._q.setFromEuler(this._e.set(rx, ry, rz));
     this._local.compose(new THREE.Vector3(x, y, z), this._q, new THREE.Vector3(sx, sy, sz));
     this.lists.get(kind).push({ m: this.frame.clone().multiply(this._local), c: color });
-    // Whatever is the size of a room or more takes up its ground: nothing grows there.
+    // Whatever is the size of a room or more takes up its ground: nothing grows there, and
+    // nobody walks through its walls.
     const s = this.scale ?? 1;
     if (kind === 'box' && sx * s >= 1.5 && sz * s >= 1.5 && sy * s >= 1) {
       const c = this.world(x, y, z);
-      occupy(c.x, c.z, this.yaw + ry, (sx * s) / 2, (sz * s) / 2);
+      occupy(c.x, c.z, this.yaw + ry, (sx * s) / 2, (sz * s) / 2, c.y + (sy * s) / 2);
     }
   }
 
@@ -480,7 +481,9 @@ function siteFits(foot, lane, lanes, piazzas, placed, level, uphill, { waterfron
       }
     }
     if (near >= other.half + (other.quay ?? 0) + 0.5) continue;
-    if (!uphill) return null;
+    // A stair climbs as it goes: whatever level a roof is capped at, some of its flight
+    // would run into the walls. Nothing is built across one.
+    if (!uphill || other.stair) return null;
     const fit = Math.floor(((there - level - 0.4) / scale - 1.2) / 1.7);
     if (fit < 1) return null;
     cap = cap === undefined ? fit : Math.min(cap, fit);

@@ -51,11 +51,15 @@ const beachBand = (v) => smoothstep(-30, -18, v) * smoothstep(64, 50, v);
 // the walls, 1 in a band around them. Nothing wild grows on it, and no tree right against a wall.
 const BUILT = new Uint8Array(SEGMENTS * SEGMENTS);
 const BUILT_BAND = 1.5;
+// The cells inside the walls of a house, with the height of its top: nobody walks through
+// them, though a lane may run over a house built in under it.
+const SOLID = new Float32Array(SEGMENTS * SEGMENTS).fill(-Infinity);
 /**
  * Marks as built the rectangle centred on (x, z), turned by `yaw`, reaching `hw` either side
- * along its local x and `hd` along its local z.
+ * along its local x and `hd` along its local z. A walled one gives the height of its `top`:
+ * below that it cannot be walked into.
  */
-export function occupy(x, z, yaw, hw, hd) {
+export function occupy(x, z, yaw, hw, hd, top = -Infinity) {
   const ax = Math.cos(yaw);
   const az = -Math.sin(yaw);
   const reach = Math.hypot(hw, hd) + BUILT_BAND;
@@ -69,6 +73,7 @@ export function occupy(x, z, yaw, hw, hd) {
       const i = iz * SEGMENTS + ix;
       if (out < CELL / 2) BUILT[i] = 2;
       else if (out < BUILT_BAND) BUILT[i] = Math.max(BUILT[i], 1);
+      if (out < -0.15) SOLID[i] = Math.max(SOLID[i], top);
     }
   }
 }
@@ -77,6 +82,12 @@ function builtAt(x, z) {
   const ix = Math.floor((x + HALF) / CELL);
   const iz = Math.floor((z + HALF) / CELL);
   return ix < 0 || iz < 0 || ix >= SEGMENTS || iz >= SEGMENTS ? 0 : BUILT[iz * SEGMENTS + ix];
+}
+/** True inside the walls of a house, unless the ground there stands over its top. */
+export function isSolid(x, z) {
+  const ix = Math.floor((x + HALF) / CELL);
+  const iz = Math.floor((z + HALF) / CELL);
+  return ix >= 0 && iz >= 0 && ix < SEGMENTS && iz < SEGMENTS && SOLID[iz * SEGMENTS + ix] > groundAt(x, z) + 0.3;
 }
 
 export const placeZone = (id, name, hint, u, v, r) => ({ id, name, hint, u, v, r, x: toX(u, v), z: toZ(u, v) });

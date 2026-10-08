@@ -4,7 +4,7 @@
 // bounce on every step. A seagull flutters around him.
 import * as THREE from 'three';
 import { PAL, paint, solid } from './style.js';
-import { WATER_LEVEL, groundAt, inSquare } from './world.js';
+import { WATER_LEVEL, groundAt, inSquare, isSolid } from './world.js';
 
 const TILE = 1.25;
 const WALK_SPEED = 5.5;
@@ -209,6 +209,8 @@ export class Player {
     const ground = groundAt(target.x, target.z);
     if (ground < WATER_LEVEL - 0.2) return false;
     if (!inSquare(target.x, target.z, 1)) return false;
+    // The houses of the villages are walked round, not through.
+    if (isSolid(target.x, target.z)) return false;
     return Math.abs(ground - groundAt(from.x, from.z)) <= MAX_STEP;
   }
 
