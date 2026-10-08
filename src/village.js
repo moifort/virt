@@ -552,36 +552,6 @@ function paveLane(parts, rng, lane, piazzas) {
   }
 }
 
-/**
- * A few steps climbing into the hill up an alley between two houses, out to the terrace behind
- * them. If the way up runs into a wall of rock or out over a drop, the alley is left without
- * steps rather than given a stair that leads nowhere.
- */
-function alleySteps(parts, rng, lane, s, side, width, placed) {
-  const p = lanePoint(lane, s);
-  const nx = -p.tz * side;
-  const nz = p.tx * side;
-  let prev = groundAt(p.x + nx * lane.half, p.z + nz * lane.half);
-  const treads = [];
-  for (let k = 0; k < 9; k++) {
-    const out = lane.half + 0.4 + k * TREAD;
-    const x = p.x + nx * out;
-    const z = p.z + nz * out;
-    const g = groundAt(x, z);
-    if (g > prev + 1.3 || g < prev - 0.6) return;
-    const top = Math.max(g, prev) + 0.1;
-    treads.push([x, z, top, prev]);
-    prev = top - 0.1;
-  }
-  for (const [x, z, top, below] of treads) {
-    parts.at(new THREE.Vector3(x, 0, z), Math.atan2(nx, nz), 1);
-    parts.add('box', 0, (top + below - 0.2) / 2, 0, width, top - below + 0.2, TREAD + 0.05, pick(rng, PAVING));
-  }
-  const run = (treads.length * TREAD) / 2;
-  const mid = lane.half + 0.4 + run;
-  placed.push(footprint(p.x + nx * mid, p.z + nz * mid, Math.atan2(nx, nz), width / 2 + 0.2, run + 0.3));
-}
-
 /** A little walled garden in a gap of the row: a lemon tree and some shrubs behind a low wall. */
 function garden(parts, rng, lane, s, side, width, placed) {
   const p = lanePoint(lane, s);
@@ -678,8 +648,9 @@ function houseRows(parts, rng, lane, lanes, piazzas, placed, village, SCALE) {
       placed.push(site.foot);
       const g = gap(rng);
       covered[side].push([s - 0.3, s + len + (g < 1.2 ? g : 0) + 0.3]);
-      if (uphill && g >= 1.4 && g < 3) alleySteps(parts, rng, lane, s + len + g / 2, side, g - 0.5, placed);
-      else if (uphill && g >= 3) garden(parts, rng, lane, s + len + g / 2, side, g - 0.6, placed);
+      // A wider gap uphill is a little walled garden; a narrower one is left to the terraces
+      // behind, which run in between the houses.
+      if (uphill && g >= 3) garden(parts, rng, lane, s + len + g / 2, side, g - 0.6, placed);
       s += len + g;
     }
   }
@@ -691,18 +662,24 @@ function houseRows(parts, rng, lane, lanes, piazzas, placed, village, SCALE) {
  * wall where it rises, low walls beside the stairs. Street lamps, and strings of little lights
  * from one front to the one across the lane.
  */
-function laneEdges(parts, rng, lane, covered, furniture) {
+function laneEdges(parts, rng, lane, covered, furniture, lanes, piazzas) {
   const isCovered = (side, s) => covered[side].some(([a, b]) => s > a && s < b);
+  // Where another lane or a square opens off this one, or a stair starts out on the paving of
+  // the lane below it, no wall stands across the way.
+  const open = (x, z, margin) =>
+    lanes.some((o) => o !== lane && laneAt(o, x, z).d < o.half + (o.quay ?? 0) + margin) || piazzas.some((pz) => Math.hypot(x - pz.x, z - pz.z) < pz.r + margin);
   let nextLamp = 4 + rng() * 5;
   let nextString = 7 + rng() * 6;
   for (let s = TREAD / 2; s < lane.length; s += TREAD) {
     const p = lanePoint(lane, s);
     const here = groundAt(p.x, p.z);
+    const across = lane.stair && open(p.x, p.z, 0);
     for (const side of [-1, 1]) {
-      if (isCovered(side, s)) continue;
+      if (isCovered(side, s) || across) continue;
       if (lane.quay && side === lane.seaSide) continue; // the quay has its own wall
       const nx = -p.tz * side;
       const nz = p.tx * side;
+      if (open(p.x + nx * (lane.half + 0.15), p.z + nz * (lane.half + 0.15), 0.3)) continue;
       const beyond = groundAt(p.x + nx * (lane.half + 2.8), p.z + nz * (lane.half + 2.8));
       parts.at(new THREE.Vector3(p.x + nx * (lane.half + 0.15), 0, p.z + nz * (lane.half + 0.15)), Math.atan2(p.tx, p.tz), 1);
       if (lane.stair) parts.add('box', 0, here + 0.3, 0, 0.3, 1.1, TREAD + 0.05, WALL_STONE);
@@ -1105,7 +1082,7 @@ export function buildVillages(scene, rng, animated) {
     const covered = new Map();
     for (const lane of streets) covered.set(lane, houseRows(parts, rng, lane, streets, squares, placed, village, SCALE));
     for (const lane of streets) {
-      laneEdges(parts, rng, lane, covered.get(lane), furniture);
+      laneEdges(parts, rng, lane, covered.get(lane), furniture, streets, squares);
       laneEnds(parts, rng, lane, streets, squares);
       if (lane.quay) quayWall(parts, rng, lane, furniture);
     }
