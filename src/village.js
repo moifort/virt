@@ -19,22 +19,22 @@ const ballShape = new THREE.SphereGeometry(0.5, 8, 6);
 const boxShape = new THREE.BoxGeometry(1, 1, 1);
 // What parts are made of: a unit shape and the way it is painted.
 const KINDS = {
-  box: { shape: boxShape, paint: { wall: true } },
-  pyramid: { shape: new THREE.ConeGeometry(Math.SQRT1_2, 1, 4).rotateY(Math.PI / 4), paint: { flat: true, roof: true } },
+  box: { shape: boxShape, paint: { wall: true, cutaway: true } },
+  pyramid: { shape: new THREE.ConeGeometry(Math.SQRT1_2, 1, 4).rotateY(Math.PI / 4), paint: { flat: true, roof: true, cutaway: true } },
   // A gable roof: a triangular prism lying along z, ridge up, 0.866 wide, from -0.25 to +0.5.
-  gable: { shape: new THREE.CylinderGeometry(0.5, 0.5, 1, 3).rotateX(-Math.PI / 2), paint: { flat: true, roof: true } },
-  cyl: { shape: new THREE.CylinderGeometry(0.5, 0.5, 1, 10), paint: {} },
-  ball: { shape: ballShape, paint: {} },
-  cone: { shape: new THREE.ConeGeometry(0.5, 1, 8), paint: { flat: true } },
+  gable: { shape: new THREE.CylinderGeometry(0.5, 0.5, 1, 3).rotateX(-Math.PI / 2), paint: { flat: true, roof: true, cutaway: true } },
+  cyl: { shape: new THREE.CylinderGeometry(0.5, 0.5, 1, 10), paint: { cutaway: true } },
+  ball: { shape: ballShape, paint: { cutaway: true } },
+  cone: { shape: new THREE.ConeGeometry(0.5, 1, 8), paint: { flat: true, cutaway: true } },
   // Half disc standing in the XY plane, flat side down (fanlights, arched openings).
-  arch: { shape: new THREE.CylinderGeometry(0.5, 0.5, 1, 10, 1, false, -Math.PI / 2, Math.PI).rotateX(-Math.PI / 2), paint: {} },
+  arch: { shape: new THREE.CylinderGeometry(0.5, 0.5, 1, 10, 1, false, -Math.PI / 2, Math.PI).rotateX(-Math.PI / 2), paint: { cutaway: true } },
   // Evergreen greenery, vines that turn with the seasons, a lit lamp, and rain water running
   // off a roof (its colour is how much it carries).
-  leaf: { shape: ballShape, paint: { leaf: true } },
-  vine: { shape: ballShape, paint: { leaf: true, deciduous: true } },
-  lamp: { shape: ballShape, paint: { glow: true } },
-  drystone: { shape: boxShape, paint: { stones: true } },
-  flow: { shape: boxShape, paint: { flow: true }, shadow: false },
+  leaf: { shape: ballShape, paint: { leaf: true, cutaway: true } },
+  vine: { shape: ballShape, paint: { leaf: true, deciduous: true, cutaway: true } },
+  lamp: { shape: ballShape, paint: { glow: true, cutaway: true } },
+  drystone: { shape: boxShape, paint: { stones: true, cutaway: true } },
+  flow: { shape: boxShape, paint: { flow: true, cutaway: true }, shadow: false },
 };
 
 const WALLS = [0xe6ba6c, 0xdfa590, 0xdc826a, 0xefca7c, 0xf1bf98, 0xf3cea4, 0xe89a78, 0xcf705c, 0xf5e4c0, 0xf0b287, 0xead8aa, 0xe8c4b0, 0xd9d2b0];
@@ -958,6 +958,13 @@ function orti(parts, rng, village, lanes, piazzas, placed) {
       if (lane.d < 2.5 && top > lane.level + 0.5) top = Math.max(hi + 0.1, lane.level + 0.5);
       cells.set(`${i},${j}`, { i, j, x, z, top, lo });
     }
+  }
+  // A terrace is a shelf: a cell with no neighbour at its own height would be one step of a
+  // stone staircase climbing the slope, and a run of them reads as a chimney.
+  for (const [key, c] of [...cells]) {
+    const level = (k) => cells.get(k)?.top;
+    const shelf = [`${c.i + 1},${c.j}`, `${c.i - 1},${c.j}`, `${c.i},${c.j + 1}`, `${c.i},${c.j - 1}`].some((k) => Math.abs((level(k) ?? -1e3) - c.top) < 0.05);
+    if (!shelf) cells.delete(key);
   }
   // A cell or two caught alone between the houses would stand up as a pillar: a garden
   // takes a few cells together or none.

@@ -84,6 +84,10 @@ export const GLOBALS = {
   // The road of light on the sea: the level direction square to the light (x, z), where the
   // road lies along it, and how bright it is.
   uSunPath: { value: new THREE.Vector4(1, 0, 0, 0) },
+  // The avatar, seen through the houses in front of him: where he stands (x, y, z) and the
+  // radius of the window they open on him, and the way back from him to the eye.
+  uCut: { value: new THREE.Vector4() },
+  uCutAxis: { value: new THREE.Vector3(0, 1, 0) },
 };
 
 // Hex (sRGB) → linear GLSL literal.
@@ -225,6 +229,8 @@ uniform vec3 uSkyTint;
 uniform vec2 uLamps;
 uniform sampler2D uLampMap;
 uniform vec3 uHeightMap;
+uniform vec4 uCut;
+uniform vec3 uCutAxis;
 varying vec3 vWorld;
 varying float vGust;
 varying float vTree;
@@ -496,6 +502,12 @@ vec3 waterColor(vec3 w) {
 `;
 
 const FRAGMENT_SHADE = /* glsl */ `
+#ifdef CUTAWAY
+  // A house standing between the eye and the avatar opens on him in a round window.
+  vec3 pxFromHim = vWorld - uCut.xyz;
+  float pxToEye = dot(pxFromHim, uCutAxis);
+  if (uCut.w > 0.0 && pxToEye > 0.8 && pxFromHim.y > -0.5 && length(pxFromHim - uCutAxis * pxToEye) < uCut.w) discard;
+#endif
 vec3 pxBase = diffuseColor.rgb;
 vec3 pxAlb = pxBase;
 vec3 pxUp = normalize(inverseTransformDirection(normal, viewMatrix));
@@ -706,14 +718,14 @@ outgoingLight = pxCol;
 `;
 
 const cache = new Map();
-const FLAGS = { terrain: 'TERRAIN', water: 'WATER', sway: 'SWAY', glow: 'GLOW', unlit: 'UNLIT', volume: 'VOLUME', leaf: 'LEAF', turning: 'TURNING', leaffall: 'LEAFFALL', deciduous: 'DECIDUOUS', roof: 'ROOF', wall: 'WALL', stones: 'STONES', flow: 'FLOW', cascade: 'CASCADE', carriage: 'CARRIAGE' };
+const FLAGS = { terrain: 'TERRAIN', water: 'WATER', sway: 'SWAY', glow: 'GLOW', unlit: 'UNLIT', volume: 'VOLUME', leaf: 'LEAF', turning: 'TURNING', leaffall: 'LEAFFALL', deciduous: 'DECIDUOUS', roof: 'ROOF', wall: 'WALL', stones: 'STONES', cutaway: 'CUTAWAY', flow: 'FLOW', cascade: 'CASCADE', carriage: 'CARRIAGE' };
 
 /**
  * @param {number} color sRGB hex
- * @param {{terrain?: boolean, water?: boolean, sway?: boolean, glow?: boolean, leaf?: boolean, turning?: boolean, leaffall?: boolean, deciduous?: boolean, roof?: boolean, wall?: boolean, stones?: boolean, flow?: boolean, cascade?: boolean, carriage?: boolean, unlit?: boolean, volume?: boolean, flat?: boolean, doubleSide?: boolean, backSide?: boolean, vertexColors?: boolean, map?: THREE.Texture}} [opts]
+ * @param {{terrain?: boolean, water?: boolean, sway?: boolean, glow?: boolean, leaf?: boolean, turning?: boolean, leaffall?: boolean, deciduous?: boolean, roof?: boolean, wall?: boolean, stones?: boolean, cutaway?: boolean, flow?: boolean, cascade?: boolean, carriage?: boolean, unlit?: boolean, volume?: boolean, flat?: boolean, doubleSide?: boolean, backSide?: boolean, vertexColors?: boolean, map?: THREE.Texture}} [opts]
  *   `leaf` is foliage (painted in clumps, rustling, evergreen unless `deciduous`), `turning` a
  *   broadleaf crown that reddens and drops its leaves (see `uLeaves`), `leaffall` those leaves
- *   falling and lying, data in the instance colours, `roof` tiles, `wall` aged plaster, `stones` a dry-stone wall, `flow`
+ *   falling and lying, data in the instance colours, `roof` tiles, `wall` aged plaster, `stones` a dry-stone wall, `cutaway` a building that opens on the avatar behind it, `flow`
  *   rain water running off a roof, `cascade` a stream or a waterfall, `carriage` the panes of a vehicle, all lit after dark wherever it goes,
  *   `unlit` spray that stays white whichever way the light falls, `volume` a translucent volume
  *   of light added over the picture (with `unlit`), which draws no outline.

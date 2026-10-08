@@ -267,6 +267,9 @@ function frame() {
   }
   focus.copy(player.position).add(pan).y += 1.4;
   view.update(focus, pixels.lowRes, pixels.offset);
+  // The houses of the villages open a window on him wherever they hide him from the eye.
+  GLOBALS.uCut.value.set(player.position.x, player.position.y + 0.9, player.position.z, 1.7);
+  GLOBALS.uCutAxis.value.copy(view.forward).negate();
   // The haze closes in on the far sea; in clear weather it only just touches the back of the
   // island, however low the view is tilted (then the island runs far back into the depth). A
   // mist or a rain draws it in over everything.
