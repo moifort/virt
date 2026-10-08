@@ -131,20 +131,24 @@ export const VILLAGES = [
       { name: 'alta', width: 3.0, points: [sh(99, 21), sh(97.5, 24.5), sh(95.5, 27), sh(93, 29.5), sh(89.5, 32.5), sh(88, 37), sh(86.5, 39.5), sh(83.5, 43.5), sh(83, 47.5), sh(82, 52), sh(81.5, 58), sh(82, 64), sh(83, 70), sh(86, 75), sh(89, 78)] },
       // The fourth lane leaves the church square along the brow of the hill.
       { name: 'cima', width: 3.0, points: [sh(96, 51), sh(93, 56), sh(92, 62), sh(94, 68), sh(99, 73), sh(104, 77)] },
-      // Stairs, slanting across the slope from one lane up to the next, and one climbing in
-      // zigzags from the top lane to the church, on a terrace cut into the brow of the hill.
+      // Stairs, slanting across the slope from one lane up to the next, about as steep as they
+      // are long (a lane stands a dozen metres over the last, so a straight flight would be a
+      // ladder), and one climbing in zigzags from the top lane to the church, on a terrace cut
+      // into the brow of the hill.
       { stair: true, width: 2.0, points: [sh(78, 9.5), sh(82, 20.5)] },
-      { stair: true, width: 2.0, points: [sh(75, 23.5), sh(84, 27)] },
-      { stair: true, width: 2.0, points: [sh(63, 33.5), sh(76.8, 34.6)] },
-      { stair: true, width: 2.0, points: [sh(61, 43.5), sh(72, 46)] },
-      { stair: true, width: 2.0, points: [sh(76.5, 36), sh(88, 37)] },
-      { stair: true, width: 2.0, points: [sh(72, 50), sh(83, 47.5)] },
+      { stair: true, width: 2.0, points: [sh(67.7, 26.7), sh(84, 27)] },
+      { stair: true, width: 2.0, points: [sh(62.9, 34.5), sh(79, 30.4)] },
+      { stair: true, width: 2.0, points: [sh(61, 43.5), sh(72, 49)] },
+      // The well square stands right under the top lane: its stair doubles back on itself.
+      { stair: true, width: 2.0, points: [sh(84.6, 34.7), sh(88.9, 27.9), sh(91.1, 31.1)] },
+      { stair: true, width: 2.0, points: [sh(71, 57.9), sh(83, 47.5)] },
       { stair: true, width: 2.2, points: [sh(99, 21), sh(102, 24), sh(103, 30), sh(101, 38.5)] },
       { stair: true, width: 2.0, points: [sh(60, 56), sh(71, 60)] },
-      { stair: true, width: 2.0, points: [sh(72, 66), sh(83, 68)] },
-      { stair: true, width: 2.0, points: [sh(82, 60), sh(93, 58)] },
+      { stair: true, width: 2.0, points: [sh(71, 63.2), sh(84, 71.7)] },
+      { stair: true, width: 2.0, points: [sh(81.7, 60), sh(95.1, 52.5)] },
       { stair: true, width: 2.0, points: [sh(74, 73), sh(86, 75)] },
-      { stair: true, width: 2.0, points: [sh(88, 77), sh(100, 74)] },
+      // From the belvedere's edge, a dogleg up to the end of the brow lane.
+      { stair: true, width: 2.0, points: [sh(92.6, 81.2), sh(98.5, 82), sh(104, 77)] },
     ],
     piazzas: [
       { u: 100, v: shore + 44.5, r: 7, level: 38, church: true },
@@ -198,17 +202,32 @@ export function villagePlan() {
     const streets = (village.lanes ?? []).slice().sort((a, b) => (a.stair ? 1 : 0) - (b.stair ? 1 : 0));
     for (const street of streets) {
       const pts = street.points.map(([u, v]) => ({ x: toX(u, v), z: toZ(u, v) }));
-      // A stair that leaves from inside a square, or arrives in one, climbs from its edge: a
-      // vertex is set where it crosses the edge, and it runs level across the square to it.
+      // A stair climbs from the edge of the lane or the square it leaves to the edge of the one
+      // it reaches, not from their middles: a vertex is set where it crosses each edge, holding
+      // the level of the landing there, and it runs level from it to its end.
       if (street.stair) {
-        for (const pz of squares) {
-          const edge = pz.r + 0.5;
-          for (const end of [0, 1]) {
-            const i = end ? pts.length - 1 : 0;
-            const j = end ? i - 1 : 1;
-            const q = crossing(pts[i], pts[j], pz, edge);
-            if (q) pts.splice(end ? i : 1, 0, q);
+        for (const end of [0, 1]) {
+          const i = end ? pts.length - 1 : 0;
+          const a = pts[i];
+          const b = pts[end ? i - 1 : 1];
+          const square = squares.find((pz) => Math.hypot(a.x - pz.x, a.z - pz.z) < pz.r + 0.5);
+          let q = null;
+          if (square) {
+            q = crossing(a, b, square, square.r + 0.5);
+            if (q) q.landing = square.level;
+          } else {
+            const on = measured.find((o) => !o.stair && laneAt(o, a.x, a.z).d < o.half);
+            const len = Math.hypot(b.x - a.x, b.z - a.z);
+            for (let t = 0.1; on && t < len - 0.5; t += 0.1) {
+              const c = { x: a.x + ((b.x - a.x) * t) / len, z: a.z + ((b.z - a.z) * t) / len };
+              const n = laneAt(on, c.x, c.z);
+              if (n.d >= on.half + 0.15) {
+                q = { ...c, landing: n.level };
+                break;
+              }
+            }
           }
+          if (q) pts.splice(end ? i : 1, 0, q);
         }
       }
       const segs = [];
@@ -251,15 +270,13 @@ export function villagePlan() {
         for (const pz of squares) if (Math.hypot(p.x - pz.x, p.z - pz.z) < pz.r + 2) lane.levels[i] = pz.level;
       });
       if (lane.stair) {
-        // The flight runs evenly between the last vertex on the square it leaves and the
-        // first on the one it reaches (its ends, if it leaves from or reaches a lane).
-        const onSquare = pts.map((p) => squares.some((pz) => Math.hypot(p.x - pz.x, p.z - pz.z) < pz.r + 0.6));
-        let a = 0;
-        while (a + 1 < pts.length - 1 && onSquare[a] && onSquare[a + 1]) a++;
-        let b = pts.length - 1;
-        while (b - 1 > a && onSquare[b] && onSquare[b - 1]) b--;
+        // The flight runs evenly between its landings, level beyond them.
+        const n = pts.length - 1;
+        const a = n > 1 && pts[1].landing !== undefined ? 1 : 0;
+        const b = n - 1 > a && pts[n - 1].landing !== undefined ? n - 1 : n;
         const at = (i) => (i === 0 ? 0 : segs[i - 1].s0 + segs[i - 1].len);
-        const [l0, l1] = [lane.levels[a], lane.levels[b]];
+        const l0 = pts[a].landing ?? lane.levels[a];
+        const l1 = pts[b].landing ?? lane.levels[b];
         lane.levels = pts.map((p, i) => (i <= a ? l0 : i >= b ? l1 : l0 + ((l1 - l0) * (at(i) - at(a))) / (at(b) - at(a))));
       }
       if (lane.quay) {
@@ -562,10 +579,12 @@ function landAt(x, z) {
       const sea = lane.quay && near.side === lane.seaSide;
       const flat = lane.half + (sea ? lane.quay : 0);
       if (near.d < flat + 1.5) {
+        // A lane keeps its own paving where a stair arrives on it or leaves it.
         const w = smoothstep(flat + 1.5, flat + 0.4, near.d);
-        cuts.push([near.level, w, w]);
+        cuts.push([near.level, w, w > 0.999 && !lane.stair && near.d < flat ? 1.5 : w]);
       }
-      if (sea && near.d > flat + 0.2 && near.d < flat + 9) dredge = Math.min(dredge, near.level + (WATER_LEVEL - 1.6 - near.level) * smoothstep(flat + 0.2, flat + 1.4, near.d));
+      // The water laps at the face of the quay wall (half a metre out from its edge): the bed is dug out right from its foot.
+      if (sea && near.d > flat - 0.1 && near.d < flat + 9) dredge = Math.min(dredge, near.level + (WATER_LEVEL - 1.6 - near.level) * smoothstep(flat - 0.1, flat + 0.6, near.d));
     }
     cuts.sort((a, b) => a[2] - b[2]);
     for (const [level, w] of cuts) h += (level - h) * w;
