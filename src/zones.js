@@ -322,7 +322,8 @@ export function buildAtelier(g, rng, animated) {
   at(new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.05, 6, 24), paint(SCREEN, { glow: true })), 0, 0, 0, proto);
   animated.push((t) => proto.rotation.set(t * 0.7, t, 0));
   for (let i = 0; i < 4; i++) at(box(0.9, 0.9, 0.9, pick(rng, [PAL.wood, PAL.ochre])), 6.5 - (i % 2), 0.75 + Math.floor(i / 2) * 0.9, 5 - (i % 2) * 0.3, g).rotation.y = rng();
-  for (let i = 0; i < 12; i++) at(sunFlower(rng), 9 + (i % 4) * 1.9, 0, -8 + Math.floor(i / 4) * 1.9, g);
+  // (Within the zone's radius, or the trees of the hillside come up through the bed.)
+  for (let i = 0; i < 12; i++) at(sunFlower(rng), 6 + (i % 4) * 1.9, 0, -8 + Math.floor(i / 4) * 1.9, g);
   furnishAtelier(g, rng, animated);
 }
 
