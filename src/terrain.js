@@ -163,7 +163,11 @@ export const VILLAGES = [
     lanes: [
       { width: 2.8, points: [[-58, 82], [-50, 83], [-42, 83.5], [-34, 83]] },
       { width: 2.6, points: [[-54, 92], [-46, 92], [-38, 91.5]] },
-      { stair: true, width: 2.0, points: [[-52, 72.5], [-44, 83.5], [-38, 92]] },
+      // One way up through the hamlet, in two flights: a stair is measured from the way it
+      // leaves to the way it reaches, so a single flight through the lower lane would ramp
+      // straight past that lane's level.
+      { stair: true, width: 2.0, points: [[-44, 83.5], [-38, 92]] },
+      { stair: true, width: 2.0, points: [[-52, 72.5], [-44, 83.5]] },
     ],
     // The stair comes down below the houses to a little lookout over the cliff.
     piazzas: [{ u: -54, v: 70.5, r: 3.5, belvedere: true }],
@@ -222,7 +226,7 @@ export function villagePlan() {
               const c = { x: a.x + ((b.x - a.x) * t) / len, z: a.z + ((b.z - a.z) * t) / len };
               const n = laneAt(on, c.x, c.z);
               if (n.d >= on.half + 0.15) {
-                q = { ...c, landing: n.level };
+                q = { ...c, landing: n.level, on };
                 break;
               }
             }
@@ -270,14 +274,21 @@ export function villagePlan() {
         for (const pz of squares) if (Math.hypot(p.x - pz.x, p.z - pz.z) < pz.r + 2) lane.levels[i] = pz.level;
       });
       if (lane.stair) {
-        // The flight runs evenly between its landings, level beyond them.
+        // The flight runs evenly between its landings. Beyond them, out to its ends, it lies on
+        // the paving of the lane it leaves or reaches, following that lane's own fall: were it
+        // held level at the landing, it would stand a step up or down from the lane at its end.
         const n = pts.length - 1;
         const a = n > 1 && pts[1].landing !== undefined ? 1 : 0;
         const b = n - 1 > a && pts[n - 1].landing !== undefined ? n - 1 : n;
         const at = (i) => (i === 0 ? 0 : segs[i - 1].s0 + segs[i - 1].len);
         const l0 = pts[a].landing ?? lane.levels[a];
         const l1 = pts[b].landing ?? lane.levels[b];
-        lane.levels = pts.map((p, i) => (i <= a ? l0 : i >= b ? l1 : l0 + ((l1 - l0) * (at(i) - at(a))) / (at(b) - at(a))));
+        const beyond = (p, landing, level) => (landing.on ? laneAt(landing.on, p.x, p.z).level : level);
+        lane.levels = pts.map((p, i) => {
+          if (i < a) return beyond(p, pts[a], l0);
+          if (i > b) return beyond(p, pts[b], l1);
+          return l0 + ((l1 - l0) * (at(i) - at(a))) / (at(b) - at(a));
+        });
       }
       if (lane.quay) {
         // The sea lies on the side where the ground falls away.
