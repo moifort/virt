@@ -67,6 +67,17 @@ const CLIMBERS = [
 // A tread of paving: the stones are laid across the lane this far apart.
 const TREAD = 0.62;
 
+/** The functions of this file that laid a part, innermost first: `laneEdges < buildVillages`. */
+function traceSource() {
+  const names = [];
+  for (const line of new Error().stack.split('\n').slice(3)) {
+    const name = /at (?:Parts\.)?(\w+) .*village\.js/.exec(line)?.[1];
+    if (name && !names.includes(name)) names.push(name);
+    if (names.length === 2) break;
+  }
+  return names.join(' < ');
+}
+
 /** Collects instanced parts, positioned in the local frame of the current building. */
 class Parts {
   constructor() {
@@ -88,7 +99,9 @@ class Parts {
   add(kind, x, y, z, sx, sy, sz, color, rx = 0, ry = 0, rz = 0) {
     this._q.setFromEuler(this._e.set(rx, ry, rz));
     this._local.compose(new THREE.Vector3(x, y, z), this._q, new THREE.Vector3(sx, sy, sz));
-    this.lists.get(kind).push({ m: this.frame.clone().multiply(this._local), c: color });
+    // The world lint (test/) asks which function laid each part, to say where to look.
+    const source = globalThis.TRACE_PARTS ? traceSource() : undefined;
+    this.lists.get(kind).push({ m: this.frame.clone().multiply(this._local), c: color, source });
     // Whatever is the size of a room or more takes up its ground: nothing grows there, and
     // nobody walks through its walls.
     const s = this.scale ?? 1;
@@ -125,8 +138,9 @@ class Parts {
       });
       mesh.castShadow = KINDS[kind].shadow !== false;
       mesh.receiveShadow = true;
-      // Which kind of part each instance is: the world lint (test/) reads them back.
+      // Which kind of part each instance is, and who laid it: the world lint (test/) reads them back.
       mesh.userData.part = kind;
+      if (globalThis.TRACE_PARTS) mesh.userData.sources = items.map((it) => it.source);
       scene.add(mesh);
     }
     for (const { p, reach } of this.lights) lamplight(scene, p.x, p.y, p.z, reach);
@@ -1104,7 +1118,8 @@ function buildSmoke(scene, rng, chimneys, animated) {
   });
 }
 
-export function buildVillages(scene, rng, animated) {
+/** `inspect(id, group)`, if given, sees the village's furniture before it is baked: see world.js. */
+export function buildVillages(scene, rng, animated, inspect = null) {
   const parts = new Parts();
   const placed = [];
   const furniture = new THREE.Group();
@@ -1155,6 +1170,7 @@ export function buildVillages(scene, rng, animated) {
   }
 
   parts.build(scene);
+  inspect?.('village', furniture);
   scene.add(bake(furniture));
   buildSmoke(scene, rng, parts.chimneys, animated);
 }

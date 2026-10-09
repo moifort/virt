@@ -15,11 +15,9 @@ const REACH = 0.6; // how far past the edge of a way a stair's end may stop
 
 const name = (lane) => `${lane.stair ? 'stair' : lane.quay ? 'quay' : 'lane'} from (${lane.pts[0].x.toFixed(0)}, ${lane.pts[0].z.toFixed(0)}) to (${lane.pts.at(-1).x.toFixed(0)}, ${lane.pts.at(-1).z.toFixed(0)})`;
 
-// Known: the lane coming up to the well square takes the square's level at its last vertex
-// and its own a vertex earlier, and so ramps 1.5 m over its last two metres, while the
-// square's skirt cuts the ground there its own way. A ratchet until the lane is measured to
-// the edge of the square as the stairs are.
-const AXIS_OFF = 5;
+// Known: two stairs whose last metre lies in the cut of the lane they reach, half a metre off
+// their own paving. A ratchet until the cuts are blended where ways meet.
+const AXIS_OFF = 2;
 
 test('the paving of every lane lies on the ground along its axis', () => {
   const { plan } = island();
@@ -37,7 +35,7 @@ test('the paving of every lane lies on the ground along its axis', () => {
 // Known: where one way meets another, the two cuts into the hillside overlap, and along the
 // last metres of the one arriving its edges lie at the other's level while its axis still
 // holds its own. A ratchet until the levels are blended at the junctions.
-const EDGES_OFF = 45;
+const EDGES_OFF = 28;
 
 test('the paving of every lane lies on the ground out to its walls', () => {
   const { plan } = island();

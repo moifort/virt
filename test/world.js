@@ -30,7 +30,7 @@ export function island() {
         if (obj.userData.aloft) continue; // hangs in the air by nature
         const box = new THREE.Box3().setFromObject(obj, true);
         if (box.isEmpty()) continue;
-        props.push({ zone, box, label: describe(zone, obj, box) });
+        props.push({ zone, box, label: describe(zone, obj, box), name: obj.name, group: !obj.isMesh, front: obj.userData.front, matrix: obj.matrixWorld.clone(), local: localBox(obj) });
       }
     },
   });
@@ -51,7 +51,8 @@ export function island() {
         box.copy(obj.geometry.boundingBox).applyMatrix4(m);
         const b = box.clone();
         const size = b.getSize(new THREE.Vector3());
-        parts.push({ kind, box: b, label: `${kind} ${size.x.toFixed(1)}×${size.y.toFixed(1)}×${size.z.toFixed(1)} ${at(b)}` });
+        const source = obj.userData.sources?.[i];
+        parts.push({ kind, box: b, label: `${kind} ${size.x.toFixed(1)}×${size.y.toFixed(1)}×${size.z.toFixed(1)} ${at(b)}${source ? ` [${source}]` : ''}` });
       } else if (obj.userData.scatter) {
         const p = new THREE.Vector3().setFromMatrixPosition(m);
         const what = obj.geometry.type.replace('Geometry', '').toLowerCase();
@@ -71,6 +72,19 @@ function* flatten(group) {
     if (!child.isMesh && child.children.length && spans(child) > CONTAINER) yield* flatten(child);
     else yield child;
   }
+}
+
+/** The bounds of an object in its own frame: turned with it, the tightest box round it. */
+function localBox(obj) {
+  const inverse = obj.matrixWorld.clone().invert();
+  const box = new THREE.Box3();
+  const m = new THREE.Matrix4();
+  obj.traverse((child) => {
+    if (!child.isMesh || child.userData.aloft) return;
+    if (!child.geometry.boundingBox) child.geometry.computeBoundingBox();
+    box.union(child.geometry.boundingBox.clone().applyMatrix4(m.multiplyMatrices(inverse, child.matrixWorld)));
+  });
+  return box;
 }
 
 function spans(obj) {

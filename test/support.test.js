@@ -5,7 +5,9 @@ import { test } from 'bun:test';
 import { Buckets, WATER_LEVEL, at, expectNone, groundAt, groundUnder, island, overlapXZ } from './world.js';
 
 const TOL = 0.35; // how far a thing's bottom may hang over what it stands on
-const WATER_TOL = 0.6; // things afloat ride a little high
+// Things afloat ride at the surface, a bob above it at most. Whatever stands higher, on a
+// pier half a metre over the water, must stand on the pier.
+const WATER_TOL = 0.2;
 const SHARE = 0.5; // the share of a footprint the ground must reach for it to count as standing on it
 const BURIED = 0.5; // a thing whose top is this far under the lowest ground under it is never seen
 

@@ -17,9 +17,10 @@ export function at(obj, x, y, z, parent) {
   return obj;
 }
 
-// The `userData` marks read by the world lint (test/): `aloft` on whatever hangs in the air
-// by nature (a festoon, a sign on its chains, a screen on a wall), so that it is not reported
-// as floating; `seat` and `lamp`, set by `seat` and `lamplight` below.
+// The marks read by the world lint (test/): `userData.aloft` on whatever hangs in the air by
+// nature (a festoon, a sign on its chains, a screen on a wall), so that it is not reported as
+// floating; `userData.front` on what has a front that must face a given way; `seat` and `lamp`,
+// set by `seat` and `lamplight` below; and a few names (`street lamp`, `plank`, `step`).
 
 /** Marks an object as animated so `bake` leaves it alone. */
 export const live = (obj) => {
@@ -125,6 +126,7 @@ export function plant(parent, x, y, z, rng) {
  */
 export function lantern(parent, x, y, z, { color = WARM_LIGHT, toward = null } = {}) {
   const g = at(new THREE.Group(), x, y, z, parent);
+  g.name = 'street lamp';
   if (toward) g.rotation.y = Math.atan2(-(toward[1] - z), toward[0] - x);
   at(cyl(0.16, 0.24, 0.5, INK, 6), 0, 0.25, 0, g);
   at(cyl(0.06, 0.09, 2.7, INK, 6), 0, 1.6, 0, g);

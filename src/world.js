@@ -59,9 +59,9 @@ function lightCone(scene, lamp) {
 }
 
 /**
- * Builds the island into `scene`. `inspect(id, group)`, if given, sees each work zone's group
- * as built, every object still its own, before it is baked into a few meshes: the world lint
- * (test/) reads where everything stands from it.
+ * Builds the island into `scene`. `inspect(id, group)`, if given, sees each work zone's group,
+ * and the village's furniture, as built, every object still its own, before it is baked into
+ * a few meshes: the world lint (test/) reads where everything stands from it.
  */
 export function createWorld(scene, { inspect = null } = {}) {
   const rng = mulberry32(20261005);
@@ -102,7 +102,7 @@ export function createWorld(scene, { inspect = null } = {}) {
   }
   buildLighthouseWalk(scene, rng, animated);
   buildObservatory(scene, rng);
-  buildVillages(scene, rng, animated);
+  buildVillages(scene, rng, animated, inspect);
   buildEstate(scene, rng);
   buildNature(scene, rng, animated);
   buildLife(scene, rng, animated);

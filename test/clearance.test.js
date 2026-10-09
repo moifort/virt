@@ -6,18 +6,17 @@ import { Buckets, expectAtMost, expectNone, island, laneAt, overlapXZ } from './
 const CLEAR_FROM = 0.5; // above the paving: a tread or a flag is lower
 const CLEAR_TO = 2.2; // the height of a door
 // The middle of a way must stay clear; along its edges stand its walls, and the benches and
-// pots at the doors. A wide lane keeps a clear way 1.6 m narrower than itself, a stair at least
-// 0.9 m.
-const clearHalf = (lane) => Math.max(0.45, lane.half - 0.8);
+// pots at the doors (at the village's scale, a metre deep). A lane keeps a clear way 2 m
+// narrower than itself, a stair at least 0.9 m (village.js, `inWay`).
+const clearHalf = (lane) => Math.max(0.45, lane.half - 1.0);
 const STRUCTURAL = new Set(['box', 'drystone', 'cyl', 'pyramid', 'gable', 'cone', 'arch']);
 
 const name = (lane) => `${lane.stair ? 'stair' : lane.quay ? 'quay' : 'lane'} from (${lane.pts[0].x.toFixed(0)}, ${lane.pts[0].z.toFixed(0)}) to (${lane.pts.at(-1).x.toFixed(0)}, ${lane.pts.at(-1).z.toFixed(0)})`;
 
-// Known: the bench and the pots at a door are set at the floor of the house, and where the
-// house stands beside a stair or at a bend they hang a metre or two over the paving; and at
-// the foot of the well square, where a stair, a lane and the square's skirt meet, the walls
-// of each are built on the ground of the others. A ratchet until those are sorted out.
-const ACROSS = 10;
+// Known: where a stair lands on a lane beside the well square, the paving of the one is laid
+// on the ground cut for the other, half a metre up; and a pot at a door on the church lane.
+// A ratchet until the cuts are blended where ways meet (see test/ground, EDGES_OFF).
+const ACROSS = 2;
 
 test('no part of a village stands across a lane or a stair', () => {
   const { parts, plan } = island();
