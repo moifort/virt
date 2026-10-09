@@ -528,29 +528,34 @@
           box-shadow: 0 0 0 3px rgba(79, 212, 122, 0.3);
         }
       }
-      /* While the island is built: the view the map opens on, blurred, a small loader and a
-         word. Building the map holds the page's thread for seconds, so nothing here moves but by
-         opacity, which the browser animates on its own while the script runs. The shot is wider
-         than any window and cropped at the sides as the map is, so it lies exactly over it:
-         main.js brings it slowly into focus as it fades, once the map has drawn its first frames
-         (see shoot.js). */
+      /* While the island is built: the arrival. The view the map opens on lies blurred under
+         a sea of pixel clouds, as from a plane coming in over them, with a title card and a
+         small loader. Building the map holds the page's thread for seconds, so everything
+         here moves by transform and opacity only, which the browser animates on its own while
+         the script runs: the clouds drift (an animation on the outer element). Once the map
+         has drawn its first frames main.js adds `is-done`: the plane comes down through the
+         clouds, which swell, part and slip off the sides (a transition on the inner element,
+         composed with the drift so nothing jumps), while the shot comes into focus and fades
+         on the map beneath. The shot is wider than any window and cropped at the sides as the
+         map is, so it lies exactly over it (see shoot.js); the clouds are drawn by the script
+         at the foot of the page. */
       .loading {
         position: fixed;
         inset: 0;
         z-index: 100;
         overflow: hidden;
         background: #9ccbf0;
-        transition: opacity 2.8s ease-in-out;
+        transition: opacity 2.6s ease-in-out 1.4s;
       }
       .loading img {
         width: 100%;
         height: 100%;
         object-fit: cover;
-        filter: blur(14px) saturate(1.1);
-        transform: scale(1.06);
+        filter: blur(12px) saturate(1.1);
+        transform: scale(1.08);
         transition:
-          filter 2.8s ease-in-out,
-          transform 2.8s ease-in-out;
+          filter 3s ease-in-out 0.5s,
+          transform 3s ease-in-out 0.5s;
       }
       .loading.is-done {
         opacity: 0;
@@ -560,27 +565,88 @@
         filter: blur(0) saturate(1);
         transform: none;
       }
+      /* The morning light over the clouds, from the upper left. */
+      .loading-light {
+        position: absolute;
+        inset: 0;
+        background: radial-gradient(ellipse 60% 50% at 18% 8%, rgba(255, 244, 214, 0.5), rgba(255, 244, 214, 0) 100%);
+        transition: opacity 1.6s ease-in-out;
+      }
+      /* Each cloud is drawn pixel by pixel on a small canvas and enlarged with nearest
+         sampling, as the map itself is. `--x` and `--y` set it on the screen, `--ax` / `--ay`
+         the way it goes when the plane comes down through it, `--i` its turn. */
+      .loading-cloud {
+        position: absolute;
+        left: var(--x);
+        top: var(--y);
+        width: 0;
+        height: 0;
+        animation: loading-drift var(--drift) ease-in-out infinite alternate;
+        animation-delay: var(--phase);
+      }
+      .loading-cloud canvas {
+        display: block;
+        position: absolute;
+        left: 0;
+        top: 0;
+        image-rendering: pixelated;
+        transform: translate(-50%, -50%);
+        filter: drop-shadow(0 6px 14px rgba(43, 60, 110, 0.18));
+        transition:
+          transform 3.4s cubic-bezier(0.5, 0, 0.75, 0.6),
+          opacity 2s ease-in 1s;
+        transition-delay: calc(var(--i) * 70ms), calc(1s + var(--i) * 70ms);
+      }
+      .loading.is-done .loading-cloud canvas {
+        opacity: 0;
+        transform: translate(-50%, -50%) translate(var(--ax), var(--ay)) scale(2.4);
+      }
+      .loading.is-done .loading-light {
+        opacity: 0;
+      }
+      @keyframes loading-drift {
+        from {
+          transform: translate(-2.4vw, 0.4vh);
+        }
+        to {
+          transform: translate(2.4vw, -0.4vh);
+        }
+      }
       .loading-caption {
         position: absolute;
         inset: 0;
         display: grid;
         place-content: center;
         justify-items: center;
-        gap: 14px;
+        gap: 18px;
         color: var(--paper);
-        font-size: max(18px, 2.6vmin);
         letter-spacing: 0.08em;
-        text-shadow: 0 2px 10px rgba(28, 35, 80, 0.55);
-        transition: opacity 0.6s ease;
+        text-shadow:
+          0 1px 0 rgba(255, 255, 255, 0.25),
+          0 3px 14px rgba(28, 35, 80, 0.5);
+        transition: opacity 0.7s ease, transform 0.9s ease;
+      }
+      .loading-title {
+        font-size: max(26px, 5.2vmin);
+        font-weight: 700;
+        line-height: 1;
+      }
+      .loading-sub {
+        font-size: max(12px, 1.7vmin);
+        letter-spacing: 0.34em;
+        opacity: 0.85;
+        margin-top: -6px;
       }
       .loading.is-done .loading-caption {
         opacity: 0;
+        transform: translateY(-10px);
       }
       /* Eight squares round a ring, lit one after the other. */
       .loading-spinner {
         display: grid;
         grid-template: repeat(3, 6px) / repeat(3, 6px);
         gap: 2px;
+        margin-top: 6px;
         filter: drop-shadow(0 1px 3px rgba(28, 35, 80, 0.5));
       }
       .loading-spinner i {
@@ -627,13 +693,80 @@
     </script>
   </head>
   <body>
-    <div class="loading" id="loading" role="status">
+    <div class="loading" id="loading" role="status" aria-label="Chargement">
       <img src="assets/loading/opening.jpg" alt="" />
+      <div class="loading-light"></div>
+      <div class="loading-sky" aria-hidden="true"></div>
       <div class="loading-caption">
+        <span class="loading-title">Les Jardins de Sable</span>
+        <span class="loading-sub">VIRT</span>
         <span class="loading-spinner" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
-        <span>Chargement</span>
       </div>
     </div>
+    <script>
+      // The sea of clouds of the loading screen, drawn before the map's script is fetched. Each
+      // cloud is a cumulus heaped from a flat base, rasterised pixel by pixel on a small canvas
+      // in the three tones of the clouds painted in the game's sky: sunlit crowns to the upper
+      // left, the white body, the blue-lavender shade of the hollows and the underside. The
+      // canvas is then enlarged with nearest sampling, and sent off outward from the middle of
+      // the screen when the plane comes down through the layer (see the styles above).
+      (() => {
+        const sky = document.querySelector('.loading-sky');
+        let seed = 7;
+        const rand = () => (seed = (seed * 1664525 + 1013904223) % 4294967296) / 4294967296;
+        const CROWN = [255, 255, 255];
+        const BODY = [234, 241, 252];
+        const SHADE = [188, 202, 234];
+        const draw = (width) => {
+          const height = Math.round(width * 0.42);
+          const base = height - 4;
+          // Puffs heaped along the base, the tallest about the middle.
+          const puffs = [];
+          const count = 4 + Math.floor(width / 24);
+          for (let i = 0; i < count; i++) {
+            const t = (i + 0.5) / count;
+            const r = (0.14 + 0.2 * Math.sin(t * Math.PI) + rand() * 0.12) * width * 0.5;
+            puffs.push([t * width + (rand() - 0.5) * 8, base - r * (0.75 + rand() * 0.35), r]);
+          }
+          const inside = (x, y) => y < base && puffs.some(([cx, cy, r]) => (x - cx) * (x - cx) + (y - cy) * (y - cy) < r * r);
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ink = canvas.getContext('2d');
+          const image = ink.createImageData(width, height);
+          for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+              if (!inside(x, y)) continue;
+              const tone = !inside(x - 3, y - 4) ? CROWN : !inside(x + 2, y + 4) || y > base - 3 ? SHADE : BODY;
+              image.data.set([...tone, 255], (y * width + x) * 4);
+            }
+          }
+          ink.putImageData(image, 0, 0);
+          return canvas;
+        };
+        // A dozen clouds about the screen, the big ones nearest, each going off from the middle.
+        // They are enlarged with the window, so that a wide screen is as well covered as a small one.
+        const grow = Math.min(Math.max(innerWidth / 900, 1), 2);
+        const spots = [
+          [8, 14, 5], [30, 6, 4], [55, 10, 6], [82, 8, 4.5], [96, 30, 5],
+          [12, 44, 4], [40, 38, 3], [70, 42, 3.5], [90, 60, 4],
+          [6, 80, 6], [28, 90, 5], [52, 78, 4], [76, 92, 6], [98, 88, 4],
+        ];
+        spots.forEach(([x, y, s], i) => {
+          const cloud = document.createElement('div');
+          cloud.className = 'loading-cloud';
+          const ax = (x - 50) * 1.6;
+          const ay = (y - 50) * 1.6;
+          cloud.style.cssText = `--x:${x}%;--y:${y}%;--i:${i};--ax:${ax}vw;--ay:${ay}vh;--drift:${34 + rand() * 24}s;--phase:${-rand() * 40}s`;
+          const canvas = draw(48 + Math.floor(rand() * 60));
+          // Enlarged by its style, not by a transform, so that it is drawn crisp while at rest.
+          canvas.style.width = `${canvas.width * s * grow}px`;
+          canvas.style.height = `${canvas.height * s * grow}px`;
+          cloud.append(canvas);
+          sky.append(cloud);
+        });
+      })();
+    </script>
     <script type="module" src="src/main.js"></script>
   </body>
 </html>

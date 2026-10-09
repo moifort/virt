@@ -311,13 +311,14 @@ function frame() {
   weather.slant = (climate.wind.x * view.right.x + climate.wind.y * view.right.z) * weather.wind;
   pixels.render(scene, view.camera, { skyTop: climate.skyTop, skyHorizon: climate.skyHorizon, texelWorld: view.texelWorld, time: t, weather });
   // The first frame compiles every shader; once the second is drawn the map runs, and the
-  // blurred shot of the loading screen (index.html) comes into focus on it as it fades away.
-  // Then the hour and the weather move on to the player's own.
+  // loading screen (index.html) plays its arrival: the plane comes down through the clouds,
+  // and the blurred shot comes into focus on the map as it fades away. Then the hour and the
+  // weather move on to the player's own.
   if (frames === 2) {
     const loading = document.getElementById('loading');
     loading?.classList.add('is-done');
-    setTimeout(() => loading?.remove(), 3000);
-    if (opensOnShot) setTimeout(() => climate.rejoin(), 3000);
+    setTimeout(() => loading?.remove(), 4200);
+    if (opensOnShot) setTimeout(() => climate.rejoin(), 4200);
   }
 }
 // `virt.frame()` runs one frame by hand, for timing it while the page is hidden.
