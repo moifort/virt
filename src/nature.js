@@ -512,7 +512,7 @@ function prototype(group) {
 }
 
 /** Instances a species across the bay: a few baked variants, many placements. */
-function grow(scene, rng, build, { count, variants = 3, margin = 0, maxSlope = 0.4, where = () => true, size = [0.8, 1.25], sink = 0.1, sample = anywhere }) {
+function grow(scene, rng, build, { count, variants = 3, margin = 0, maxSlope = 0.4, where = () => true, size = [0.8, 1.25], sink = 0.1, sample = anywhere, bed = 0 }) {
   const protos = Array.from({ length: variants }, () => prototype(build(rng)));
   const placements = protos.map(() => []);
   const p = new THREE.Vector3();
@@ -526,6 +526,14 @@ function grow(scene, rng, build, { count, variants = 3, margin = 0, maxSlope = 0
     s.setScalar(size[0] + rng() * (size[1] - size[0]));
     // On a slope the foot of the plant is buried on the uphill side.
     p.y -= sink + slope * 0.7;
+    // What is broad at the foot (`bed`, its reach in its own metres) is set no higher than the
+    // lowest ground under it, or it hangs out over the slope on the downhill side.
+    if (bed) {
+      for (let k = 0; k < 8; k++) {
+        const a = (k / 8) * Math.PI * 2;
+        p.y = Math.min(p.y, groundAt(p.x + Math.cos(a) * bed * s.x, p.z + Math.sin(a) * bed * s.x));
+      }
+    }
     placements[Math.floor(rng() * variants)].push(new THREE.Matrix4().compose(p, q, s));
     n++;
   }
@@ -608,7 +616,14 @@ export function buildNature(scene, rng, animated) {
     if (!isWild(p.x, p.z)) return false;
     if (region(p.x, p.z) !== 'mountain' ? r() < 0.6 : worked(p.x, p.z) > 0.5) return false;
     s.set(0.6 + r() * 1.4, 0.5 + r() * 1.5, 0.6 + r() * 1.4);
-    p.y += s.y * 0.3;
+    // Bedded on the lowest ground round it, the uphill side sunk into the slope: set on the
+    // ground at its middle, a boulder on a steep slope hung out over it on the downhill side.
+    let lowest = Infinity;
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2;
+      lowest = Math.min(lowest, groundAt(p.x + Math.cos(a) * Math.max(s.x, s.z) * 0.8, p.z + Math.sin(a) * Math.max(s.x, s.z) * 0.8));
+    }
+    p.y = Math.min(p.y + s.y * 0.3, lowest + s.y * 0.75);
     c.setHex(pick(r, ROCK));
     // No tree grows out of the middle of a boulder.
     occupy(p.x, p.z, 0, Math.max(s.x, s.z), Math.max(s.x, s.z));
@@ -664,7 +679,7 @@ export function buildNature(scene, rng, animated) {
   grow(scene, rng, pricklyPear, { count: 60, variants: 3, maxSlope: 0.7, where: on('shore', 'plain') });
 
   // Limestone outcrops on the wild ground.
-  grow(scene, rng, outcrop, { count: 100, variants: 4, margin: 1, maxSlope: 1.3, where: (x, z) => worked(x, z) < 0.5, size: [0.7, 1.6], sink: 0.25 });
+  grow(scene, rng, outcrop, { count: 100, variants: 4, margin: 1, maxSlope: 1.3, where: (x, z) => worked(x, z) < 0.5, size: [0.7, 1.6], sink: 0.25, bed: 1.6 });
 
   // Lanterns along the footpaths, baked together.
   const lamps = new THREE.Group();

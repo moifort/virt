@@ -69,3 +69,20 @@ test('every seat stands at sitting height over the ground', () => {
   }
   expectNone(odd, 'seats at an odd height');
 });
+
+test('no boulder hangs out over the slope it lies on', () => {
+  const { scatter } = island();
+  const hanging = [];
+  for (const rock of scatter) {
+    if (!['dodecahedron', 'outcrop'].includes(rock.kind) || rock.reach < 0.5 || rock.y < WATER_LEVEL) continue;
+    const { bottom } = rock;
+    // Round the rock, a little in from its edge: the ground there must reach up to it.
+    let lowest = Infinity;
+    for (let k = 0; k < 8; k++) {
+      const a = (k / 8) * Math.PI * 2;
+      lowest = Math.min(lowest, groundAt(rock.x + Math.cos(a) * rock.reach * 0.7, rock.z + Math.sin(a) * rock.reach * 0.7));
+    }
+    if (lowest < bottom - 0.35) hanging.push(`${rock.label}: ${(bottom - lowest).toFixed(2)} m of air under its downhill side`);
+  }
+  expectNone(hanging, 'boulders hanging over the slope');
+});

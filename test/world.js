@@ -53,11 +53,13 @@ export function island() {
         const size = b.getSize(new THREE.Vector3());
         const source = obj.userData.sources?.[i];
         parts.push({ kind, box: b, label: `${kind} ${size.x.toFixed(1)}×${size.y.toFixed(1)}×${size.z.toFixed(1)} ${at(b)}${source ? ` [${source}]` : ''}` });
-      } else if (obj.userData.scatter) {
+      } else if (obj.userData.scatter || obj.userData.plant === 'outcrop') {
         const p = new THREE.Vector3().setFromMatrixPosition(m);
-        const what = obj.geometry.type.replace('Geometry', '').toLowerCase();
-        const height = (obj.geometry.boundingBox.max.y - obj.geometry.boundingBox.min.y) * new THREE.Vector3().setFromMatrixScale(m).y;
-        scatter.push({ x: p.x, y: p.y, z: p.z, height, label: `scattered ${what} #${i} (${height.toFixed(1)} tall) at (${p.x.toFixed(1)}, ${p.z.toFixed(1)})` });
+        const what = obj.userData.plant ?? obj.geometry.type.replace('Geometry', '').toLowerCase();
+        const scale = new THREE.Vector3().setFromMatrixScale(m);
+        const height = (obj.geometry.boundingBox.max.y - obj.geometry.boundingBox.min.y) * scale.y;
+        const radius = (obj.geometry.boundingBox.max.x - obj.geometry.boundingBox.min.x) / 2;
+        scatter.push({ x: p.x, y: p.y, z: p.z, height, kind: what, reach: radius * Math.max(scale.x, scale.z), bottom: p.y + obj.geometry.boundingBox.min.y * scale.y, label: `scattered ${what} #${i} (${height.toFixed(1)} tall) at (${p.x.toFixed(1)}, ${p.z.toFixed(1)})` });
       }
     }
   });
