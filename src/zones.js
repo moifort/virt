@@ -3,7 +3,7 @@ import * as THREE from 'three';
 import { mulberry32, pick } from './noise.js';
 import { PAL, WATER_LEVEL, paint, solid } from './style.js';
 import { DARK_WOOD, INK, SCREEN, STONE, WARM_LIGHT, at, bake, ball, box, cone, cyl, lamplight, lantern, live, plant, ring, screen, seat } from './kit.js';
-import { ISLET, OBSERVATORY, SUN_DIR, ZONES, groundAt, laneAt, lanePoint, toX, toZ, villagePlan } from './terrain.js';
+import { ISLET, OBSERVATORY, SUN_DIR, ZONES, groundAt, laneAt, lanePoint, occupy, toX, toZ, villagePlan } from './terrain.js';
 import { cypress, lemonTree } from './nature.js';
 
 /** Shelves of books along a wall. axis 'x' runs along x facing +z; axis 'z' runs along z facing +x. */
@@ -318,6 +318,7 @@ export function buildAtelier(g, rng, animated) {
   at(box(3.6, 0.14, 1.4, PAL.wood), -1, 1.4, 4.5, g);
   for (const dx of [-1.6, 1.6]) at(box(0.14, 1.1, 1.2, DARK_WOOD), -1 + dx, 0.85, 4.5, g);
   const proto = at(live(new THREE.Group()), -1.2, 1.75, 4.5, g);
+  proto.userData.aloft = true; // a prototype turning in the air over the bench
   at(ball(0.35, PAL.ivory, { flat: true }, 6, 4), 0, 0, 0, proto);
   at(new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.05, 6, 24), paint(SCREEN, { glow: true })), 0, 0, 0, proto);
   animated.push((t) => proto.rotation.set(t * 0.7, t, 0));
@@ -662,6 +663,10 @@ export function lighthouse(parent, x, y, z, size = 1) {
 function fishStall(parent, rng, x, z, yaw) {
   const s = at(new THREE.Group(), x, 0.2, z, parent);
   s.rotation.y = yaw;
+  // Its front, where the customers stand (+z, the side away from the awning's poles): the
+  // world lint (test/) checks it faces the street.
+  s.name = 'fish stall';
+  s.userData.front = 'street';
   const color = pick(rng, [PAL.red, PAL.teal, PAL.blue, PAL.coral]);
   for (const [dx, dz] of [[-1.3, -0.5], [1.3, -0.5], [-1.3, 0.5], [1.3, 0.5]]) at(box(0.12, 0.9, 0.12, PAL.wood), dx, 0.45, dz, s);
   at(box(2.9, 0.12, 1.4, PAL.wood), 0, 0.95, 0, s);
@@ -974,12 +979,38 @@ export function buildPort(g, rng, animated) {
     const dz = p.z + p.tx * sea * Q - g.position.z;
     return dx * Math.sin(turn) + dz * Math.cos(turn);
   };
-  // Stone steps down from the edge of the quay onto each pier.
-  const steps = (x, width) => {
-    const n = Math.ceil((quayTop - DECK - 0.2) / 0.3);
-    const z0 = edgeAt(x);
-    for (let k = 0; k < n; k++) at(box(width, 0.3, 0.62, k % 2 ? 0xd8cdb7 : 0xcdc2ab), x, quayTop - 0.15 - k * 0.3, z0 + 0.31 + k * 0.62, g);
+  // The face of the quay wall stands this far out from the edge of its paving (village.js,
+  // `quayWall`): whatever leaves the quay for the water leaves from it.
+  const FACE = 0.45;
+  const TREAD = 0.62;
+  // A flight of steps from the face of the quay wall down to `floor`: every step solid down to
+  // it, so the flight stands as one block, and as wide as the way it leads to. Stone onto the
+  // mole, wood onto the piers and the jetty, as the planks it lands on. Returns where it ends.
+  const steps = (x, width, floor, wood = false) => {
+    const z0 = edgeAt(x) + FACE;
+    const n = Math.max(2, Math.round((quayTop - floor) / 0.28));
+    const rise = (quayTop - floor) / n;
+    for (let k = 1; k < n; k++) {
+      const top = quayTop - k * rise;
+      const color = wood ? pick(rng, TIMBER) : k % 2 ? 0xd8cdb7 : 0xcdc2ab;
+      at(box(width, top - floor + 0.04, TREAD, color), x, (top + floor - 0.04) / 2, z0 + (k - 0.5) * TREAD, g).name = 'step';
+      // A wooden flight is boarded on its sides, a darker plank along each.
+      if (wood) for (const s of [-1, 1]) at(box(0.08, top - floor + 0.1, TREAD, DARK_WOOD), x + s * (width / 2 + 0.04), (top + floor + 0.02) / 2, z0 + (k - 0.5) * TREAD, g);
+    }
+    return z0 + (n - 1) * TREAD;
   };
+  // A post at the end of a pier with a little lantern on top: no street lamp stands on planks.
+  const postLantern = (x, z) => {
+    const post = at(new THREE.Group(), x, 0.12, z, deck);
+    post.name = 'post lantern';
+    at(box(0.2, 1.1, 0.2, DARK_WOOD), 0, 0.55, 0, post);
+    at(box(0.3, 0.06, 0.3, DARK_WOOD), 0, 1.13, 0, post);
+    at(cyl(0.12, 0.1, 0.28, WARM_LIGHT, 4, { glow: true }), 0, 1.3, 0, post).rotation.y = Math.PI / 4;
+    at(cone(0.18, 0.14, INK, 4), 0, 1.51, 0, post).rotation.y = Math.PI / 4;
+    lamplight(post, 0, 1.3, 0, 4.5);
+  };
+  // Where the piers and the jetty end, out over the water.
+  const PIER_END = Q + 19.6;
 
   // A straight wooden jetty at the plain end of the quay, the pontoon farthest from the mole.
   const plank = (x, z, yaw, width) => {
@@ -993,7 +1024,7 @@ export function buildPort(g, rng, animated) {
   const PLANE = { x: JETTY + 8.5, z: Q + 22 };
   at(live(plane), PLANE.x, surface + 0.1, PLANE.z, g);
   const bow = { x: PLANE.x, z: PLANE.z + 3.3 };
-  const endPile = { x: JETTY + 1.4, z: Q + 19.6 };
+  const endPile = { x: JETTY + 1.4, z: Q + 20.2 };
   const rope = at(box(0.04, 0.04, Math.hypot(bow.x - endPile.x, bow.z - endPile.z), 0xe6dcc8), (bow.x + endPile.x) / 2, DECK - 0.1, (bow.z + endPile.z) / 2, g);
   rope.rotation.y = Math.atan2(bow.x - endPile.x, bow.z - endPile.z);
   animated.push((t, dt) => {
@@ -1001,16 +1032,21 @@ export function buildPort(g, rng, animated) {
     plane.rotation.z = Math.sin(t * 0.8) * 0.03;
     prop.rotation.z += dt * 3;
   });
-  for (let z = edgeAt(JETTY) + 0.4; z < Q + 21; z += 0.62) plank(JETTY, z + 0.31, 0, 3);
-  for (let z = edgeAt(JETTY) + 1.2; z < Q + 21; z += 3) for (const dx of [-1.4, 1.4]) pile(JETTY + dx, z);
-  lantern(deck, JETTY + 1, 0.13, Q + 20.4, { toward: [JETTY, Q + 20.4] });
-  steps(JETTY, 3);
+  // Every pier runs from the foot of the quay wall to the same end, however the quay bends.
+  const planks = (x, from, to, width, color) => {
+    const n = Math.ceil((to - from) / 0.62);
+    for (let i = 0; i < n; i++) at(box(width, 0.14, 0.56, color ?? pick(rng, TIMBER)), x, 0.05, from + 0.31 + ((to - from - 0.62) * i) / Math.max(1, n - 1), deck).name = 'plank';
+  };
+  planks(JETTY, edgeAt(JETTY) + FACE, PIER_END + 1.2, 3);
+  for (let z = edgeAt(JETTY) + 1.2; z < PIER_END + 1.2; z += 3) for (const dx of [-1.4, 1.4]) pile(JETTY + dx, z);
+  postLantern(JETTY + 1.2, PIER_END + 0.6);
+  steps(JETTY, 3, DECK, true);
   // Two wooden piers.
   for (const px of [-8, 6]) {
-    for (let i = 0; i < 30; i++) at(box(2.6, 0.16, 0.56, PAL.wood), px, 0.05, edgeAt(px) + 0.4 + i * 0.62, deck);
-    for (let z = Q + 1; z < Q + 19; z += 2.8) for (const dx of [-1.2, 1.2]) at(cyl(0.13, 0.13, 3.6, DARK_WOOD, 6), px + dx, -1.7, z, deck);
-    lantern(deck, px + 1.1, 0.13, Q + 18.6, { toward: [px, Q + 18.6] });
-    steps(px, 2.6);
+    planks(px, edgeAt(px) + FACE, PIER_END, 2.6, PAL.wood);
+    for (let z = Q + 1; z < PIER_END; z += 2.8) for (const dx of [-1.2, 1.2]) at(cyl(0.13, 0.13, 3.6, DARK_WOOD, 6), px + dx, -1.7, z, deck);
+    postLantern(px + 1.05, PIER_END - 0.5);
+    steps(px, 2.6, DECK, true);
   }
   for (let z = Q + 2; z < Q + 19; z += 2.8) for (const px of [-8, 6]) for (const dx of [-1.2, 1.2]) mussels(deck, rng, px + dx, z, 0.14);
 
@@ -1033,7 +1069,8 @@ export function buildPort(g, rng, animated) {
   // Its root is set into the end of the quay, a few steps down from the paving.
   const mole = (t) => [-22 + 15 * (1 - Math.cos(t * Math.PI * 0.5)), Q - 2.6 + 38 * Math.sin(t * Math.PI * 0.5)];
   const out = -1; // the open sea lies to the left of the way along the mole
-  steps(-22, 3.2);
+  // (The top of the mole, in the frame of the harbour: its blocks and their paving.)
+  steps(-22, 3.2, DECK - 0.12 + 0.53);
   const SEGS = 22;
   const moorings = [];
   for (let i = 0; i < SEGS; i++) {
@@ -1056,7 +1093,8 @@ export function buildPort(g, rng, animated) {
       if (rng() < 0.6) perchedGull(deck, x - out * Math.cos(yaw) * 1.4, top + 0.86, z + out * Math.sin(yaw) * 1.4, rng() * Math.PI * 2);
     }
     if (i % 7 === 1) perchedGull(deck, x + out * Math.cos(yaw) * 1.6, top + 0.9, z - out * Math.sin(yaw) * 1.6, yaw + Math.PI / 2 + (rng() - 0.5));
-    if (i % 6 === 3) lantern(deck, x - out * Math.cos(yaw) * 0.6, top, z + out * Math.sin(yaw) * 0.6, { toward: [x + out * Math.cos(yaw), z - out * Math.sin(yaw)] });
+    // (None at the head, where the green light stands.)
+    if (i % 6 === 3 && i < SEGS - 3) lantern(deck, x - out * Math.cos(yaw) * 0.6, top, z + out * Math.sin(yaw) * 0.6, { toward: [x + out * Math.cos(yaw), z - out * Math.sin(yaw)] });
     for (let k = 0; k < 2; k++) {
       const off = 2.5 + rng() * 1.6;
       const along = (rng() - 0.5) * len;
@@ -1128,9 +1166,10 @@ export function buildPort(g, rng, animated) {
   const slip = at(box(4.6, 0.5, 10, 0xd3c7b0), SLIP, rampAt(slipTop + 5) - 0.25, slipTop + 5, deck);
   slip.rotation.x = lean;
   for (const sx of [-1, 1]) at(box(0.3, 0.7, 10, BLOCK[1]), SLIP + sx * 2.45, rampAt(slipTop + 5) - 0.1, slipTop + 5, deck).rotation.x = lean;
-  for (const [dx, z] of [[-1.15, slipTop + 1.8], [1.15, slipTop + 3.1], [-0.2, slipTop + 6.6]]) {
+  // Each boat lies on two rollers, its keel on them, its stern clear of the quay wall.
+  for (const [dx, z] of [[-1.15, slipTop + 2.8], [1.15, slipTop + 3.6], [-0.2, slipTop + 7.0]]) {
     for (const dz of [-1.2, 1.2]) at(cyl(0.1, 0.1, 1.9, DARK_WOOD, 6), SLIP + dx, rampAt(z + dz) + 0.1, z + dz, deck).rotation.z = Math.PI / 2;
-    const boat = at(gozzo(rng), SLIP + dx, rampAt(z) + 0.2, z, deck);
+    const boat = at(gozzo(rng), SLIP + dx, rampAt(z) + 0.46, z, deck);
     boat.rotation.x = lean;
     boat.rotation.y = Math.PI;
   }
@@ -1148,11 +1187,21 @@ export function buildPort(g, rng, animated) {
 
   // The quay itself: two fishmongers' stalls, the gear of the boats, the cats.
   const quay = at(new THREE.Group(), 0, quayTop - 0.1, Q - 1.1, g);
-  for (const x of [-13, 10.5]) fishStall(quay, rng, x, 0, 0);
+  // The stalls face the street, the fishmonger behind the ice with his back to the boats.
+  for (const x of [-13, 10.5]) fishStall(quay, rng, x, 0, Math.PI);
   furnishPort(quay, g, rng, Q);
   const inset = (x) => edgeAt(x) - Q;
   for (const thing of quay.children) thing.position.z += inset(thing.position.x);
   harbourCats(quay, deck, rng, animated, Q, inset);
+  // Whatever stands on the quay takes up its ground: the boats the village hauls up on its
+  // quay (village.js, `quayWall`) are laid down elsewhere.
+  g.updateMatrixWorld(true);
+  for (const thing of quay.children) {
+    const bounds = new THREE.Box3().setFromObject(thing);
+    if (bounds.isEmpty()) continue;
+    const c = bounds.getCenter(new THREE.Vector3());
+    occupy(c.x, c.z, 0, (bounds.max.x - bounds.min.x) / 2, (bounds.max.z - bounds.min.z) / 2);
+  }
 }
 
 export function buildAgora(g, rng) {

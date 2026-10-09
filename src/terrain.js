@@ -78,7 +78,7 @@ export function occupy(x, z, yaw, hw, hd, top = -Infinity) {
   }
 }
 /** How built the ground is at (x, z): 0 free, 1 beside a building, 2 under one. */
-function builtAt(x, z) {
+export function builtAt(x, z) {
   const ix = Math.floor((x + HALF) / CELL);
   const iz = Math.floor((z + HALF) / CELL);
   return ix < 0 || iz < 0 || ix >= SEGMENTS || iz >= SEGMENTS ? 0 : BUILT[iz * SEGMENTS + ix];
@@ -139,8 +139,9 @@ export const VILLAGES = [
       { stair: true, width: 2.0, points: [sh(67.7, 26.7), sh(84, 27)] },
       { stair: true, width: 2.0, points: [sh(62.9, 34.5), sh(79, 30.4)] },
       { stair: true, width: 2.0, points: [sh(61, 43.5), sh(72, 49)] },
-      // The well square stands right under the top lane: its stair doubles back on itself.
-      { stair: true, width: 2.0, points: [sh(84.6, 34.7), sh(88.9, 27.9), sh(91.1, 31.1)] },
+      // The well square, a widening of the middle lane, stands fourteen metres under the top
+      // lane: its stair runs a long way across the slope before it turns up to it.
+      { stair: true, width: 2.0, points: [sh(84.6, 34.7), sh(90.6, 25.6), sh(93.2, 29.3)] },
       { stair: true, width: 2.0, points: [sh(71, 57.9), sh(83, 47.5)] },
       { stair: true, width: 2.2, points: [sh(99, 21), sh(102, 24), sh(103, 30), sh(101, 38.5)] },
       { stair: true, width: 2.0, points: [sh(60, 56), sh(71, 60)] },
@@ -196,8 +197,32 @@ export function villagePlan() {
   const piazzas = [];
   for (const village of VILLAGES) {
     const squares = (village.piazzas ?? []).map((pz) => ({ ...pz, village, x: toX(pz.u, pz.v), z: toZ(pz.u, pz.v) }));
+    // A square a lane runs through is a widening of that lane, at its level: measured on the
+    // hillside round it, the well square stood five metres over the lane through it, which
+    // climbed up to it and back down in a few metres.
+    const through = (pz) => {
+      let best = null;
+      for (const street of village.lanes ?? []) {
+        if (street.stair || street.quay) continue;
+        const pts = street.points.map(([u, v]) => ({ x: toX(u, v), z: toZ(u, v) }));
+        for (let i = 1; i < pts.length; i++) {
+          const [a, b] = [pts[i - 1], pts[i]];
+          const len2 = (b.x - a.x) ** 2 + (b.z - a.z) ** 2;
+          const t = Math.min(1, Math.max(0, ((pz.x - a.x) * (b.x - a.x) + (pz.z - a.z) * (b.z - a.z)) / len2));
+          const q = { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t };
+          const d = Math.hypot(pz.x - q.x, pz.z - q.z);
+          if (d < pz.r && (!best || d < best.d)) best = { d, q };
+        }
+      }
+      return best && best.q;
+    };
     for (const pz of squares) {
       if (pz.level !== undefined) continue;
+      const on = through(pz);
+      if (on) {
+        pz.level = natural(on.x, on.z);
+        continue;
+      }
       let sum = 0;
       for (let k = 0; k < 8; k++) sum += natural(pz.x + Math.cos((k * Math.PI) / 4) * pz.r * 0.6, pz.z + Math.sin((k * Math.PI) / 4) * pz.r * 0.6);
       pz.level = sum / 8;
@@ -232,6 +257,21 @@ export function villagePlan() {
             }
           }
           if (q) pts.splice(end ? i : 1, 0, q);
+        }
+      }
+      if (street.stair && pts.length > 2) {
+        // A stair turns on a landing: at each bend between its landings the flight stops for a
+        // metre either side, level. (Without one the treads of the two flights meet at the
+        // corner at different heights, and the inside of the turn is a jumble of them.)
+        const first = pts[1].landing !== undefined ? 1 : 0;
+        const last = pts[pts.length - 2].landing !== undefined ? pts.length - 2 : pts.length - 1;
+        for (let i = last - 1; i > first; i--) {
+          const [a, p, b] = [pts[i - 1], pts[i], pts[i + 1]];
+          const toward = (q, d) => {
+            const len = Math.hypot(q.x - p.x, q.z - p.z);
+            return { x: p.x + ((q.x - p.x) * Math.min(d, len / 2)) / len, z: p.z + ((q.z - p.z) * Math.min(d, len / 2)) / len, turn: true };
+          };
+          pts.splice(i, 1, toward(a, 1.0), toward(b, 1.0));
         }
       }
       const segs = [];
@@ -280,7 +320,11 @@ export function villagePlan() {
         const n = pts.length - 1;
         const a = n > 1 && pts[1].landing !== undefined ? 1 : 0;
         const b = n - 1 > a && pts[n - 1].landing !== undefined ? n - 1 : n;
-        const at = (i) => (i === 0 ? 0 : segs[i - 1].s0 + segs[i - 1].len);
+        // How far the flight has climbed at each vertex: along it, less its landings (the
+        // stretches between the two vertices of a turn).
+        const climb = [0];
+        for (let i = 1; i < pts.length; i++) climb.push(climb[i - 1] + (pts[i - 1].turn && pts[i].turn ? 0 : segs[i - 1].len));
+        const at = (i) => climb[i];
         const l0 = pts[a].landing ?? lane.levels[a];
         const l1 = pts[b].landing ?? lane.levels[b];
         const beyond = (p, landing, level) => (landing.on ? laneAt(landing.on, p.x, p.z).level : level);

@@ -13,7 +13,7 @@ import { pick, smoothstep } from './noise.js';
 import { PAL, WATER_LEVEL, paint } from './style.js';
 import { at, bake, lamplight, lantern, seat } from './kit.js';
 import { festoon, gozzo } from './zones.js';
-import { CLEARINGS, PATHS, SQUARE, UP, VILLAGES, ZONES, bankAt, cultivated, estateWeight, footU, groundAt, inSquare, isWild, laneAt, lanePoint, occupy, segmentDistance, slopeAt, toU, toV, toX, toZ, villagePlan } from './terrain.js';
+import { CLEARINGS, PATHS, SQUARE, UP, VILLAGES, ZONES, bankAt, builtAt, cultivated, estateWeight, footU, groundAt, inSquare, isWild, laneAt, lanePoint, occupy, segmentDistance, slopeAt, toU, toV, toX, toZ, villagePlan } from './terrain.js';
 
 const ballShape = new THREE.SphereGeometry(0.5, 8, 6);
 const boxShape = new THREE.BoxGeometry(1, 1, 1);
@@ -255,15 +255,22 @@ function house(parts, rng, w, d, floors, { plinth = 0, terrace = false, door = 0
     const stripe = pick(rng, [0xd9584a, 0x58a0a0, 0xe6b450, 0x5a86a0]);
     for (let k = 0; k < 5; k++) parts.add('box', -0.6 + k * 0.3, 2.9, d / 2 + 0.42, 0.3, 0.05, 0.9, k % 2 ? PAL.ivory : stripe, 0.4);
   }
+  // (Only where it stands by the wall: where the street bends away from a straight front, a
+  // bench or a pot would stand out in the middle of it.)
+  const byTheWall = (x, z) => !parts.inWay?.(parts.world(x, 0, z));
   if (rng() < 0.5) {
     const x = doorX > 0 ? doorX - 1.3 : doorX + 1.3;
     if (rng() < 0.5) {
-      parts.add('box', x, 0.45, d / 2 + 0.4, 1.1, 0.08, 0.36, WOOD);
-      for (const s of [-1, 1]) parts.add('box', x + s * 0.45, 0.22, d / 2 + 0.4, 0.08, 0.44, 0.3, WOOD);
+      if (byTheWall(x - 0.55, d / 2 + 0.58) && byTheWall(x + 0.55, d / 2 + 0.58)) {
+        parts.add('box', x, 0.45, d / 2 + 0.4, 1.1, 0.08, 0.36, WOOD);
+        for (const s of [-1, 1]) parts.add('box', x + s * 0.45, 0.22, d / 2 + 0.4, 0.08, 0.44, 0.3, WOOD);
+      }
     } else {
       for (const s of [-1, 0, 1]) {
+        const green = pick(rng, [0x5a9050, 0x4f8456, 0x74a862]);
+        if (!byTheWall(x + s * 0.4, d / 2 + 0.51)) continue;
         parts.add('cyl', x + s * 0.4, 0.2, d / 2 + 0.36, 0.3, 0.36, 0.3, TILE);
-        parts.add('leaf', x + s * 0.4, 0.55, d / 2 + 0.36, 0.42, 0.46, 0.42, pick(rng, [0x5a9050, 0x4f8456, 0x74a862]));
+        parts.add('leaf', x + s * 0.4, 0.55, d / 2 + 0.36, 0.42, 0.46, 0.42, green);
       }
     }
   }
@@ -438,6 +445,8 @@ function well(parts, x, y, z, yaw) {
 
 /** A wooden bench facing `yaw`, with two places to sit. */
 function bench(parts, furniture, x, y, z, yaw) {
+  // Not across a lane that opens on the square.
+  if (parts.inWay?.({ x, z })) return;
   parts.at(new THREE.Vector3(x, y, z), yaw, 1);
   parts.add('box', 0, 0.5, 0, 2.0, 0.12, 0.5, PAL.wood);
   parts.add('box', 0, 0.85, -0.24, 2.0, 0.45, 0.08, PAL.wood);
@@ -496,16 +505,19 @@ function siteFits(foot, lane, lanes, piazzas, placed, level, uphill, { waterfron
   }
   for (const other of placed) if (overlap(foot, other, slack)) return null;
   let cap;
+  // Against the other lanes, the very corners count: a lane that only clips one of them runs
+  // over the roof there all the same. Where it runs over the house, it is its lowest paving
+  // over it that the roof must stay under.
+  const edge = [...pts];
+  for (const sx of [-1, -0.5, 0.5, 1]) for (const sz of [-1, -0.5, 0.5, 1]) edge.push(corner(foot, sx, sz));
   for (const other of lanes) {
     if (other === lane) continue;
     let near = Infinity;
-    let there = 0;
-    for (const p of pts) {
+    let there = Infinity;
+    for (const p of edge) {
       const q = laneAt(other, p.x, p.z);
-      if (q.d < near) {
-        near = q.d;
-        there = q.level;
-      }
+      near = Math.min(near, q.d);
+      if (q.d < other.half + (other.quay ?? 0) + 0.5) there = Math.min(there, q.level);
     }
     if (near >= other.half + (other.quay ?? 0) + 0.5) continue;
     // A stair climbs as it goes: whatever level a roof is capped at, some of its flight
@@ -682,6 +694,8 @@ function laneEdges(parts, rng, lane, covered, furniture, lanes, piazzas) {
       const nx = -p.tz * side;
       const nz = p.tx * side;
       if (open(p.x + nx * (lane.half + 0.15), p.z + nz * (lane.half + 0.15), 0.3)) continue;
+      // Where the way bends, the wall on the inside of the bend would stand across it.
+      if (laneAt(lane, p.x + nx * (lane.half + 0.15), p.z + nz * (lane.half + 0.15)).d < lane.half - 0.05) continue;
       const beyond = groundAt(p.x + nx * (lane.half + 2.8), p.z + nz * (lane.half + 2.8));
       parts.at(new THREE.Vector3(p.x + nx * (lane.half + 0.15), 0, p.z + nz * (lane.half + 0.15)), Math.atan2(p.tx, p.tz), 1);
       if (lane.stair) parts.add('box', 0, here + 0.3, 0, 0.3, 1.1, TREAD + 0.05, WALL_STONE);
@@ -695,7 +709,8 @@ function laneEdges(parts, rng, lane, covered, furniture, lanes, piazzas) {
     if (s > nextLamp && !lane.quay) {
       const side = lane.quay ? -lane.seaSide : rng() < 0.5 ? -1 : 1;
       const out = lane.half - 0.35;
-      lantern(furniture, p.x - p.tz * side * out, here + 0.1, p.z + p.tx * side * out, { toward: [p.x, p.z] });
+      const [lx, lz] = [p.x - p.tz * side * out, p.z + p.tx * side * out];
+      lantern(furniture, lx, groundAt(lx, lz) + 0.1, lz, { toward: [p.x, p.z] });
       nextLamp = s + 9 + rng() * 5;
     }
     if (s > nextString && isCovered(-1, s) && isCovered(1, s)) {
@@ -734,6 +749,7 @@ function quayWall(parts, rng, lane, furniture) {
   const edge = lane.half + lane.quay;
   let nextLamp = 3 + rng() * 4;
   let nextBollard = 2;
+  const bollards = [];
   for (let s = 1.0; s < lane.length - 1; s += 2.0) {
     const p = lanePoint(lane, s);
     const nx = -p.tz * sea;
@@ -747,6 +763,7 @@ function quayWall(parts, rng, lane, furniture) {
     if (s > nextBollard) {
       parts.add('cyl', sea * 0.35, here + 0.55, 0, 0.3, 0.8, 0.3, IRON);
       parts.add('ball', sea * 0.35, here + 0.98, 0, 0.36, 0.3, 0.36, IRON);
+      bollards.push(s);
       nextBollard = s + 5 + rng() * 3;
     }
     if (s > nextLamp) {
@@ -755,11 +772,30 @@ function quayWall(parts, rng, lane, furniture) {
       nextLamp = s + 9 + rng() * 5;
     }
   }
-  // Two or three boats hauled up on the quay, lying over on their keels.
-  for (const t of [0.12, 0.3, 0.86]) {
-    if (rng() < 0.3) continue;
-    const p = lanePoint(lane, lane.length * t);
-    const out = lane.half + lane.quay * 0.45;
+  // Two or three boats hauled up on the quay, lying over on their keels: clear of the
+  // bollards along its edge, and of the stalls and the gear the harbour has set down on it
+  // (zones.js, `buildPort`, marks their ground as built).
+  const BOAT = { half: 2.7, beam: 1.0 };
+  const out = lane.half + lane.quay * 0.45;
+  const clear = (s) => {
+    if (s < BOAT.half + 0.5 || s > lane.length - BOAT.half - 0.5) return false;
+    if (bollards.some((b) => Math.abs(b - s) < BOAT.half + 0.6)) return false;
+    for (let ds = -BOAT.half; ds <= BOAT.half; ds += 0.5) {
+      const q = lanePoint(lane, s + ds);
+      for (const across of [-BOAT.beam, 0, BOAT.beam]) {
+        if (builtAt(q.x - q.tz * sea * (out + across), q.z + q.tx * sea * (out + across)) === 2) return false;
+      }
+    }
+    return true;
+  };
+  const hauled = [];
+  for (const t of [0.12, 0.3, 0.86, 0.5, 0.7]) {
+    if (hauled.length === 3 || rng() < 0.3) continue;
+    let s = null;
+    for (let d = 0; d < 6 && s === null; d += 0.5) for (const sign of [1, -1]) if (s === null && clear(lane.length * t + sign * d)) s = lane.length * t + sign * d;
+    if (s === null || hauled.some((h) => Math.abs(h - s) < BOAT.half * 2 + 0.4)) continue;
+    hauled.push(s);
+    const p = lanePoint(lane, s);
     const boat = at(gozzo(rng), p.x - p.tz * sea * out, groundAt(p.x, p.z) + 0.35, p.z + p.tx * sea * out, furniture);
     boat.rotation.y = Math.atan2(p.tx, p.tz) + (rng() - 0.5) * 0.3;
     boat.rotation.z = 0.22 * (rng() < 0.5 ? 1 : -1);
@@ -1077,6 +1113,13 @@ export function buildVillages(scene, rng, animated) {
   // across, as a Ligurian house is to the people who live in it.
   const SCALE = 2.0;
   const { lanes, piazzas } = villagePlan();
+  // The clear way down the middle of every lane and stair (2 m less than its width), which
+  // nothing set down beside it may stand in. The world lint (test/clearance) holds the same.
+  parts.inWay = ({ x, z }) =>
+    lanes.some((lane) => {
+      const q = laneAt(lane, x, z);
+      return q.d < Math.max(0.45, lane.half - 1.0) && q.s > 0.3 && q.s < lane.length - 0.3;
+    });
   for (const village of VILLAGES) {
     const streets = lanes.filter((l) => l.village === village);
     const squares = piazzas.filter((p) => p.village === village);
