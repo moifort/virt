@@ -1001,6 +1001,8 @@ export function scatterInstanced(scene, rng, geo, mat, count, place) {
   mesh.count = n;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
+  // Scattered over the island at random: the world lint (test/) checks where they landed.
+  mesh.userData.scatter = true;
   scene.add(mesh);
   return mesh;
 }

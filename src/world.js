@@ -58,7 +58,12 @@ function lightCone(scene, lamp) {
   return { pivot, material };
 }
 
-export function createWorld(scene) {
+/**
+ * Builds the island into `scene`. `inspect(id, group)`, if given, sees each work zone's group
+ * as built, every object still its own, before it is baked into a few meshes: the world lint
+ * (test/) reads where everything stands from it.
+ */
+export function createWorld(scene, { inspect = null } = {}) {
   const rng = mulberry32(20261005);
   const animated = [];
   PATHS.forEach((p, i) => GLOBALS.uPaths.value[i].set(...p));
@@ -92,6 +97,7 @@ export function createWorld(scene) {
     g.position.set(zn.x, 0, zn.z);
     scene.add(g);
     builders[zn.id](g, rng, animated);
+    inspect?.(zn.id, g);
     bake(g);
   }
   buildLighthouseWalk(scene, rng, animated);

@@ -17,6 +17,10 @@ export function at(obj, x, y, z, parent) {
   return obj;
 }
 
+// The `userData` marks read by the world lint (test/): `aloft` on whatever hangs in the air
+// by nature (a festoon, a sign on its chains, a screen on a wall), so that it is not reported
+// as floating; `seat` and `lamp`, set by `seat` and `lamplight` below.
+
 /** Marks an object as animated so `bake` leaves it alone. */
 export const live = (obj) => {
   obj.userData.dynamic = true;
@@ -100,6 +104,7 @@ export function screen(w, h, parent, x, y, z, rotY, animated, rng) {
     at(box(bw, 0.08, 0.04, i === 0 ? PAL.ivory : 0x3f8f99), -w / 2 + 0.15 + bw / 2, h / 2 - 0.25 - i * 0.28, 0.04, g);
   }
   g.rotation.y = rotY;
+  g.userData.aloft = true; // hung on a wall or from a ceiling
   at(live(g), x, y, z, parent);
   const phase = rng() * 6;
   animated.push((t) => (g.position.y = y + Math.sin(t * 1.4 + phase) * 0.06));

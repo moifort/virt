@@ -1,0 +1,11 @@
+{
+  "name": "virt",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "three": "0.170.0"
+  }
+}

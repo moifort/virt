@@ -125,6 +125,8 @@ class Parts {
       });
       mesh.castShadow = KINDS[kind].shadow !== false;
       mesh.receiveShadow = true;
+      // Which kind of part each instance is: the world lint (test/) reads them back.
+      mesh.userData.part = kind;
       scene.add(mesh);
     }
     for (const { p, reach } of this.lights) lamplight(scene, p.x, p.y, p.z, reach);

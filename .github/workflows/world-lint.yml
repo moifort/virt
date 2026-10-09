@@ -1,0 +1,20 @@
+# The world lint (test/): the island is built headless under bun and checked as a level
+# designer checks a map before shipping it. Nothing floats, nothing is buried, every way
+# leads somewhere, every seat can be reached.
+name: World lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+      - run: bun install --frozen-lockfile
+      - run: bun test

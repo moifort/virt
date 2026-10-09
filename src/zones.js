@@ -472,7 +472,7 @@ export function buildPub(g, rng, animated) {
     const n = Math.round(Math.hypot(bx - ax, bz - az) / 0.9);
     for (let i = 1; i < n; i++) {
       const t = i / n;
-      at(ball(0.14, bulbs[(i + e) % 4], { glow: true }, 6, 4), ax + (bx - ax) * t, ay + (by - ay) * t - Math.sin(t * Math.PI) * 0.6, az + (bz - az) * t, g);
+      at(ball(0.14, bulbs[(i + e) % 4], { glow: true }, 6, 4), ax + (bx - ax) * t, ay + (by - ay) * t - Math.sin(t * Math.PI) * 0.6, az + (bz - az) * t, g).userData.aloft = true;
     }
   });
   for (const [x, z] of [[sx, front + 1.4], [-3.5, 3.5], [3.5, 3.5]]) lamplight(g, x, F + 3, z, 7);
@@ -495,6 +495,7 @@ export function buildPub(g, rng, animated) {
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.magFilter = tex.minFilter = THREE.NearestFilter;
   const sign = at(solid(new THREE.BoxGeometry(3, 1.1, 0.1), paint(0xffffff, { map: tex })), sx, eave - 0.75, front + 1.5, g);
+  sign.userData.aloft = true; // hung from the eave
   animated.push((t) => (sign.rotation.x = Math.sin(t * 0.8) * 0.05));
 }
 
@@ -616,7 +617,7 @@ export function festoon(parent, ax, ay, az, bx, by, bz, sag = 0.7) {
   const n = Math.max(3, Math.round(Math.hypot(bx - ax, by - ay, bz - az) / 0.85));
   for (let i = 1; i < n; i++) {
     const t = i / n;
-    at(ball(0.13, bulbs[i % bulbs.length], { glow: true }, 5, 4), ax + (bx - ax) * t, ay + (by - ay) * t - Math.sin(t * Math.PI) * sag, az + (bz - az) * t, parent);
+    at(ball(0.13, bulbs[i % bulbs.length], { glow: true }, 5, 4), ax + (bx - ax) * t, ay + (by - ay) * t - Math.sin(t * Math.PI) * sag, az + (bz - az) * t, parent).userData.aloft = true;
   }
   lamplight(parent, (ax + bx) / 2, (ay + by) / 2, (az + bz) / 2, 5.5);
 }
