@@ -1408,7 +1408,8 @@ function harbourCats(quay, deck, rng, animated, Q, inset) {
   put(deck, 'sleep', 6.6, 0.13, Q + 9, -0.6);
   // On patrol: back and forth along the quay and a pier, pausing at each end.
   for (const [parent, ax, az, bx, bz, y, speed] of [[quay, -18, 0.3, 18, 0.3, 0.1, 1.1], [deck, 6.4, Q + 2, 6.4, Q + 17, 0.13, 0.9]]) {
-    const cat = put(parent, 'walk', ax, y, az, 0);
+    // (Set down where its first step will be: on the quay, that is in from its true edge.)
+    const cat = put(parent, 'walk', ax, y, az + (parent === quay ? inset(ax) : 0), 0);
     const length = Math.hypot(bx - ax, bz - az);
     const travel = length / speed;
     const rest = 4 + rng() * 5;
