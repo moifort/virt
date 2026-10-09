@@ -38,3 +38,18 @@ Cloudy, rain, snow and mist. Delicate always: a light rain and snow that never h
 the world carries the weather (puddles, gutters running, snow on roofs, trees and walls, wet
 paving that shines); mist that softens the distance without greying the near. src/climate.js,
 src/weather.js, src/style.js.
+
+## life
+The cats, the gulls, the sheep, the dolphins and the whale, the boats that bob and the train:
+four frames at each stop, 0.7 s apart. Where they are (a cat on a warm step, gulls on bollards
+and rails, sheep on grass, never on a roof or in the sea), how many (enough for the place to
+feel lived in, never a crowd), and how they move (gait, bobbing, turning, no sliding, no
+popping, nothing through a wall). Life in src/life.js, the harbour cats in src/zones.js.
+
+## views
+The views a player takes in, wide, from each corner, at the zoom he plays at. Judge each
+picture as a painting: what draws the eye, whether the village, the harbour and the mountain
+read at a glance, whether colours hold together in the map's Miyazaki palette, whether an
+empty or muddled patch spoils it, whether the horizon and the sky sit well. Changes here are
+of composition and colour: a tree that hides the best of the view, a dull stretch of slope, a
+roof colour that jars. Keep them few and subtle; the user's own taste rules (art direction).

@@ -1,7 +1,7 @@
 # The weekly review of the island
 
 A scheduled Claude session runs this once a week. Each run looks at **one part of the island**
-with **one kind of review**, fixes or improves what it can, and leaves the map a little better
+with **one kind of review** (defects, details, macro, walk), fixes or improves what it can, and leaves the map a little better
 than it found it. Over the weeks every kind of review meets every part of the island.
 
 The repository is a hobby project: commit and **push straight to `main`**, no branch, no pull
@@ -13,7 +13,10 @@ it was checked.
 1. **Start clean.** In `/Users/thibaut/Code/game`: `git pull --rebase`, `bun install`,
    `bun test`. If the lint fails before you change anything, fixing that is this week's work.
 2. **This week's plan.** `bun --preload ./test/setup.js tour/plan.js` prints the kind
-   (`defects`, `details` or `macro`, with a theme), the sector and the tour URLs to open.
+   (`defects`, `details`, `macro` with a theme, or `walk`), the sector, the tour URLs to open
+   and the budget command. Run the budget command before and after the changes: the
+   triangles and objects of the sector go in the journal, and test/budget holds the whole
+   island under a ceiling.
 3. **Read before you look.** The routine of the kind (`tour/routines/<kind>.md`); the last
    entries of `tour/JOURNAL.md` (what earlier runs did, left for later, or were told not to
    do); the art direction in the auto-memory, `art-direction-realistic-cinque-terre.md`.
@@ -34,8 +37,8 @@ it was checked.
    - `bun test` green, then take the same stops again and compare before and after;
    - commit (`type(scope): description`, body in detail, the attribution line), push to main.
 7. **Write the journal.** Add an entry at the top of `tour/JOURNAL.md`: the date, week, kind,
-   theme and sector; what was found; what was changed (commits); what was seen but left for
-   later, and why. Commit and push it.
+   theme and sector; what was found; what was changed (commits); the sector's budget before
+   and after; what was seen but left for later, and why. Commit and push it.
 8. **Report** in French, in a few lines: what changed, with one before and one after picture
    sent to the user (SendUserFile), and what is left.
 

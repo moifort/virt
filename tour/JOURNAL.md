@@ -3,6 +3,16 @@
 Newest first. Each run adds an entry: date, week, kind (and theme), sector; what it found; what
 it changed (commits); what it saw but left for later, and why; what the user turned down.
 
+## 2026-10-09 — the reviews widened (set up by hand)
+
+- Added the `walk` kind (the island at the avatar's height), the `life` and `views` themes of
+  the macro review, and the drawing budget: `tour/budget.js` gives each sector's triangles and
+  objects, and test/budget holds the island under a ceiling (3.6 M triangles, 680 meshes,
+  115 k instances; 3.15 M, 588 and 98.6 k today).
+- Budget of the sectors today (triangles / objects within 25 m of their stops): port 220 k /
+  5.5 k; lower village 642 k / 14.4 k; upper village 506 k / 16.0 k; hamlet 179 k / 5.7 k;
+  agora 825 k / 28.5 k; railway 313 k / 9.5 k; mountain 249 k / 6.2 k; shore 524 k / 18.0 k.
+
 ## 2026-10-09 — set up by hand (kind: defects; sectors: port, lower and upper village)
 
 - Found on the harbour, from the user's annotated screenshot: the left pier stopping short of

@@ -1,6 +1,6 @@
 // Which review runs this week: the kind of review and the part of the island, both turning
-// with the ISO week number, so that every kind meets every sector in turn (3 kinds, 8
-// sectors: all 24 pairs in 24 weeks) and no single run has to look at the whole map.
+// with the ISO week number, so that every kind meets every sector in turn (4 kinds, 8
+// sectors: all 32 pairs in 32 weeks) and no single run has to look at the whole map.
 //
 //   bun tour/plan.js               this week's review, as JSON
 //   bun tour/plan.js 2026-10-19    the review of the week holding that date
@@ -9,9 +9,9 @@
 // pictures land in tour/shots/<out>/. The procedure is in tour/routines/README.md.
 import { SECTORS } from '../src/tour.js';
 
-const KINDS = ['defects', 'details', 'macro'];
+const KINDS = ['defects', 'details', 'macro', 'walk'];
 // The macro review looks at one living system at a time, turning more slowly.
-const THEMES = ['nature', 'wind-and-foliage', 'seasons', 'light', 'weather'];
+const THEMES = ['nature', 'wind-and-foliage', 'seasons', 'light', 'weather', 'life', 'views'];
 
 /** The ISO 8601 week number of a date. */
 function isoWeek(date) {
@@ -26,13 +26,19 @@ export function plan(date = new Date()) {
   // Counted from a fixed week, so that the turn does not restart each January.
   const n = date.getFullYear() * 53 + week;
   const kind = KINDS[n % KINDS.length];
-  const sector = SECTORS[n % SECTORS.length];
+  // The sector moves one further on each time round them all: with as many kinds as divide
+  // the number of sectors, a sector would otherwise only ever meet the same kinds.
+  // Taken within a cycle of kinds × sectors weeks, any run of that many weeks meets every pair.
+  const cycle = n % (KINDS.length * SECTORS.length);
+  const sector = SECTORS[(n + Math.floor(cycle / SECTORS.length)) % SECTORS.length];
   const base = `http://localhost:8742/?tour=${sector}`;
   const runs = [];
   const run = (label, query, out = `${sector}-${label}`) => runs.push({ label, out, url: `${base}&out=${out}${query}` });
   let theme = null;
   if (kind === 'defects') run('defects', '&yaws=0,2');
   if (kind === 'details') run('details', '&yaws=0,1&zoom=26');
+  // At the avatar's own height and distance, from every corner: what a player sees as he walks.
+  if (kind === 'walk') run('walk', '&yaws=0,1,2,3&limit=10&zoom=16&pitch=0.45');
   if (kind === 'macro') {
     theme = THEMES[Math.floor(n / KINDS.length) % THEMES.length];
     // A few stops only, each seen several times over: about forty pictures in all.
@@ -44,8 +50,13 @@ export function plan(date = new Date()) {
     if (theme === 'seasons') for (const [label, day] of [['spring', 105], ['summer', 196], ['autumn', 288], ['winter', 15]]) run(label, `&yaws=0&limit=8&day=${day}`);
     if (theme === 'light') for (const [label, hour] of [['dawn', 6.8], ['noon', 13], ['sunset', 18.6], ['night', 22.5]]) run(label, `&yaws=0&limit=8&hour=${hour}`);
     if (theme === 'weather') for (const weather of ['cloudy', 'rain', 'snow', 'mist']) run(weather, `&yaws=0&limit=8&weather=${weather}`);
+    // The animals and the boats, a few seconds of their life at each stop.
+    if (theme === 'life') run('life', '&yaws=0,2&limit=5&frames=4&every=700&zoom=24');
+    // The views a player takes in, framed as he frames them: wide, from each corner.
+    if (theme === 'views') run('views', '&yaws=0,1,2,3&limit=3&zoom=90&pitch=0.44');
   }
-  return { week, kind, theme, sector, routine: `tour/routines/${kind}.md`, runs };
+  const budget = `bun --preload ./test/setup.js tour/budget.js ${sector}`;
+  return { week, kind, theme, sector, routine: `tour/routines/${kind}.md`, budget, runs };
 }
 
 if (import.meta.main) {
