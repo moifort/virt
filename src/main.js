@@ -67,6 +67,9 @@ if (params.has('yaw')) view.yaw = (Number(params.get('yaw')) * Math.PI) / 2;
 // view, at the same hour and in the same weather, which then run on to the player's own. A view
 // or a moment asked for in the address bar takes its place.
 const opensOnShot = !['at', 'zoom', 'yaw', 'hour', 'day', 'weather', 'bench', 'tour'].some((name) => params.has(name));
+// The sunrise the map opens with, once the loading screen has gone: how many hours it runs
+// through from the shot's moment, and how long it takes.
+const SUNRISE = { hours: 2.75, seconds: 11 };
 if (opensOnShot) {
   const { yaw, pitch, viewHeight } = OPENING.view;
   Object.assign(view, { yaw, pitch, viewHeight });
@@ -311,14 +314,18 @@ function frame() {
   weather.slant = (climate.wind.x * view.right.x + climate.wind.y * view.right.z) * weather.wind;
   pixels.render(scene, view.camera, { skyTop: climate.skyTop, skyHorizon: climate.skyHorizon, texelWorld: view.texelWorld, time: t, weather });
   // The first frame compiles every shader; once the second is drawn the map runs, and the
-  // loading screen (index.html) plays its arrival: the plane comes down through the clouds,
-  // and the blurred shot comes into focus on the map as it fades away. Then the hour and the
-  // weather move on to the player's own.
+  // blurred shot of the loading screen (index.html) comes into focus on it as it fades away.
+  // The shot is taken before dawn: once it has gone, the sun comes up over the island in a few
+  // seconds and the morning light finds it out, roof by roof; then the hours and the weather
+  // run on to the player's own.
   if (frames === 2) {
     const loading = document.getElementById('loading');
     loading?.classList.add('is-done');
-    setTimeout(() => loading?.remove(), 4200);
-    if (opensOnShot) setTimeout(() => climate.rejoin(), 4200);
+    setTimeout(() => loading?.remove(), 2400);
+    if (opensOnShot) {
+      setTimeout(() => climate.travel(OPENING.moment.hour + SUNRISE.hours, SUNRISE.seconds), 1400);
+      setTimeout(() => climate.rejoin(), 1400 + SUNRISE.seconds * 1000 + 200);
+    }
   }
 }
 // `virt.frame()` runs one frame by hand, for timing it while the page is hidden.
