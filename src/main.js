@@ -66,7 +66,7 @@ if (params.has('yaw')) view.yaw = (Number(params.get('yaw')) * Math.PI) / 2;
 // The map opens on the shot blurred behind the loading screen (see shoot.js): the same
 // view, at the same hour and in the same weather, which then run on to the player's own. A view
 // or a moment asked for in the address bar takes its place.
-const opensOnShot = !['at', 'zoom', 'yaw', 'hour', 'day', 'weather', 'bench'].some((name) => params.has(name));
+const opensOnShot = !['at', 'zoom', 'yaw', 'hour', 'day', 'weather', 'bench', 'tour'].some((name) => params.has(name));
 if (opensOnShot) {
   const { yaw, pitch, viewHeight } = OPENING.view;
   Object.assign(view, { yaw, pitch, viewHeight });
@@ -322,6 +322,19 @@ function frame() {
 }
 // `virt.frame()` runs one frame by hand, for timing it while the page is hidden.
 virt.frame = frame;
+// `virt.aim({ x, z, yaw, pitch, zoom })` points the view at a spot of the map, the avatar left
+// where he stands; with `carry`, the avatar is taken there, and the houses that hide the spot
+// open their round window on it (see tour.js, which hides him).
+virt.aim = ({ x, z, yaw = view.yaw, pitch = view.pitch, zoom = view.viewHeight, carry = false }) => {
+  if (carry) player.position.set(x, groundAt(x, z), z);
+  pan.set(x - player.position.x, 0, z - player.position.z);
+  homing = false;
+  yawTarget = view.yaw = yaw;
+  pitchTarget = view.pitch = clamp(pitch, PITCH.min, PITCH.max);
+  view.viewHeight = zoom;
+};
 renderer.setAnimationLoop(frame);
 // `?bench=label` measures a few seconds of the game and posts the figures to the dev server: see bench.js.
 if (params.has('bench')) import('./bench.js').then((m) => m.bench(virt, params));
+// `?tour=village` takes a picture of every corner of the village and its harbour: see tour.js.
+if (params.has('tour')) import('./tour.js').then((m) => m.tour(virt, params));
