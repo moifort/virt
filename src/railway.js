@@ -213,6 +213,30 @@ function rockBeside(s, l) {
   return rockAt(p.x, p.z);
 }
 
+// The passenger building, in its own units, set down SIZE times larger on the platform's back.
+const HOUSE = { SIZE: 1.6, W: 12, D: 5.2, FLOOR: 2.6 };
+const PLATFORM_BACK = -5.2;
+const PLATFORM_TOP = 0.55;
+/** The middle of the passenger building, along the line. */
+const houseMiddle = () => STATION.s0 + 1.6 + (HOUSE.W / 2) * HOUSE.SIZE;
+
+/**
+ * The doors of the station's passenger building, where they open on the ground: the five on
+ * the platform and the back door where the trail from the observatory comes down. Each gives
+ * the point in front of it (along `s`, across `l` the line, as `railPoint` takes them, and in
+ * the world) and the face it is on.
+ */
+export function stationDoors() {
+  const { SIZE, W, D } = HOUSE;
+  const cx = houseMiddle();
+  const back = PLATFORM_BACK - D * SIZE;
+  const doors = [-2, -1, 0, 1, 2].map((k) => ({ face: 'platform', s: cx + k * 2.2 * SIZE, l: PLATFORM_BACK + 0.4 }));
+  // The back door, in the back wall where the trail ends, kept clear of the building's corners.
+  const s = Math.min(cx + (W / 2 - 1) * SIZE, Math.max(cx - (W / 2 - 1) * SIZE, STATION.back));
+  doors.push({ face: 'back', s, l: back - 0.4 });
+  return doors.map((d) => ({ ...d, ...railPoint(d.s, d.l) }));
+}
+
 /**
  * A small Ligurian station: a stone platform carried on a retaining wall, a two-storey passenger
  * building in faded red with stone trim and a tile roof, an iron awning, name boards and lamps.
@@ -223,8 +247,8 @@ function buildStation(line) {
   const P0 = STATION.s0;
   const P1 = STATION.s1;
   const EDGE = -1.72; // platform edge, just clear of the cars
-  const BACK = -5.2;
-  const TOP = 0.55;
+  const BACK = PLATFORM_BACK;
+  const TOP = PLATFORM_TOP;
   const WALL = 0xd9785c;
   const TRIM = 0xefe4cf;
   const ROOF = 0xb8623e;
@@ -242,12 +266,9 @@ function buildStation(line) {
   at(box(P1 - P0, 0.03, 0.2, TRIM), (P0 + P1) / 2, TOP + 0.01, EDGE - 0.06, line);
 
   // Passenger building, facing the track.
-  const SIZE = 1.6;
-  const W = 12;
-  const D = 5.2;
-  const FLOOR = 2.6;
+  const { SIZE, W, D, FLOOR } = HOUSE;
   const H = FLOOR * 2 + 0.4;
-  const cx = P0 + 1.6 + (W / 2) * SIZE;
+  const cx = houseMiddle();
   const house = at(new THREE.Group(), cx, TOP, BACK - (D / 2) * SIZE, line);
   house.scale.setScalar(SIZE);
   at(box(W, H, D, WALL), 0, H / 2, 0, house);
@@ -284,6 +305,28 @@ function buildStation(line) {
       at(box(0.08, 1.4, 1.0, TRIM), sx * (W / 2 + 0.02), y, z, house);
       at(box(0.1, 1.15, 0.72, GLASS), sx * (W / 2 + 0.04), y, z, house);
     }
+  }
+  // Mountain side: the back door where the trail from the observatory comes down, on a stone
+  // step, and a row of shuttered windows upstairs as on the track side.
+  const rear = -D / 2;
+  const door = (stationDoors().find((d) => d.face === 'back').s - cx) / SIZE;
+  // Set out in front of the plinth, which the doorway cuts through.
+  at(box(1.2, 2.1, 0.08, TRIM), door, 1.05, rear - 0.1, house);
+  at(box(0.95, 1.95, 0.1, 0x5a4034), door, 0.975, rear - 0.12, house);
+  at(box(1.3, 0.12, 0.25, TRIM), door, 2.15, rear - 0.18, house);
+  // Down to the ground behind, in steps of a hand's height or so, each one further out.
+  const drop = Math.max(0, LEVEL + TOP - groundBeside(cx + door * SIZE, BACK - D * SIZE - 0.8)) / SIZE;
+  const treads = Math.max(1, Math.ceil(drop / 0.2));
+  for (let k = 0; k < treads; k++) {
+    const top = -(drop * k) / treads;
+    at(box(1.5, top + drop + 0.1, 0.3, STONE), door, (top - drop - 0.1) / 2, rear - 0.15 - k * 0.3, house);
+  }
+  for (let k = -2; k <= 2; k++) {
+    const x = k * 2.2;
+    at(box(1.0, 1.4, 0.08, TRIM), x, FLOOR + 1.5, rear - 0.02, house);
+    at(box(0.72, 1.15, 0.1, GLASS), x, FLOOR + 1.5, rear - 0.04, house);
+    for (const sx of [-1, 1]) at(box(0.36, 1.15, 0.06, 0x4d6a4c), x + sx * 0.56, FLOOR + 1.5, rear - 0.07, house);
+    at(box(1.2, 0.1, 0.2, TRIM), x, FLOOR + 0.85, rear - 0.08, house);
   }
   // Name board in white on blue, as on every Italian platform, and the station clock.
   at(box(4.2, 0.6, 0.1, 0x2f4f9a), 0, H - 0.5, front + 0.06, house);

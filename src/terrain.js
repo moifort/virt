@@ -434,7 +434,9 @@ export const CLEARINGS = [{ x: OBSERVATORY.x, z: OBSERVATORY.z, r: OBSERVATORY.r
 // `s` runs along the line from a, `l` across it (negative uphill).
 export const RAIL = { a: { u: 129, v: 25 }, b: { u: 45, v: 106 }, level: 56 };
 // The yard runs deep enough behind the line for a passenger building at the avatar's scale.
-export const STATION = { s0: 24, s1: 49, yard: { s0: 24, s1: 43, l0: -15.5, l1: -3.5 } };
+// `back`: where along the line the trail from the observatory comes down behind the station,
+// to the passenger building's back door.
+export const STATION = { s0: 24, s1: 49, back: 36, yard: { s0: 24, s1: 43, l0: -15.5, l1: -3.5 } };
 const railStart = { x: toX(RAIL.a.u, RAIL.a.v), z: toZ(RAIL.a.u, RAIL.a.v) };
 const railEnd = { x: toX(RAIL.b.u, RAIL.b.v), z: toZ(RAIL.b.u, RAIL.b.v) };
 const railLength = Math.hypot(railEnd.x - railStart.x, railEnd.z - railStart.z);
@@ -478,7 +480,7 @@ for (const [s, r] of [[SPUR_END - 2, 7], [SPUR_END + 10, 6]]) CLEARINGS.push({ .
 // packed earth, wide enough for one walker.
 const TRAIL = (() => {
   const from = { x: OBSERVATORY.x + OBSERVATORY.lower.dx, z: OBSERVATORY.z + OBSERVATORY.lower.dz + OBSERVATORY.lower.r + 1.5 };
-  const to = railPoint(STATION.s0 + 12, -15.5);
+  const to = railPoint(STATION.back, -15.5);
   const dx = to.x - from.x;
   const dz = to.z - from.z;
   const len = Math.hypot(dx, dz);
