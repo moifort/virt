@@ -6,7 +6,7 @@ import { hash, pick } from './noise.js';
 import { PAL, WATER_LEVEL, paint, solid } from './style.js';
 import { INK, WARM_LIGHT, at, ball, box, cyl, lamplight, live } from './kit.js';
 import { gozzo } from './zones.js';
-import { UP, VILLAGES, coastU, groundAt, isWild, randomSpot, toX, toZ } from './terrain.js';
+import { UP, VILLAGES, builtAt, coastU, groundAt, isWild, randomSpot, toX, toZ } from './terrain.js';
 
 /** A herring gull on the wing: white, with grey wings tipped in black. */
 function gull() {
@@ -230,10 +230,21 @@ function sheep(rng, black = false) {
  */
 function buildSheep(scene, rng, animated) {
   const PASTURE = { u: 145, v: 100, r: 9 };
-  const spot = () => {
-    const a = rng() * Math.PI * 2;
-    const d = Math.sqrt(rng()) * PASTURE.r;
-    return new THREE.Vector3(toX(PASTURE.u + Math.cos(a) * d, PASTURE.v + Math.sin(a) * d), 0, toZ(PASTURE.u + Math.cos(a) * d, PASTURE.v + Math.sin(a) * d));
+  // The boulders of the pasture (nature.js marks each one built): a sheep grazes round them,
+  // never on one, and walks only where the way to its next tuft is clear of them.
+  const free = (x, z) => builtAt(x, z) < 2;
+  const clear = (from, to) => {
+    const n = Math.ceil(from.distanceTo(to) / 0.4);
+    for (let k = 1; k <= n; k++) if (!free(from.x + ((to.x - from.x) * k) / n, from.z + ((to.z - from.z) * k) / n)) return false;
+    return true;
+  };
+  const spot = (from) => {
+    for (let tries = 0; ; tries++) {
+      const a = rng() * Math.PI * 2;
+      const d = Math.sqrt(rng()) * PASTURE.r;
+      const p = new THREE.Vector3(toX(PASTURE.u + Math.cos(a) * d, PASTURE.v + Math.sin(a) * d), 0, toZ(PASTURE.u + Math.cos(a) * d, PASTURE.v + Math.sin(a) * d));
+      if ((free(p.x, p.z) && (!from || clear(from, p))) || tries > 40) return tries > 40 && from ? from.clone() : p;
+    }
   };
   for (let i = 0; i < 9; i++) {
     const { g, head } = sheep(rng, i === 4);
@@ -241,8 +252,9 @@ function buildSheep(scene, rng, animated) {
     g.scale.setScalar(scale);
     g.position.copy(spot());
     g.position.y = groundAt(g.position.x, g.position.z);
+    g.userData.sheep = true;
     scene.add(g);
-    let target = spot();
+    let target = spot(g.position);
     let yaw = rng() * Math.PI * 2;
     let grazing = rng() * 8;
     const phase = rng() * 10;
@@ -250,7 +262,7 @@ function buildSheep(scene, rng, animated) {
       if (grazing > 0) {
         grazing -= dt;
         head.rotation.x = 0.9 + Math.sin(t * 3 + phase) * 0.12;
-        if (grazing <= 0) target = spot();
+        if (grazing <= 0) target = spot(g.position);
         return;
       }
       const dx = target.x - g.position.x;
@@ -262,6 +274,11 @@ function buildSheep(scene, rng, animated) {
       const want = Math.atan2(dx, dz);
       yaw += Math.atan2(Math.sin(want - yaw), Math.cos(want - yaw)) * Math.min(1, dt * 3);
       const step = 0.7 * dt * scale;
+      // Turning toward the tuft, the head may swing at a stone: stop and graze there instead.
+      if (!free(g.position.x + Math.sin(yaw) * 0.7, g.position.z + Math.cos(yaw) * 0.7)) {
+        grazing = 2 + rng() * 4;
+        return;
+      }
       g.position.x += Math.sin(yaw) * step;
       g.position.z += Math.cos(yaw) * step;
       g.position.y = groundAt(g.position.x, g.position.z) + Math.abs(Math.sin(t * 9 + phase)) * 0.04;
