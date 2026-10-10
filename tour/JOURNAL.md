@@ -3,6 +3,16 @@
 Newest first. Each run adds an entry: date, week, kind (and theme), sector; what it found; what
 it changed (commits); what it saw but left for later, and why; what the user turned down.
 
+## 2026-10-10 — week 41 (kind: walk; sector: mountain) — not run
+
+- `bun test` green at the start (21 pass); budget of the mountain: 249 k triangles / 6.2 k
+  objects (island 3.15 M triangles, 588 meshes, 98.6 k instances).
+- Stopped before the pictures: starting the `jardins` dev server from the Browser pane was
+  declined, and nothing was listening on port 8742, so no tour could be taken. As the routine
+  says, no change was made without pictures.
+- Left for next time: the whole walk of the mountain (tour URL
+  `?tour=mountain&out=mountain-walk&yaws=0,1,2,3&limit=10&zoom=16&pitch=0.45`).
+
 ## 2026-10-09 — the reviews widened (set up by hand)
 
 - Added the `walk` kind (the island at the avatar's height), the `life` and `views` themes of
