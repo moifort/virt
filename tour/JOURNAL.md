@@ -3,15 +3,27 @@
 Newest first. Each run adds an entry: date, week, kind (and theme), sector; what it found; what
 it changed (commits); what it saw but left for later, and why; what the user turned down.
 
-## 2026-10-10 — week 41 (kind: walk; sector: mountain) — not run
+## 2026-10-10 — week 41 (kind: walk; sector: mountain)
 
-- `bun test` green at the start (21 pass); budget of the mountain: 249 k triangles / 6.2 k
-  objects (island 3.15 M triangles, 588 meshes, 98.6 k instances).
-- Stopped before the pictures: starting the `jardins` dev server from the Browser pane was
-  declined, and nothing was listening on port 8742, so no tour could be taken. As the routine
-  says, no change was made without pictures.
-- Left for next time: the whole walk of the mountain (tour URL
-  `?tour=mountain&out=mountain-walk&yaws=0,1,2,3&limit=10&zoom=16&pitch=0.45`).
+- The first attempt that morning stopped before any picture: starting the `jardins` server
+  was declined (fd268f4). Run again by hand the same day at the user's request.
+- Found: the flock standing on boulders and half inside them on the pasture beside the summit
+  (8 of 9 sheep walk into a stone within two minutes); the stone stair up the back wall of the
+  astronomers' house laid across five of its windows; the trail from the observatory ending
+  two metres short of the station's blind back wall (no door, no window on that face).
+- Changed: bd7ec2a (sheep keep to free ground, test/life), e836679 (back windows laid out
+  clear of the stair, test/facade), 0735668 (a back door, steps and upstairs windows where the
+  trail reaches the station, test/station).
+- Budget of the mountain: 249.0 k triangles / 6 199 objects before, 248.7 k / 6 199 after;
+  island 3 153 150 → 3 153 270 triangles, 588 meshes, 98 638 instances (unchanged).
+- Pictures: the 40 of the tour plus about a dozen close-ups and retakes (pasture, back of the
+  house, back of the station), a little over the budget.
+- Seen, left alone: from the pasture the station's tile roof reads as a flat orange slab over
+  the crest, which is the building seen from above, not a fault; the steps between the
+  observatory's two terraces are steep (0.32 m up for 0.34 m along) but within the avatar's
+  stride; sheep may still graze inside a maquis bush, which only boulders are marked against.
+  The station's back door is on the railway sector's building but serves the mountain trail;
+  the railway review should look at its yard.
 
 ## 2026-10-09 — the reviews widened (set up by hand)
 
