@@ -712,6 +712,34 @@ function mussels(parent, rng, x, z, radius = 0.17) {
 }
 
 /**
+ * The plan of the astronomers' house beside the observatory's tower: its size, the stone stair
+ * that climbs its back wall to the roof, one cantilevered tread above the other, and the
+ * windows of each face. A window stays clear of the stair: no tread crosses it, and nobody
+ * climbing passes in front of it (the band from a tread up to a head's height over it).
+ */
+export function astronomersHouse() {
+  const W = 7.4;
+  const D = 4.8;
+  const H = 5.4;
+  const treads = Array.from({ length: 12 }, (_, k) => ({ x: -W / 2 + 0.6 + k * 0.5, y: 0.15 + k * 0.45, w: 0.9, h: 0.3 }));
+  const WINDOW = { w: 0.8, h: 1.2 };
+  const grid = [-2.4, -0.8, 0.8, 2.4].flatMap((x) => [1.5, 4.1].map((y) => ({ x, y })));
+  const crossed = ({ x, y }) => treads.some((t) => Math.abs(t.x - x) < (t.w + WINDOW.w) / 2 && y + WINDOW.h / 2 > t.y - t.h / 2 && y - WINDOW.h / 2 < t.y + t.h / 2 + HEADROOM);
+  return {
+    W,
+    D,
+    H,
+    treads,
+    window: WINDOW,
+    front: [...[-2.4, 2.4].map((x) => ({ x, y: 1.5 })), ...[-2.4, -0.8, 0.8, 2.4].map((x) => ({ x, y: 4.1 }))],
+    back: grid.filter((w) => !crossed(w)),
+    grid,
+  };
+}
+/** The height over a tread a climber's body fills, that a window must keep clear of. */
+export const HEADROOM = 1.8;
+
+/**
  * The observatory on the summit, grown over the years into a little compound, nothing about it
  * symmetrical: the whitewashed round tower under its copper dome gone green, set to one side of
  * a flagged upper terrace behind a dry-stone parapet, its slit open to the sky with the
@@ -787,9 +815,8 @@ export function buildObservatory(scene, rng) {
   // string course, a flat roof with its parapet, the pergola over one end, the little dome on
   // its drum over the other, a chimney, and a stone stair up the back wall to the roof.
   const house = at(new THREE.Group(), 3.4, 0, -0.6, g);
-  const W = 7.4;
-  const D = 4.8;
-  const H = 5.4;
+  const plan = astronomersHouse();
+  const { W, D, H } = plan;
   at(box(W, H, D, WHITE), 0, H / 2, 0, house);
   at(box(W + 0.14, 0.6, D + 0.14, 0xc9b99c), 0, 0.3, 0, house);
   at(box(W + 0.12, 0.14, D + 0.12, 0xe6dcc8), 0, 2.7, 0, house);
@@ -800,9 +827,8 @@ export function buildObservatory(scene, rng) {
     at(box(0.62, 1.05, 0.1, 0x3b3346), x, yy, z + Math.sign(z) * 0.02, house);
     for (const s of [-1, 1]) at(box(0.3, 1.05, 0.06, 0x4d7a62), x + s * 0.5, yy, z + Math.sign(z) * 0.04, house);
   };
-  for (const x of [-2.4, 2.4]) window(x, 1.5, D / 2 + 0.02);
-  for (const x of [-2.4, -0.8, 0.8, 2.4]) window(x, 4.1, D / 2 + 0.02);
-  for (const x of [-2.4, -0.8, 0.8, 2.4]) for (const yy of [1.5, 4.1]) window(x, yy, -D / 2 - 0.02);
+  for (const w of plan.front) window(w.x, w.y, D / 2 + 0.02);
+  for (const w of plan.back) window(w.x, w.y, -D / 2 - 0.02);
   at(box(1.2, 2.2, 0.1, 0xe6dcc8), 0, 1.1, D / 2 + 0.02, house);
   at(box(1.0, 2.1, 0.12, DARK_WOOD), 0, 1.05, D / 2 + 0.04, house);
   at(box(1.6, 0.14, 0.9, STONE), 0, 0.07, D / 2 + 0.5, house);
@@ -814,7 +840,7 @@ export function buildObservatory(scene, rng) {
   at(ball(1.55, COPPER, { flat: true }, 14, 7), 2.3, H + 1.6, 0, house).scale.y = 0.85;
   at(box(0.5, 1.4, 0.7, INK), 2.3, H + 2.3, 0.3, house).rotation.x = -0.5;
   at(box(0.5, 1.2, 0.5, WHITE), -3.0, H + 0.8, -1.4, house);
-  for (let k = 0; k < 12; k++) at(box(0.9, 0.3, 0.5, STONE), -W / 2 + 0.6 + k * 0.5, 0.15 + k * 0.45, -D / 2 - 0.5, house);
+  for (const t of plan.treads) at(box(t.w, t.h, 0.5, STONE), t.x, t.y, -D / 2 - 0.5, house);
 
   // The steps down to the lower terrace.
   const steps = Math.ceil(L.drop / 0.32);
