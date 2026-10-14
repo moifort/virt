@@ -10,7 +10,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { fbm, mulberry32, pick } from './noise.js';
 import { GLOBALS, PAL, WATER_LEVEL, paint, solid } from './style.js';
 import { at, bake, ball, box, cone, cyl, lantern } from './kit.js';
-import { PATHS, SPUR_END, UP, ZONES, anywhere, coastU, cultivated, footU, groundAt, isWild, occupy, railPoint, scatterInstanced, segmentDistance, slopeAt, toU, toV, toX, toZ, villagePlan } from './terrain.js';
+import { ISLET, PATHS, SPUR_END, UP, ZONES, anywhere, coastU, cultivated, footU, groundAt, isWild, occupy, railPoint, scatterInstanced, segmentDistance, slopeAt, toU, toV, toX, toZ, villagePlan } from './terrain.js';
 
 const BARK = 0x7d5a48;
 const DARK_BARK = 0x5e463c;
@@ -641,6 +641,8 @@ export function buildNature(scene, rng, animated) {
     if (p.y > WATER_LEVEL - 0.3 || p.y < WATER_LEVEL - 2.6 || (v > -32 && v < 52 && u < 0)) return false;
     if (ZONES.some((zn) => Math.hypot(p.x - zn.x, p.z - zn.z) < zn.r + (zn.id === 'port' ? 10 : 3))) return false;
     if (quays.some((seg) => segmentDistance(p.x, p.z, seg) < 32)) return false;
+    // The lighthouse rock has boulders of its own, and its jetty runs twenty metres out.
+    if (Math.hypot(p.x - ISLET.x, p.z - ISLET.z) < ISLET.r + 12) return false;
     s.set(0.5 + r() * 1.3, 0.6 + r() * 1.1, 0.5 + r() * 1.3);
     p.y = WATER_LEVEL - 0.3;
     c.setHex(pick(r, [0x8f8678, 0x9d9484, 0x7f7a70]));
