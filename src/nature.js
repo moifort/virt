@@ -480,6 +480,9 @@ function outcrop(rng) {
 
 // ---------------------------------------------------------------- Beach
 
+/** The colours of the beach towels: none the colour of the sand, or only its shadow shows. */
+export const TOWELS = [PAL.blue, PAL.saffron, PAL.coral, PAL.teal];
+
 /** A few parasols and towels on the white sand. */
 function buildBeach(scene, rng) {
   const g = new THREE.Group();
@@ -493,7 +496,7 @@ function buildBeach(scene, rng) {
     at(cyl(0.05, 0.05, 2.6, PAL.ivory, 4), x, y + 1.3, z, g).rotation.z = 0.12;
     at(cone(1.6, 0.6, color, 8), x + 0.15, y + 2.65, z, g);
     at(ball(0.12, PAL.ivory, {}, 4, 3), x + 0.15, y + 2.98, z, g);
-    const towel = at(box(1.0, 0.04, 1.9, pick(rng, [PAL.ivory, PAL.saffron, PAL.coral, PAL.teal])), x + 1.3, y + 0.03, z + 0.4, g);
+    const towel = at(box(1.0, 0.04, 1.9, pick(rng, TOWELS)), x + 1.3, y + 0.03, z + 0.4, g);
     towel.rotation.y = Math.PI / 4 + (rng() - 0.5) * 0.4;
     if (rng() < 0.4) at(ball(0.3, pick(rng, [PAL.red, PAL.saffron]), {}, 8, 6), x - 1.2, y + 0.3, z + 1.1, g);
     occupy(x + 0.6, z + 0.2, 0, 2.1, 2.1);
