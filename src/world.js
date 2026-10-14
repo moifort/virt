@@ -100,7 +100,7 @@ export function createWorld(scene, { inspect = null } = {}) {
     inspect?.(zn.id, g);
     bake(g);
   }
-  buildLighthouseWalk(scene, rng, animated);
+  buildLighthouseWalk(scene, rng, animated, inspect);
   buildObservatory(scene, rng);
   buildVillages(scene, rng, animated, inspect);
   buildEstate(scene, rng);

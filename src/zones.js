@@ -884,7 +884,7 @@ export function buildObservatory(scene, rng) {
  * steps cut up to the tower, a lantern, a bollard, and the keeper's boat riding at her
  * mooring. Over on the shore, the landing stage she puts out from.
  */
-export function buildLighthouseWalk(scene, rng, animated) {
+export function buildLighthouseWalk(scene, rng, animated, inspect = null) {
   const g = new THREE.Group();
   g.position.set(ISLET.x, 0, ISLET.z);
   // Local +z looks from the rock toward the island, up the bay.
@@ -948,6 +948,7 @@ export function buildLighthouseWalk(scene, rng, animated) {
     rock.rotation.set(rng() * 3, rng() * 3, rng() * 3);
     rock.scale.y = 0.7;
   }
+  inspect?.('lighthouse', g);
   scene.add(bake(g));
 
   // On the shore, the landing stage the boat puts out from: planks on piles black with
@@ -962,7 +963,7 @@ export function buildLighthouseWalk(scene, rng, animated) {
   while (shore > -60 && sground(21, shore) < WATER_LEVEL + 0.9) shore -= 0.62;
   const DECK = WATER_LEVEL + 1.0;
   for (let z = shore; z < shore + 11; z += 0.62) {
-    at(box(2.8, 0.14, 0.56, pick(rng, TIMBER)), 21, DECK, z + 0.31, stage);
+    at(box(2.8, 0.14, 0.56, pick(rng, TIMBER)), 21, DECK, z + 0.31, stage).name = 'plank';
     if (Math.round((z - shore) / 0.62) % 5 === 2 && sground(21, z) < WATER_LEVEL - 0.2) {
       for (const dx of [-1.3, 1.3]) {
         at(cyl(0.14, 0.16, 4.2, DARK_WOOD, 6), 21 + dx, DECK - 2.0, z, stage);
@@ -970,9 +971,13 @@ export function buildLighthouseWalk(scene, rng, animated) {
       }
     }
   }
-  lantern(stage, 22.2, DECK + 0.08, shore + 1.5, { toward: [21, shore + 1.5] });
+  // The lamp stands on the shore at the root of the stage, not on its planks, and nothing
+  // grows at its foot.
+  lantern(stage, 22.4, sground(22.4, shore - 1.0), shore - 1.0, { toward: [21, shore + 1.5] });
+  occupy(stage.position.x + 22.4 * scos + (shore - 1.0) * ssin, stage.position.z - 22.4 * ssin + (shore - 1.0) * scos, 0, 0.8, 0.8);
   at(cyl(0.14, 0.18, 0.7, INK, 6), 19.9, DECK + 0.4, shore + 10.4, stage);
   perchedGull(stage, 19.9, DECK + 0.75, shore + 10.4, 0.4);
+  inspect?.('landing', stage);
   scene.add(bake(stage));
 }
 
