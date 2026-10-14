@@ -6,6 +6,7 @@ import { Climate } from './climate.js';
 import { dayNightSwitch } from './daynight.js';
 import { seasonSwitch } from './season.js';
 import { weatherSwitch } from './weather.js';
+import { touchPad } from './touch.js';
 import { LAND_ENDS, SQUARE, WATER_LEVEL, createWorld, groundAt, toX, toZ } from './world.js';
 import OPENING from '../assets/loading/opening.json' with { type: 'json' };
 
@@ -37,7 +38,10 @@ const skies = weatherSwitch(climate);
 // long shadows it throws across the valley would come and go with every move of the map.
 const sun = new THREE.DirectionalLight(0xffffff, 1);
 sun.castShadow = true;
-sun.shadow.mapSize.set(4096, 4096);
+// A phone draws the island on a screen a few centimetres wide: its shadow map is a quarter the
+// size, no coarser than its own pixels, and the shadow pass costs it a quarter as much.
+const PHONE = matchMedia('(pointer: coarse)').matches && Math.min(screen.width, screen.height) <= 500;
+sun.shadow.mapSize.set(PHONE ? 2048 : 4096, PHONE ? 2048 : 4096);
 sun.shadow.bias = -0.0006;
 sun.shadow.normalBias = 0.08;
 scene.add(sun, sun.target);
@@ -94,59 +98,116 @@ resize();
 const keys = new Set();
 // Keys pressed since the last frame: a quick tap still moves one tile, as in Gather.
 const tapped = new Set();
-addEventListener('keydown', (e) => {
-  keys.add(e.code);
-  tapped.add(e.code);
-  if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
+const STEPS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'KeyW', 'KeyA', 'KeyS', 'KeyD'];
+/** A key, or an arm of the touch pad, pressed. */
+function press(code) {
+  keys.add(code);
+  tapped.add(code);
   // Any step he is asked to take brings the view back to him, wherever it was looking.
-  if (e.code.startsWith('Arrow') || ['KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(e.code)) homing = true;
+  if (STEPS.includes(code)) homing = true;
+}
+function release(code) {
+  keys.delete(code);
+}
+/** Sits him down on the seat at hand, or gets him up; false if there is nothing to sit on. */
+function sitOrStand() {
+  if (player.seat) player.stand();
+  else if (seatAtHand) player.sit(seatAtHand);
+  else return false;
+  return true;
+}
+addEventListener('keydown', (e) => {
+  press(e.code);
+  if (e.code === 'Space' || e.code.startsWith('Arrow')) e.preventDefault();
   if (!e.repeat) climate.key(e.code, true);
   // A / E on AZERTY (KeyQ / KeyE codes) turn the view to the next isometric corner.
   if (e.code === 'KeyQ') yawTarget = snapYaw(yawTarget) + Math.PI / 2;
   if (e.code === 'KeyE') yawTarget = snapYaw(yawTarget) - Math.PI / 2;
   // F or Enter: sit down on the seat at hand, or get up.
-  if ((e.code === 'KeyF' || e.code === 'Enter') && !e.repeat) {
-    if (player.seat) player.stand();
-    else if (seatAtHand) player.sit(seatAtHand);
-  }
+  if ((e.code === 'KeyF' || e.code === 'Enter') && !e.repeat) sitOrStand();
 });
 addEventListener('keyup', (e) => {
-  keys.delete(e.code);
+  release(e.code);
   climate.key(e.code, false);
 });
 addEventListener('blur', () => keys.clear());
+// On a touch screen, the pad in the bottom left corner stands in for the arrows (touch.js);
+// its round button sits him down where there is a seat, and makes him hop elsewhere.
+const pad = touchPad({ press, release, act: () => sitOrStand() || tapped.add('Space') });
 
 // The view, as on a map: dragging slides it over the island to look around, and as soon as the
 // avatar walks again it comes back to him. Dragging with the right button, or with Ctrl, Cmd
 // or Alt held, turns the view around the point it looks at and tilts it, from low over the sea
 // to nearly straight down. A and E turn it to the next corner of the island, where the walk
-// lines up with the screen again.
+// lines up with the screen again. On a touch screen one finger slides the map, and two pinch
+// to zoom it, twist to turn it and move up or down the screen to tilt it.
 const snapYaw = (yaw) => Math.round(yaw / (Math.PI / 2)) * (Math.PI / 2);
 const PITCH = { min: 0.3, max: 1.5 };
+const ZOOM = { min: 24, max: 260 };
 let yawTarget = view.yaw;
 let pitchTarget = view.pitch;
-let dragging = null; // 'pan' | 'orbit'
+let dragging = null; // 'pan' | 'orbit' | 'pinch'
 let homing = false; // the view is on its way back to the avatar
 const pan = opensOnShot ? new THREE.Vector3(OPENING.view.pan[0], 0, OPENING.view.pan[1]) : new THREE.Vector3();
+// Every finger, or the mouse, down on the map, and where it was last seen: a touch screen
+// reports no movement of its own, so each move is measured from the last.
+const pointers = new Map();
+let pinch = null; // the two fingers as they last stood
+/** The two fingers: how far apart, which way round, and how high up the screen. */
+function fingers() {
+  const [a, b] = [...pointers.values()];
+  return { gap: Math.hypot(b.x - a.x, b.y - a.y), turn: Math.atan2(b.y - a.y, b.x - a.x), y: (a.y + b.y) / 2 };
+}
 renderer.domElement.addEventListener('pointerdown', (e) => {
-  dragging = e.button === 2 || e.ctrlKey || e.metaKey || e.altKey ? 'orbit' : 'pan';
+  // The finger is followed off the canvas, over the buttons and out of the window; a made-up
+  // pointer (a script's) cannot be captured, and is followed all the same.
+  try {
+    renderer.domElement.setPointerCapture(e.pointerId);
+  } catch {}
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pointers.size >= 2) {
+    dragging = 'pinch';
+    pinch = fingers();
+  } else dragging = e.button === 2 || e.ctrlKey || e.metaKey || e.altKey ? 'orbit' : 'pan';
   homing = false;
 });
 renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
-addEventListener('pointerup', () => (dragging = null));
+const lift = (e) => {
+  if (!pointers.delete(e.pointerId)) return;
+  if (pointers.size === 0) dragging = null;
+  else if (pointers.size === 1) dragging = 'pan';
+  else pinch = fingers();
+};
+addEventListener('pointerup', lift);
+addEventListener('pointercancel', lift);
 addEventListener('pointermove', (e) => {
-  if (!dragging) return;
+  const last = pointers.get(e.pointerId);
+  if (!last || !dragging) return;
+  const dx = e.clientX - last.x;
+  const dy = e.clientY - last.y;
+  last.x = e.clientX;
+  last.y = e.clientY;
+  if (dragging === 'pinch') {
+    if (pointers.size < 2) return;
+    const now = fingers();
+    view.viewHeight = clamp((view.viewHeight * pinch.gap) / now.gap, ZOOM.min, ZOOM.max);
+    const twist = now.turn - pinch.turn;
+    yawTarget += twist - Math.round(twist / (Math.PI * 2)) * Math.PI * 2;
+    pitchTarget = clamp(pitchTarget + (now.y - pinch.y) * 0.005, PITCH.min, PITCH.max);
+    pinch = now;
+    return;
+  }
   if (dragging === 'orbit') {
-    yawTarget += e.movementX * 0.006;
-    pitchTarget = clamp(pitchTarget + e.movementY * 0.005, PITCH.min, PITCH.max);
+    yawTarget += dx * 0.006;
+    pitchTarget = clamp(pitchTarget + dy * 0.005, PITCH.min, PITCH.max);
     return;
   }
   // The map follows the hand: a screen pixel is so many metres across, and more than that
   // along the ground up the screen, which the view looks at aslant.
   const metres = view.viewHeight / innerHeight;
-  pan.addScaledVector(view.right, -e.movementX * metres);
-  pan.x += (view.forward.x / Math.hypot(view.forward.x, view.forward.z)) * ((e.movementY * metres) / Math.sin(view.pitch));
-  pan.z += (view.forward.z / Math.hypot(view.forward.x, view.forward.z)) * ((e.movementY * metres) / Math.sin(view.pitch));
+  pan.addScaledVector(view.right, -dx * metres);
+  pan.x += (view.forward.x / Math.hypot(view.forward.x, view.forward.z)) * ((dy * metres) / Math.sin(view.pitch));
+  pan.z += (view.forward.z / Math.hypot(view.forward.x, view.forward.z)) * ((dy * metres) / Math.sin(view.pitch));
   pan.y = 0;
   pan.clampLength(0, 320);
 });
@@ -157,7 +218,7 @@ addEventListener(
   (e) => {
     e.preventDefault();
     const step = e.ctrlKey ? clamp(e.deltaY * 0.01, -0.1, 0.1) : Math.sign(e.deltaY) * 0.1;
-    view.viewHeight = clamp(view.viewHeight * (1 + step), 24, 260);
+    view.viewHeight = clamp(view.viewHeight * (1 + step), ZOOM.min, ZOOM.max);
   },
   { passive: false },
 );
@@ -251,6 +312,7 @@ function frame() {
     }
   }
   seatMark.visible = seatAtHand !== null;
+  pad?.update(seatAtHand, player.seat !== null);
   if (seatAtHand) seatMark.position.copy(seatAtHand.position).setY(seatAtHand.position.y + 1.9 + Math.sin(t * 4) * 0.12);
 
   GLOBALS.uTime.value = t;

@@ -2,7 +2,12 @@
 <html lang="fr">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <!-- Added to the home screen of a phone, the map fills the screen, bars and all. -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#f8d3a8" />
     <title>VIRT — Les Jardins de Sable</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -23,13 +28,18 @@
         font-family: 'Pixelify Sans', monospace;
         color: var(--ink);
         user-select: none;
-        /* The page itself never zooms: pinching zooms the map (see main.js). */
+        -webkit-user-select: none;
+        /* Nor does a long press on a phone bring up its menu. */
+        -webkit-touch-callout: none;
+        /* The page itself never zooms nor scrolls: pinching zooms the map, a finger slides it
+           (see main.js). */
         touch-action: none;
       }
       canvas {
         display: block;
         cursor: grab;
         image-rendering: pixelated;
+        touch-action: none;
       }
       canvas:active {
         cursor: grabbing;
@@ -44,7 +54,7 @@
       .weather,
       .fan-chip {
         position: fixed;
-        bottom: 16px;
+        bottom: calc(16px + env(safe-area-inset-bottom));
         z-index: 10;
         height: 30px;
         padding: 0;
@@ -61,27 +71,34 @@
         transition: transform 0.15s, box-shadow 0.15s;
       }
       .daynight {
-        right: 16px;
+        right: calc(16px + env(safe-area-inset-right));
         width: 64px;
       }
       .season {
-        right: 90px;
+        right: calc(90px + env(safe-area-inset-right));
         width: 34px;
       }
       .weather {
-        right: 134px;
+        right: calc(134px + env(safe-area-inset-right));
         width: 34px;
       }
-      .daynight:hover,
-      .season:hover,
-      .weather:hover,
-      .fan-chip:hover {
-        transform: translateY(-1px);
-        box-shadow:
-          0 2px 3px rgba(43, 37, 51, 0.16),
-          0 8px 18px rgba(43, 37, 51, 0.26),
-          inset 0 1px 0 rgba(255, 255, 255, 0.45),
-          inset 0 -1px 0 rgba(43, 37, 51, 0.12);
+      /* A finger leaves no hover behind it: these are for the mouse alone. */
+      @media (hover: hover) {
+        .daynight:hover,
+        .season:hover,
+        .weather:hover,
+        .fan-chip:hover {
+          transform: translateY(-1px);
+          box-shadow:
+            0 2px 3px rgba(43, 37, 51, 0.16),
+            0 8px 18px rgba(43, 37, 51, 0.26),
+            inset 0 1px 0 rgba(255, 255, 255, 0.45),
+            inset 0 -1px 0 rgba(43, 37, 51, 0.12);
+        }
+        .fan.is-open .fan-chip:hover {
+          transform: translate(-50%, -50%) translate(var(--dx), var(--dy)) scale(1.08);
+          transition-delay: 0s;
+        }
       }
       .daynight:active,
       .season:active,
@@ -336,10 +353,6 @@
         opacity: 1;
         transform: translate(-50%, -50%) translate(var(--dx), var(--dy)) scale(1);
       }
-      .fan.is-open .fan-chip:hover {
-        transform: translate(-50%, -50%) translate(var(--dx), var(--dy)) scale(1.08);
-        transition-delay: 0s;
-      }
       .fan.is-open .fan-chip:active {
         transform: translate(-50%, -50%) translate(var(--dx), var(--dy)) scale(0.96);
         transition-delay: 0s;
@@ -528,6 +541,122 @@
           box-shadow: 0 0 0 3px rgba(79, 212, 122, 0.3);
         }
       }
+      /* On a touch screen (touch.js): a pad in the bottom left corner walks the avatar, four
+         arms of paper with the one under the thumb lit, and a round button beside it that sits
+         him down by a seat or makes him hop. Soft shadows, as on the other controls. */
+      .pad {
+        position: fixed;
+        left: calc(16px + env(safe-area-inset-left));
+        bottom: calc(16px + env(safe-area-inset-bottom));
+        z-index: 10;
+        width: 132px;
+        height: 132px;
+        touch-action: none;
+      }
+      .pad i,
+      .act {
+        position: absolute;
+        display: block;
+        width: 44px;
+        height: 44px;
+        padding: 0;
+        border: 0;
+        border-radius: 12px;
+        background: rgba(247, 236, 212, 0.86);
+        box-shadow:
+          0 1px 2px rgba(43, 37, 51, 0.18),
+          0 5px 12px rgba(43, 37, 51, 0.22),
+          inset 0 1px 0 rgba(255, 255, 255, 0.55),
+          inset 0 -1px 0 rgba(43, 37, 51, 0.12);
+        transition: transform 0.1s, background 0.1s;
+      }
+      .pad-up { left: 44px; top: 0; }
+      .pad-right { left: 88px; top: 44px; }
+      .pad-down { left: 44px; top: 88px; }
+      .pad-left { left: 0; top: 44px; }
+      .pad-hub {
+        left: 44px;
+        top: 44px;
+        border-radius: 0;
+        background: rgba(247, 236, 212, 0.55);
+        box-shadow: none;
+      }
+      /* The arrow on each arm: a pixel chevron in ink. */
+      .pad i:not(.pad-hub)::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 14px;
+        height: 10px;
+        background: var(--ink);
+        opacity: 0.7;
+        clip-path: polygon(50% 0, 100% 100%, 72% 100%, 50% 55%, 28% 100%, 0 100%);
+        transform: translate(-50%, -50%) rotate(var(--turn, 0deg));
+      }
+      .pad-right::after { --turn: 90deg; }
+      .pad-down::after { --turn: 180deg; }
+      .pad-left::after { --turn: 270deg; }
+      .pad i.is-down {
+        transform: translateY(1px);
+        background: #ffd98a;
+        box-shadow:
+          0 1px 1px rgba(43, 37, 51, 0.18),
+          0 2px 5px rgba(43, 37, 51, 0.2),
+          inset 0 1px 0 rgba(255, 255, 255, 0.55),
+          inset 0 -1px 0 rgba(43, 37, 51, 0.12);
+      }
+      .act {
+        left: calc(162px + env(safe-area-inset-left));
+        bottom: calc(60px + env(safe-area-inset-bottom));
+        z-index: 10;
+        width: 52px;
+        height: 52px;
+        border-radius: 50%;
+        cursor: pointer;
+      }
+      .act:active {
+        transform: translateY(1px);
+        background: #ffd98a;
+      }
+      .act i {
+        position: absolute;
+        display: block;
+        background: var(--ink);
+        opacity: 0.7;
+        transition: opacity 0.2s;
+      }
+      /* Hop: a pixel figure of three pips rising. */
+      .act .leap {
+        left: 23px;
+        top: 20px;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        box-shadow: -8px 7px 0 -1px var(--ink), 8px 7px 0 -1px var(--ink);
+      }
+      /* Sit: a little chair, seat and back, drawn in pixels. */
+      .act .chair {
+        left: 21px;
+        top: 27px;
+        width: 12px;
+        height: 4px;
+        box-shadow: -5px -8px 0 0 var(--ink), -5px -4px 0 0 var(--ink), -4px 5px 0 -1px var(--ink), 4px 5px 0 -1px var(--ink);
+        opacity: 0;
+      }
+      .act.is-seat .leap {
+        opacity: 0;
+      }
+      .act.is-seat .chair {
+        opacity: 0.7;
+      }
+      .act.is-seat {
+        box-shadow:
+          0 0 0 2px var(--paper),
+          0 0 0 3px rgba(43, 37, 51, 0.35),
+          0 5px 12px rgba(43, 37, 51, 0.22);
+      }
+
       /* While the island is built: the view the map opens on, blurred, a small loader and a
          word. Building the map holds the page's thread for seconds, so nothing here moves but by
          opacity, which the browser animates on its own while the script runs. The shot is wider
@@ -610,6 +739,8 @@
         .loading *,
         .weather *,
         .fan-chip,
+        .pad i,
+        .act,
         .season *,
         .season,
         .daynight *,
