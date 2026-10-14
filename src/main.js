@@ -139,44 +139,120 @@ const pad = touchPad({ press, release, act: () => sitOrStand() || tapped.add('Sp
 // avatar walks again it comes back to him. Dragging with the right button, or with Ctrl, Cmd
 // or Alt held, turns the view around the point it looks at and tilts it, from low over the sea
 // to nearly straight down. A and E turn it to the next corner of the island, where the walk
-// lines up with the screen again. On a touch screen one finger slides the map, and two pinch
-// to zoom it, twist to turn it and move up or down the screen to tilt it.
+// lines up with the screen again. On a touch screen the map is handled as in Google Maps: one
+// finger slides it; two fingers slide it together, pinch to zoom and twist to turn, the ground
+// under them held under them all the while, or, moving straight up or down the screen, tilt
+// it; a double tap held down and dragged down the screen zooms in, up zooms out. A double tap
+// on its own does nothing: the map never jumps.
 const snapYaw = (yaw) => Math.round(yaw / (Math.PI / 2)) * (Math.PI / 2);
 const PITCH = { min: 0.3, max: 1.5 };
 const ZOOM = { min: 24, max: 260 };
+const Y_AXIS = new THREE.Vector3(0, 1, 0);
 let yawTarget = view.yaw;
 let pitchTarget = view.pitch;
-let dragging = null; // 'pan' | 'orbit' | 'pinch'
+let dragging = null; // 'pan' | 'orbit' | 'pinch' | 'dtap'
 let homing = false; // the view is on its way back to the avatar
 const pan = opensOnShot ? new THREE.Vector3(OPENING.view.pan[0], 0, OPENING.view.pan[1]) : new THREE.Vector3();
-// Every finger, or the mouse, down on the map, and where it was last seen: a touch screen
-// reports no movement of its own, so each move is measured from the last.
+const scratch = new THREE.Vector3();
+const scratch2 = new THREE.Vector3();
+/** Metres a pixel of the screen is across, at a zoom (the height of the view in metres). */
+const perPixel = (zoom) => zoom / innerHeight;
+/**
+ * The ground a vector of the screen runs over: so many pixels across and so many down, at so
+ * many metres a pixel. Up the screen the ground runs away aslant, and so further.
+ */
+function ground(dx, dy, metres, out) {
+  const level = Math.hypot(view.forward.x, view.forward.z);
+  return out
+    .set(view.forward.x / level, 0, view.forward.z / level)
+    .multiplyScalar((-dy * metres) / Math.sin(view.pitch))
+    .addScaledVector(view.right, dx * metres);
+}
+/** Slides the map under the hand, which has moved so many pixels across and down the screen. */
+function slide(dx, dy) {
+  pan.sub(ground(dx, dy, perPixel(view.viewHeight), scratch)).clampLength(0, 320);
+}
+/** Where a pixel of the screen stands from the point the view is centred on, which sits below the middle (PixelCamera.lift). */
+const fromMiddle = (x, y) => [x - innerWidth / 2, y - innerHeight * (0.5 + view.lift)];
+/** Zooms the view, the ground under a point of the screen held still under it. */
+function zoomAt(zoom, x, y) {
+  zoom = clamp(zoom, ZOOM.min, ZOOM.max);
+  const was = view.viewHeight;
+  view.viewHeight = zoom;
+  // That ground lies so far from the middle at the old scale and less, or more, at the new:
+  // the view moves over by the difference.
+  const [sx, sy] = fromMiddle(x, y);
+  pan.add(ground(sx, sy, perPixel(was) - perPixel(zoom), scratch)).clampLength(0, 320);
+}
+/** Turns the view, the ground under a point of the screen held still under it. */
+function turnAt(delta, x, y) {
+  const [sx, sy] = fromMiddle(x, y);
+  const offset = ground(sx, sy, perPixel(view.viewHeight), scratch);
+  // The screen's axes turn with the view: where that ground would go, the view goes the other way.
+  pan.add(offset).sub(scratch2.copy(offset).applyAxisAngle(Y_AXIS, delta)).clampLength(0, 320);
+  view.yaw += delta;
+  yawTarget = view.yaw;
+  // The axes turn now, not at the next frame: the fingers may move again before it.
+  view.right.applyAxisAngle(Y_AXIS, delta);
+  view.forward.applyAxisAngle(Y_AXIS, delta);
+}
+/** Tilts the view, at once: the fingers give it no time to settle. */
+function tiltBy(delta) {
+  view.pitch = pitchTarget = clamp(pitchTarget + delta, PITCH.min, PITCH.max);
+}
+
+// Every finger, or the mouse, down on the map: where it went down and when, and where it was
+// last seen, since a touch screen reports no movement of its own.
 const pointers = new Map();
-let pinch = null; // the two fingers as they last stood
-/** The two fingers: how far apart, which way round, and how high up the screen. */
+// Two fingers down: how they stood when they came down and when last seen, and what they are
+// up to once that can be told — 'tilt', straight up or down the screen together, else 'pan':
+// sliding, pinching and twisting all at once.
+let pinch = null;
+// The last tap on the map, for a double tap; and a double tap held down, for the zoom it drags.
+let lastTap = null;
+let dtap = null;
+const TAP = { within: 300, still: 10, again: 350, near: 40 };
+/** The two fingers: their middle, how far apart, and which way round. */
 function fingers() {
   const [a, b] = [...pointers.values()];
-  return { gap: Math.hypot(b.x - a.x, b.y - a.y), turn: Math.atan2(b.y - a.y, b.x - a.x), y: (a.y + b.y) / 2 };
+  return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2, gap: Math.hypot(b.x - a.x, b.y - a.y), turn: Math.atan2(b.y - a.y, b.x - a.x) };
 }
+const wrapTurn = (turn) => turn - Math.round(turn / (Math.PI * 2)) * Math.PI * 2;
 renderer.domElement.addEventListener('pointerdown', (e) => {
   // The finger is followed off the canvas, over the buttons and out of the window; a made-up
   // pointer (a script's) cannot be captured, and is followed all the same.
   try {
     renderer.domElement.setPointerCapture(e.pointerId);
   } catch {}
-  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  const now = performance.now();
+  pointers.set(e.pointerId, { x: e.clientX, y: e.clientY, x0: e.clientX, y0: e.clientY, at: now });
   if (pointers.size >= 2) {
     dragging = 'pinch';
-    pinch = fingers();
+    const stand = fingers();
+    pinch = { start: stand, last: stand, mode: pinch?.mode ?? null };
+  } else if (lastTap && now - lastTap.at < TAP.again && Math.hypot(e.clientX - lastTap.x, e.clientY - lastTap.y) < TAP.near) {
+    dragging = 'dtap';
+    dtap = { x: e.clientX, y: e.clientY, zoom: view.viewHeight };
   } else dragging = e.button === 2 || e.ctrlKey || e.metaKey || e.altKey ? 'orbit' : 'pan';
+  lastTap = null;
   homing = false;
 });
 renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
 const lift = (e) => {
+  const was = pointers.get(e.pointerId);
   if (!pointers.delete(e.pointerId)) return;
-  if (pointers.size === 0) dragging = null;
-  else if (pointers.size === 1) dragging = 'pan';
-  else pinch = fingers();
+  const now = performance.now();
+  // A finger down and up on the spot is a tap; a second one soon after, held, drags the zoom.
+  if (dragging === 'pan' && pointers.size === 0 && now - was.at < TAP.within && Math.hypot(e.clientX - was.x0, e.clientY - was.y0) < TAP.still) lastTap = { x: e.clientX, y: e.clientY, at: now };
+  if (pointers.size === 0) {
+    dragging = null;
+    pinch = null;
+    dtap = null;
+  } else if (pointers.size === 1) dragging = 'pan';
+  else {
+    const stand = fingers();
+    pinch = { start: stand, last: stand, mode: pinch?.mode ?? null };
+  }
 };
 addEventListener('pointerup', lift);
 addEventListener('pointercancel', lift);
@@ -190,11 +266,33 @@ addEventListener('pointermove', (e) => {
   if (dragging === 'pinch') {
     if (pointers.size < 2) return;
     const now = fingers();
-    view.viewHeight = clamp((view.viewHeight * pinch.gap) / now.gap, ZOOM.min, ZOOM.max);
-    const twist = now.turn - pinch.turn;
-    yawTarget += twist - Math.round(twist / (Math.PI * 2)) * Math.PI * 2;
-    pitchTarget = clamp(pitchTarget + (now.y - pinch.y) * 0.005, PITCH.min, PITCH.max);
-    pinch = now;
+    if (!pinch.mode) {
+      // Which it is can be told once the fingers have moved a little: together, straight up
+      // or down the screen, neither closing nor turning, is a tilt. Nothing is lost in the
+      // telling: what they did meanwhile is taken up from where they came down.
+      const { start } = pinch;
+      const mx = now.x - start.x;
+      const my = now.y - start.y;
+      const closing = Math.abs(now.gap - start.gap);
+      const turning = Math.abs(wrapTurn(now.turn - start.turn));
+      if (Math.abs(my) > 12 && Math.abs(mx) < Math.abs(my) * 0.5 && closing < 12 && turning < 0.1) pinch.mode = 'tilt';
+      else if (closing > 12 || turning > 0.1 || Math.hypot(mx, my) > 12) pinch.mode = 'pan';
+      else return;
+      pinch.last = start;
+    }
+    const { last: then } = pinch;
+    if (pinch.mode === 'tilt') tiltBy((now.y - then.y) * 0.005);
+    else {
+      zoomAt((view.viewHeight * then.gap) / now.gap, now.x, now.y);
+      turnAt(wrapTurn(now.turn - then.turn), now.x, now.y);
+      slide(now.x - then.x, now.y - then.y);
+    }
+    pinch.last = now;
+    return;
+  }
+  if (dragging === 'dtap') {
+    // Down the screen zooms in, up zooms out, the spot tapped held still.
+    zoomAt(dtap.zoom * Math.exp(-(e.clientY - dtap.y) * 0.008), dtap.x, dtap.y);
     return;
   }
   if (dragging === 'orbit') {
@@ -202,23 +300,16 @@ addEventListener('pointermove', (e) => {
     pitchTarget = clamp(pitchTarget + dy * 0.005, PITCH.min, PITCH.max);
     return;
   }
-  // The map follows the hand: a screen pixel is so many metres across, and more than that
-  // along the ground up the screen, which the view looks at aslant.
-  const metres = view.viewHeight / innerHeight;
-  pan.addScaledVector(view.right, -dx * metres);
-  pan.x += (view.forward.x / Math.hypot(view.forward.x, view.forward.z)) * ((dy * metres) / Math.sin(view.pitch));
-  pan.z += (view.forward.z / Math.hypot(view.forward.x, view.forward.z)) * ((dy * metres) / Math.sin(view.pitch));
-  pan.y = 0;
-  pan.clampLength(0, 320);
+  slide(dx, dy);
 });
-// The wheel zooms the map, and so does a pinch on the trackpad (a wheel with Ctrl held), which
-// would otherwise blow up the whole page.
+// The wheel zooms the map about the pointer, and so does a pinch on the trackpad (a wheel with
+// Ctrl held), which would otherwise blow up the whole page.
 addEventListener(
   'wheel',
   (e) => {
     e.preventDefault();
     const step = e.ctrlKey ? clamp(e.deltaY * 0.01, -0.1, 0.1) : Math.sign(e.deltaY) * 0.1;
-    view.viewHeight = clamp(view.viewHeight * (1 + step), ZOOM.min, ZOOM.max);
+    zoomAt(view.viewHeight * (1 + step), e.clientX, e.clientY);
   },
   { passive: false },
 );
