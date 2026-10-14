@@ -3,6 +3,30 @@
 Newest first. Each run adds an entry: date, week, kind (and theme), sector; what it found; what
 it changed (commits); what it saw but left for later, and why; what the user turned down.
 
+## 2026-10-14 — week 42 (kind: defects; sector: shore)
+
+- Run by hand on the Tuesday at the user's request (the Saturday run had been stopped at the
+  server). Twenty-five pictures of the tour, eight close-ups and three retakes.
+- Found: the first stop of the shore tour fifty metres off the map, a picture of sky; a
+  street lamp on the planks of the lighthouse keeper's landing stage, the very fault fixed on
+  the harbour piers on 2026-10-09, unseen because the lighthouse rock and the stage were never
+  handed to the lint; a rock of the shallows standing through a block of the lighthouse's
+  jetty (seen by the lint once the rock was inspected); the ivory towels under the blue
+  parasols invisible on the white sand, only their shadows showing.
+- Changed: 8615d92 (shore stops kept on the map, test/tour), 9f931e6 (no shallows rock within
+  24 m of the lighthouse rock), 0eed247 (the lighthouse rock and the landing stage inspected
+  by every work-zone rule; the lamp on the shore at the stage's root), 808dfe5 (towel colours
+  kept apart from the sand, test/palette).
+- Budget of the shore: 524.4 k triangles / 18 048 objects before, 521.3 k / 17 932 after;
+  island 3 153 270 → 3 153 390 triangles, 588 → 584 meshes, 98 638 → 98 631 instances.
+- Checked and found sound: the keeper's gozzo clears the jetty by 0.4 m (it only looked
+  moored over it); the beach bar's deck stands on a stone plinth on the slope; the belvedere
+  stair above the cove lands on a round terrace with a bench.
+- Seen, left alone: the round cutaway hole on a roof in the shore-90 picture is the hidden
+  avatar carried to the stop, a tour artefact, not a fault; the lamp at the stage's root is
+  hidden by a maple from the sea side; the rocks in the shallows read as floating from high
+  up, as their white swell is faint at that zoom, a matter for a details review.
+
 ## 2026-10-10 — week 41 (kind: walk; sector: mountain)
 
 - The first attempt that morning stopped before any picture: starting the `jardins` server
