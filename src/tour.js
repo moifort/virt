@@ -18,7 +18,7 @@
 // shore.
 // `?tour=spots&spots=-97,-12;-106,-19` looks closely at a few points of the map (x, z), for a
 // fix: the lint (test/) gives the points of whatever it finds.
-import { ISLET, OBSERVATORY, PATHS, RAIL_MOUTHS, STATION, TRACKS, TRAILS, VILLAGES, ZONES, coastU, lanePoint, railPoint, toX, toZ, villagePlan } from './terrain.js';
+import { HALF, ISLET, OBSERVATORY, PATHS, RAIL_MOUTHS, STATION, TRACKS, TRAILS, VILLAGES, ZONES, coastU, lanePoint, railPoint, toX, toZ, villagePlan } from './terrain.js';
 
 const WIDTH = 1600; // the picture as drawn, in screen pixels: two to an art pixel
 const HEIGHT = 1000;
@@ -118,8 +118,13 @@ export function stops(tour, params = new URLSearchParams()) {
     segments('track', TRACKS, 26, 30);
   } else if (tour === 'shore') {
     add('lighthouse', ISLET.x, ISLET.z, 40);
-    // Along the shore of the bay, every 20 m, a few metres in from the water's edge.
-    for (let v = -110; v <= 100; v += 20) add(`shore-${v}`, toX(coastU(v, 0) + 4, v), toZ(coastU(v, 0) + 4, v), 34);
+    // Along the shore of the bay, every 20 m, a few metres in from the water's edge. Toward the
+    // open sea the coast leaves the map (terrain.js, farLeft): no stop out there.
+    for (let v = -110; v <= 100; v += 20) {
+      const x = toX(coastU(v, 0) + 4, v);
+      const z = toZ(coastU(v, 0) + 4, v);
+      if (Math.abs(x) < HALF - 10 && Math.abs(z) < HALF - 10) add(`shore-${v}`, x, z, 34);
+    }
   }
   return list;
 }
