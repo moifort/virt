@@ -3,6 +3,18 @@
 Newest first. Each run adds an entry: date, week, kind (and theme), sector; what it found; what
 it changed (commits); what it saw but left for later, and why; what the user turned down.
 
+## 2026-10-16 — week 42 (kind: defects; sector: shore) — scheduled run, not run
+
+- `bun test` green at the start (26 pass); budget of the shore: 521.3 k triangles / 17 932
+  objects (island 3 153 390 triangles, 584 meshes, 98 631 instances), unchanged since the
+  run of 2026-10-14.
+- Stopped before the pictures: starting the `jardins` dev server from the Browser pane was
+  declined, so no tour could be taken. As the routine says, no change was made without
+  pictures.
+- Nothing lost: this week's shore defects review was already run by hand on 2026-10-14
+  (entry below). The items it left for a details review (rocks of the shallows reading as
+  floating from high up) still stand.
+
 ## 2026-10-14 — week 42 (kind: defects; sector: shore)
 
 - Run by hand on the Tuesday at the user's request (the Saturday run had been stopped at the
