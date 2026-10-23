@@ -3,6 +3,30 @@
 Newest first. Each run adds an entry: date, week, kind (and theme), sector; what it found; what
 it changed (commits); what it saw but left for later, and why; what the user turned down.
 
+## 2026-10-23 — week 43 (kind: details; sector: port) — run by hand
+
+- Run the same day at the user's request, the `jardins` server approved. Eighteen pictures of
+  the tour (`port-details`), six close-ups and their retakes (slipway, both stalls).
+- Found: the three gozzi on the slipway lay hull to hull, two abreast with a hand's breadth
+  between their strakes and the third pushed in between their ends, so with the boat moored
+  beside the slip they read as four boats crossing; along both piers the moored boats were
+  5 m apart for a 4.8 m hull, a chain of boats bow to stern. The quay itself had long
+  stretches of bare paving, the widest from the red stall to the mole's root.
+- Changed: 7d521b0 (a lint rule in test/harbour, every boat keeps 0.35 m all round its hull,
+  11 pairs failing; the slipway boats staggered, the moorings 5.6 m apart), bb14887 (empty
+  fish crates stacked by both stalls; a green and rust net heap with its cork line, a stool
+  and a crate of twine near the mole's root, on their own seed so nothing after them moves).
+- Budget of the port: 220 544 triangles / 5 549 objects before, 221 620 / 5 549 after;
+  island 3 153 390 → 3 154 466 triangles, 584 meshes and 98 631 instances unchanged. (The
+  commit message of bb14887 gives 3 154 430 / 221.6 k, taken before the last colour tweak.)
+- Learnt: new furniture drawn from the harbour's shared `rng` shifts every random draw after
+  it on the island (+248 instances and a ratchet moved on the first try); give additions
+  their own `mulberry32` seed. The quay's paving stands 0.1 above the `quay` group's origin.
+- Seen, left alone: the fish stalls stand 0.1 m above the paving and their blue crate is half
+  sunk in it (fishStall's own offsets), too small to see at the game's zoom; the quay wall
+  has no iron rings or ladder down to the water, a candidate for the next details run here.
+  The third addition the routine allows was not used, to keep the run short.
+
 ## 2026-10-23 — week 43 (kind: details; sector: port) — scheduled run, not run
 
 - `bun test` green at the start (26 pass); budget of the port: 220 544 triangles / 5 549
