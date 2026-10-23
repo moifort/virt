@@ -3,6 +3,18 @@
 Newest first. Each run adds an entry: date, week, kind (and theme), sector; what it found; what
 it changed (commits); what it saw but left for later, and why; what the user turned down.
 
+## 2026-10-23 — week 43 (kind: details; sector: port) — scheduled run, not run
+
+- `bun test` green at the start (26 pass); budget of the port: 220 544 triangles / 5 549
+  objects (island 3 153 390 triangles, 584 meshes, 98 631 instances), unchanged.
+- Stopped before the pictures: starting the `jardins` dev server from the Browser pane was
+  declined again, and nothing was listening on port 8742, so the tour
+  (`?tour=port&out=port-details&yaws=0,1&zoom=26`) could not be taken. No change was made
+  without pictures.
+- Second scheduled run in a row stopped at the server (see week 42): the automated runs
+  cannot start it without someone approving the pane. This week's port details review is
+  still to do, by hand or with the server approved for the scheduled run.
+
 ## 2026-10-16 — week 42 (kind: defects; sector: shore) — scheduled run, not run
 
 - `bun test` green at the start (26 pass); budget of the shore: 521.3 k triangles / 17 932
