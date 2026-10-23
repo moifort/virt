@@ -3,7 +3,7 @@
 // a flight of steps hollow underneath, a street lamp on the planks of a pier.
 import { test } from 'bun:test';
 import * as THREE from 'three';
-import { Buckets, expectAtMost, expectNone, groundAt, island, laneAt } from './world.js';
+import { Buckets, expectAtMost, expectNone, groundAt, island, laneAt, overlapXZ } from './world.js';
 
 const AIRBORNE = new Set(['lamp', 'flow', 'leaf', 'vine', 'ball']);
 // The most a piece of furniture holds, in cubic metres of its own box: a boat, a stall.
@@ -83,4 +83,35 @@ test('no street lamp stands on the planks of a pier', () => {
     if (planks.near(lamp.box).some((p) => Math.abs(p.box.max.y - lamp.box.min.y) < 0.2 && p.box.min.x < lamp.box.max.x && p.box.max.x > lamp.box.min.x && p.box.min.z < lamp.box.max.z && p.box.max.z > lamp.box.min.z)) wrong.push(`${lamp.label} stands on planks`);
   }
   expectNone(wrong, 'street lamps on a pier');
+});
+
+test('boats lie clear of one another, on the water and hauled up', () => {
+  const { props } = island();
+  const boats = props.filter((p) => p.name === 'boat');
+  // A gozzo's hull at the strake, in its own frame: half its beam and half its length.
+  const BEAM = 1.0;
+  const LENGTH = 2.4;
+  // Room enough between two hulls for a hand, a fender, a man to pass with a line.
+  const ROOM = 0.35;
+  const rim = (b, grow) => {
+    const out = [];
+    for (let k = 0; k < 48; k++) {
+      const a = (k / 48) * Math.PI * 2;
+      out.push(new THREE.Vector3(Math.cos(a) * (BEAM + grow), 0.4, Math.sin(a) * (LENGTH + grow)).applyMatrix4(b.matrix));
+    }
+    return out;
+  };
+  const within = (b, p) => {
+    const q = p.clone().applyMatrix4(b.matrix.clone().invert());
+    return (q.x / BEAM) ** 2 + (q.z / LENGTH) ** 2 < 1;
+  };
+  const crowded = [];
+  for (let i = 0; i < boats.length; i++) {
+    for (let j = i + 1; j < boats.length; j++) {
+      const [a, b] = [boats[i], boats[j]];
+      if (!overlapXZ(a.box, b.box, ROOM)) continue;
+      if (rim(b, ROOM).some((p) => within(a, p)) || rim(a, ROOM).some((p) => within(b, p))) crowded.push(`${a.label} and ${b.label} lie hull to hull`);
+    }
+  }
+  expectNone(crowded, 'boats crowded against one another');
 });

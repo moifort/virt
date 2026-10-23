@@ -557,7 +557,9 @@ export function gozzo(rng, sail = false) {
     at(canvas, 0.55, 2.1, 0.3, g);
   }
   // A boat bobs as one piece: baked, it is a few meshes rather than twenty.
-  return bake(g);
+  const boat = bake(g);
+  boat.name = 'boat';
+  return boat;
 }
 
 /** A gull at rest on a post or a rail, wings folded, looking out to sea. */
@@ -1197,16 +1199,19 @@ export function buildPort(g, rng, animated) {
   const slip = at(box(4.6, 0.5, 10, 0xd3c7b0), SLIP, rampAt(slipTop + 5) - 0.25, slipTop + 5, deck);
   slip.rotation.x = lean;
   for (const sx of [-1, 1]) at(box(0.3, 0.7, 10, BLOCK[1]), SLIP + sx * 2.45, rampAt(slipTop + 5) - 0.1, slipTop + 5, deck).rotation.x = lean;
-  // Each boat lies on two rollers, its keel on them, its stern clear of the quay wall.
-  for (const [dx, z] of [[-1.15, slipTop + 2.8], [1.15, slipTop + 3.6], [-0.2, slipTop + 7.0]]) {
+  // Each boat lies on two rollers, its keel on them, its stern clear of the quay wall: two
+  // abreast at the head of the ramp, staggered so a man can pass between them, and one
+  // lower down, its bow at the water's edge, as if just drawn up.
+  for (const [dx, z] of [[-1.2, slipTop + 2.8], [1.2, slipTop + 4.6], [-1.2, slipTop + 8.0]]) {
     for (const dz of [-1.2, 1.2]) at(cyl(0.1, 0.1, 1.9, DARK_WOOD, 6), SLIP + dx, rampAt(z + dz) + 0.1, z + dz, deck).rotation.z = Math.PI / 2;
     const boat = at(gozzo(rng), SLIP + dx, rampAt(z) + 0.46, z, deck);
     boat.rotation.x = lean;
     boat.rotation.y = Math.PI;
   }
 
-  // Moored boats along the piers and in the lee of the mole, bobbing.
-  for (const px of [-8, 6]) for (const side of [-1, 1]) for (let k = 0; k < 3; k++) moorings.push([px + side * 2.6, Q + 3 + k * 5, (rng() - 0.5) * 0.2]);
+  // Moored boats along the piers and in the lee of the mole, bobbing, a fender's width of
+  // water between one bow and the next stern.
+  for (const px of [-8, 6]) for (const side of [-1, 1]) for (let k = 0; k < 3; k++) moorings.push([px + side * 2.6, Q + 3 + k * 5.6, (rng() - 0.5) * 0.2]);
   moorings.forEach(([x, z, yaw], i) => {
     const boat = at(live(gozzo(rng, i % 5 === 4)), x, surface, z, g);
     boat.rotation.y = yaw;
