@@ -1529,6 +1529,42 @@ function furnishPort(quay, g, rng, Q) {
     at(cyl(0.4, 0.4, 0.55, 0x5a6a7a, 8), x, 0.28, z, quay);
     at(ring(0.4, 0.03, PAL.saffron, Math.PI * 2, 10), x, 0.55, z, quay).rotation.x = Math.PI / 2;
   }
+  // Empty fish crates stacked by the stalls, shallow and slatted, one askew on its stack, the
+  // morning's catch long sold; and a heap of net by the mole's root, its line of cork floats
+  // showing, a stool and a crate of twine beside it where someone sits to mend it.
+  // (Their own seed, so that nothing drawn after them on the island changes.)
+  const rs = mulberry32(1043);
+  const crates = (x, z, n) => {
+    const stack = at(new THREE.Group(), x, 0.1, z, quay);
+    stack.name = 'fish crates';
+    stack.rotation.y = (rs() - 0.5) * 0.4;
+    for (let k = 0; k < n; k++) {
+      const crate = at(new THREE.Group(), (rs() - 0.5) * 0.1, k * 0.24, (rs() - 0.5) * 0.1, stack);
+      crate.rotation.y = k === n - 1 ? 0.25 : (rs() - 0.5) * 0.08;
+      const wood = pick(rs, [0xd2ae7c, 0xc49c68, 0xb98a5a]);
+      at(box(0.8, 0.04, 0.5, wood), 0, 0.02, 0, crate);
+      for (const s of [-1, 1]) {
+        at(box(0.8, 0.18, 0.04, wood), 0, 0.13, s * 0.23, crate);
+        at(box(0.04, 0.2, 0.5, 0x9a7048), s * 0.38, 0.12, 0, crate);
+      }
+    }
+  };
+  crates(-16.0, 0.2, 3);
+  crates(-16.9, -0.4, 2);
+  crates(7.5, 0.3, 4);
+  const mending = at(new THREE.Group(), -18.2, 0.1, 0, quay);
+  mending.name = 'net heap';
+  mending.rotation.y = rs() * Math.PI;
+  at(ball(0.7, 0x4f7d5e, { flat: true }, 8, 5), 0, 0.1, 0, mending).scale.set(1.3, 0.42, 0.9);
+  at(ball(0.45, 0xa0573c, { flat: true }, 7, 4), 0.4, 0.24, 0.15, mending).scale.set(1.2, 0.5, 1);
+  at(ball(0.3, 0x5f8c68, { flat: true }, 6, 4), -0.45, 0.22, -0.2, mending).scale.set(1.3, 0.55, 1);
+  for (let k = 0; k < 9; k++) {
+    const a = (k / 9) * Math.PI * 1.6 - 0.4;
+    at(ball(0.07, PAL.saffron, {}, 5, 4), Math.cos(a) * 0.8, 0.18 + Math.sin(k * 1.7) * 0.05, Math.sin(a) * 0.55, mending).scale.set(1, 0.6, 1.4);
+  }
+  at(cyl(0.2, 0.18, 0.42, PAL.wood, 8), -1.25, 0.21, 0.35, mending);
+  at(box(0.5, 0.26, 0.36, 0xc49c68), -1.1, 0.13, -0.5, mending);
+  at(ring(0.1, 0.04, PAL.cream, Math.PI * 2, 8), -1.1, 0.3, -0.5, mending).rotation.x = Math.PI / 2;
   const anchor = at(new THREE.Group(), 16, 0.2, 0.2, quay);
   anchor.rotation.set(-Math.PI / 2, 0, 0.4);
   at(cyl(0.08, 0.08, 1.6, INK, 6), 0, 0, 0, anchor);
