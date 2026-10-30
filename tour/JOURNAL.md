@@ -3,6 +3,17 @@
 Newest first. Each run adds an entry: date, week, kind (and theme), sector; what it found; what
 it changed (commits); what it saw but left for later, and why; what the user turned down.
 
+## 2026-10-30 — week 44 (kind: macro; theme: light; sector: lower-village) — scheduled run, not run
+
+- `bun test` green at the start (27 pass); budget of the lower village: 640 998 triangles /
+  14 400 objects (island 3 154 466 triangles, 584 meshes, 98 631 instances), no change made.
+- Stopped before the pictures: starting the `jardins` dev server from the Browser pane was
+  declined, and nothing was listening on port 8742, so none of the four tours (dawn, noon,
+  sunset, night) could be taken. As the routine says, no change was made without pictures.
+- Third scheduled run stopped at the server (weeks 42, 43 and 44): the automated runs cannot
+  start it unless the approval is given for them. This week's light review of the lower
+  village is still to do, by hand or with the server approved for the scheduled run.
+
 ## 2026-10-23 — week 43 (kind: details; sector: port) — run by hand
 
 - Run the same day at the user's request, the `jardins` server approved. Eighteen pictures of
