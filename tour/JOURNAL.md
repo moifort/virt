@@ -3,6 +3,18 @@
 Newest first. Each run adds an entry: date, week, kind (and theme), sector; what it found; what
 it changed (commits); what it saw but left for later, and why; what the user turned down.
 
+## 2026-11-06 — week 45 (kind: walk; sector: upper-village) — scheduled run, not run
+
+- `bun test` green at the start (27 pass); budget of the upper village: 506 484 triangles /
+  16 048 objects (island 3 154 466 triangles, 584 meshes, 98 631 instances), no change made.
+- Stopped before the pictures: starting the `jardins` dev server from the Browser pane was
+  declined, and nothing was listening on port 8742, so the walk tour
+  (`?tour=upper-village&out=upper-village-walk&yaws=0,1,2,3&limit=10&zoom=16&pitch=0.45`)
+  could not be taken. No change was made without pictures.
+- Fourth scheduled run in a row stopped at the server (weeks 42 to 45). Still to do, by hand
+  or with the server approved for the scheduled run: this walk of the upper village, the
+  light review of the lower village (week 44).
+
 ## 2026-10-30 — week 44 (kind: macro; theme: light; sector: lower-village) — scheduled run, not run
 
 - `bun test` green at the start (27 pass); budget of the lower village: 640 998 triangles /
