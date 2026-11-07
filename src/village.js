@@ -721,11 +721,24 @@ function laneEdges(parts, rng, lane, covered, furniture, lanes, piazzas) {
     }
     if (lane.stair) continue;
     if (s > nextLamp && !lane.quay) {
-      const side = lane.quay ? -lane.seaSide : rng() < 0.5 ? -1 : 1;
+      // Not in the mouth of a stair opening off the lane: the other side if that one is
+      // clear, otherwise a little further along.
+      // (Two draws of `rng` per lamp whatever happens, so nothing after it on the island moves.)
       const out = lane.half - 0.35;
-      const [lx, lz] = [p.x - p.tz * side * out, p.z + p.tx * side * out];
-      lantern(furniture, lx, groundAt(lx, lz) + 0.1, lz, { toward: [p.x, p.z] });
-      nextLamp = s + 9 + rng() * 5;
+      const first = rng() < 0.5 ? -1 : 1;
+      const gap = 9 + rng() * 5;
+      let spot = null;
+      for (let ahead = 0; ahead <= 4.5 && !spot && s + ahead < lane.length - 1; ahead += 1.5) {
+        const q = lanePoint(lane, s + ahead);
+        for (const side of [first, -first]) {
+          const [lx, lz] = [q.x - q.tz * side * out, q.z + q.tx * side * out];
+          if (lanes.some((o) => o !== lane && o.stair && laneAt(o, lx, lz).d < o.half + 0.6)) continue;
+          spot = [lx, lz, q];
+          break;
+        }
+      }
+      if (spot) lantern(furniture, spot[0], groundAt(spot[0], spot[1]) + 0.1, spot[1], { toward: [spot[2].x, spot[2].z] });
+      nextLamp = s + gap;
     }
     if (s > nextString && isCovered(-1, s) && isCovered(1, s)) {
       const out = lane.half + 0.1;

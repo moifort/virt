@@ -2,7 +2,7 @@
 // through a house, never up more than one terrace at a step. From where he starts, every lane,
 // stair and square, every work zone and path, and every seat must be within his reach.
 import { test } from 'bun:test';
-import { HALF, PATHS, WATER_LEVEL, ZONES, expectAtMost, expectNone, groundAt, inSquare, isSolid, island, lanePoint } from './world.js';
+import { HALF, PATHS, WATER_LEVEL, ZONES, expectAtMost, expectNone, groundAt, inSquare, isSolid, island, laneAt, lanePoint } from './world.js';
 
 // The avatar's own rules, as player.js has them.
 const TILE = 1.25;
@@ -145,4 +145,22 @@ test('every seat can be reached and sat on', () => {
     if (!ok) lost.push(`seat at ${spot(x, z)}, ${y.toFixed(1)} up`);
   }
   expectAtMost(lost, UNREACHED, 'seats the avatar cannot reach');
+});
+
+// A street lamp stands at the side of its lane; where a stair opens onto the lane, that side
+// is the stair's mouth, and the lamp would stand in the way of whoever comes down it.
+test('no street lamp stands in the mouth of a stair', () => {
+  const { props, plan } = island();
+  const stairs = plan.lanes.filter((lane) => lane.stair);
+  const wrong = [];
+  for (const lamp of props) {
+    if (lamp.name !== 'street lamp') continue;
+    const x = lamp.matrix.elements[12];
+    const z = lamp.matrix.elements[14];
+    for (const stair of stairs) {
+      const { d, s } = laneAt(stair, x, z);
+      if (d < stair.half + 0.25 && s > -0.6 && s < stair.length + 0.6) wrong.push(`${lamp.label} stands ${d.toFixed(2)} m from the axis of the stair at ${spot(x, z)}`);
+    }
+  }
+  expectNone(wrong, 'street lamps in the way of a stair');
 });
