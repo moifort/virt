@@ -3,6 +3,33 @@
 Newest first. Each run adds an entry: date, week, kind (and theme), sector; what it found; what
 it changed (commits); what it saw but left for later, and why; what the user turned down.
 
+## 2026-11-07 — week 45 (kind: walk; sector: upper-village) — run by hand
+
+- Run the day after the scheduled attempt, at the user's request, the `jardins` server
+  approved. Forty pictures of the walk tour (`upper-village-walk`, ten stops, four yaws, zoom
+  16, pitch 0.45), six close-ups before and six after.
+- Found: three street lamps standing in the mouth of a stair where it opens onto its lane, at
+  (-71.2, -30.6), (-66.1, -39.3) and (-74.2, -45.8), 0.7 to 1.2 m from the stair's axis — the
+  side of the lane a lamp stood on was drawn at random, with no look at what opened off the
+  lane there. Measured headless against every stair of the plan (14 stairs, 42 lamps).
+- Changed: 2b98061 (a rule in test/walk, no street lamp within a stair's width along its run;
+  laneEdges tries the other side, then the next treads, before setting a lamp, keeping two
+  draws of the rng per lamp so nothing downstream moves).
+- Budget of the upper village: 506 484 triangles / 16 048 objects before and after; island
+  3 154 466 triangles, 584 meshes, 98 631 instances unchanged. (A first version of the fix
+  that skipped a draw of the rng moved the island to 3 165 336 / 594 / 97 634: the lesson of
+  week 43 again, a changed draw count shifts everything after it.)
+- Checked and found sound: the lanes end at parapets or at a stair, none at a bare drop; the
+  belvedere at the top lane's end has its bench and lamp; every stair of the sector is walked
+  end to end by the lint; the lamps found inside the squares are the squares' own.
+- Seen, left alone: the church square's bench at the very top of the stair down to the
+  piazzetta reads as standing in the way from the stair, but it sits on the square's paving
+  clear of the treads; the terraced orti bank beside the long stair at (-107, -18) shows
+  its stone courses stretched where the slope is steepest, a texture matter for a details
+  run; the lamps on the lanes still stand where a lane crosses another (not measured as a
+  fault here, a candidate rule). One change only, to keep the run short; the light review of
+  the lower village (week 44) is still to do.
+
 ## 2026-11-06 — week 45 (kind: walk; sector: upper-village) — scheduled run, not run
 
 - `bun test` green at the start (27 pass); budget of the upper village: 506 484 triangles /
