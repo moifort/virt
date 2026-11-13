@@ -3,6 +3,20 @@
 Newest first. Each run adds an entry: date, week, kind (and theme), sector; what it found; what
 it changed (commits); what it saw but left for later, and why; what the user turned down.
 
+## 2026-11-13 — week 46 (kind: defects; sector: port) — scheduled run, not run
+
+- `bun test` green at the start (28 pass); budget of the port: 221 620 triangles / 5 549
+  objects (island 3 154 466 triangles, 584 meshes, 98 631 instances), no change made.
+- Stopped before the pictures: starting the `jardins` dev server from the Browser pane was
+  declined, and nothing was listening on port 8742, so the tour
+  (`?tour=port&out=port-defects&yaws=0,2`) could not be taken. As the routine says, no change
+  was made without pictures.
+- Fifth scheduled run stopped at the server (weeks 42 to 46); only the runs by hand get
+  through. Still to do, by hand or with the server approved for the scheduled run: this
+  defects review of the port, the light review of the lower village (week 44). Candidates
+  already noted for the port: the fish stalls 0.1 m above the paving with their blue crate
+  half sunk (week 43), a defect by this routine's terms and measurable headless.
+
 ## 2026-11-07 — week 45 (kind: walk; sector: upper-village) — run by hand
 
 - Run the day after the scheduled attempt, at the user's request, the `jardins` server
