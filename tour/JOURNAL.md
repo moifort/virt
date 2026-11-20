@@ -3,6 +3,39 @@
 Newest first. Each run adds an entry: date, week, kind (and theme), sector; what it found; what
 it changed (commits); what it saw but left for later, and why; what the user turned down.
 
+## 2026-11-20 — week 47 (kind: details; sector: lower-village) — scheduled run, on pi6
+
+- First scheduled run taken on pi6 (Linux arm64 container) instead of the Mac: the server
+  started in tmux, the pictures taken with headless Chromium and software WebGL
+  (`/opt/taches/weekly-island-review/photos.mjs`, about 3 minutes a picture on this board).
+  Thirty-three pictures: the tour (`lower-village-details`, thirteen stops, yaws 0 and 1,
+  zoom 26), four stops retaken after, three close-ups of the walls.
+- Two snags of the machine, not of the game: `bun test` failed at the start only because
+  the first test to build the island (test/harbour) takes more than bun's 5 s on this board
+  (28 pass with `--timeout 60000`, used for the whole run); and no WebGL context could be
+  made because the container's Xvfb on :99 was down (a stale root-owned lock), so a private
+  Xvfb was started on :98 and the browser pointed at it (`DISPLAY=:98`).
+- Found: the well square (-96.9, -16.6) ringed by six lamp posts within a dozen metres, its
+  own two lanterns and lane lamps 1.0 and 3.2 m off its edge (and one 3.4 m off the
+  belvedere at (-72.1, -54.5)); every facade a flawless coat of render, no damp, no wear;
+  the flat roofs all furnished alike (three green balls and a parasol, or a pergola).
+- Changed: 8db0fb5 (a rule in test/walk, no lane lamp within 4 m of the edge of a square on
+  its level; laneEdges skips such spots as it skips a stair's mouth, same draws of the rng),
+  2556dbf (weather(): damp band over the footing, ragged patches of fallen render at the
+  corners, now and then a square of newer render; own seed per house), 555f975 (washing():
+  a line of washing on a little more than half the parasol terraces; own seed).
+- Budget of the lower village: 640 998 triangles / 14 400 objects before, 645 966 / 14 814
+  after; island 3 154 466 → 3 161 326 triangles, 98 631 → 99 234 instances, 584 meshes.
+- Learnt: a facade detail smaller than a window reads as a meter box, not as wear; the first
+  flakes (0.2-0.36 units) had to be made bigger and ragged, in a colour between the wall's
+  and the stone's, before they read at zoom 11.
+- Seen, left alone: the great bare retaining slope behind the well square (the ground's own
+  paint, a terrain matter rather than a detail); the tall houses down the slope show broad
+  beige bands where their lower floors meet the footing, which reads well enough. The light
+  review of the lower village (week 44) and the port's defects review (week 46) are still to
+  do. For the next runs on pi6: start Xvfb on :98 before the pictures, and pass
+  `--timeout 60000` to `bun test`.
+
 ## 2026-11-13 — week 46 (kind: defects; sector: port) — scheduled run, not run
 
 - `bun test` green at the start (28 pass); budget of the port: 221 620 triangles / 5 549
