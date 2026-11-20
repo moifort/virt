@@ -219,6 +219,28 @@ function weather(parts, w, d, H, wall) {
   }
 }
 
+/**
+ * The washing hung out on a roof terrace: a line across it from one post to another, with
+ * sheets, shirts and towels pegged on it, down the side of the terrace away from the parasol.
+ * On its own seed, like the wear of the walls.
+ */
+function washing(parts, w, d, H) {
+  const at = parts.world(0, 0, 0);
+  const r = mulberry32((Math.round(at.x * 89) * 83492791) ^ (Math.round(at.z * 89) * 2971215073));
+  if (r() < 0.45) return;
+  const x = w / 2 - 0.42;
+  const half = d / 2 - 0.35;
+  for (const z of [-half, half]) parts.add('box', x, H + 0.85, z, 0.05, 1.3, 0.05, WOOD);
+  parts.add('box', x, H + 1.45, 0, 0.02, 0.02, 2 * half, 0xd8d4e0);
+  const n = 2 + Math.floor(r() * 3);
+  for (let k = 0; k < n; k++) {
+    const len = 0.3 + r() * 0.25;
+    const drop = r() < 0.3 ? 0.62 : 0.4;
+    const z = -half + 0.25 + ((k + 0.2 + r() * 0.6) * (2 * half - 0.5)) / n;
+    parts.add('box', x, H + 1.45 - drop / 2, z, 0.03, drop, len, pick(r, [PAL.ivory, PAL.ivory, 0x9ab4d0, 0xe2826a, 0xe8d2a0, 0xb8d0b0, 0xf2f0ea]));
+  }
+}
+
 /** A climber rooted by the wall and spreading as it goes up: leaves, then flowers on top. */
 function climber(parts, rng, face, w, d, across, top) {
   const [leaf, flower, bright] = pick(rng, CLIMBERS);
@@ -376,6 +398,7 @@ function house(parts, rng, w, d, floors, { plinth = 0, terrace = false, door = 0
     if (rng() < 0.5) {
       parts.add('cyl', -w * 0.2, H + 1.2, 0, 0.06, 1.9, 0.06, 0x3b3346);
       parts.add('cone', -w * 0.2, H + 2.1, 0, 2.2, 0.55, 2.2, pick(rng, [0xe9e0c8, 0xd9584a, 0x56866a]));
+      washing(parts, w, d, H);
     } else {
       // A vine pergola for the shade, with a lantern under it for the evenings.
       for (const sx of [-1, 1]) for (const sz of [-1, 1]) parts.add('box', sx * (w / 2 - 0.5), H + 1.1, sz * (d / 2 - 0.5), 0.08, 1.5, 0.08, WOOD);
