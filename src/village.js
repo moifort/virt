@@ -46,6 +46,8 @@ const TILE = 0xcc6e48;
 const WOOD = 0x8a5a41;
 const STONE = 0xd9cbb5;
 const IRON = 0x4a4654;
+// A lane keeps its street lamps this far beyond the edge of a square on its level (test/walk).
+const SQUARE_LIT = 4.2;
 const WARM_LIGHT = 0xffe2a6;
 // The stone of the streets: flags and treads, the walls beside them, the blocks of the quay.
 const PAVING = [0xbfb4a0, 0xb4a995, 0xc9bea9, 0xaba08c];
@@ -733,6 +735,8 @@ function laneEdges(parts, rng, lane, covered, furniture, lanes, piazzas) {
         for (const side of [first, -first]) {
           const [lx, lz] = [q.x - q.tz * side * out, q.z + q.tx * side * out];
           if (lanes.some((o) => o !== lane && o.stair && laneAt(o, lx, lz).d < o.half + 0.6)) continue;
+          // Nor just outside a square on its level: the square's own lanterns light it.
+          if (piazzas.some((pz) => Math.abs(pz.level - q.level) < 3 && Math.hypot(lx - pz.x, lz - pz.z) < pz.r + SQUARE_LIT)) continue;
           spot = [lx, lz, q];
           break;
         }

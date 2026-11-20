@@ -164,3 +164,25 @@ test('no street lamp stands in the mouth of a stair', () => {
   }
   expectNone(wrong, 'street lamps in the way of a stair');
 });
+
+// A square lights itself: its own lanterns stand on its paving, by its edge. A lane's street
+// lamp just outside it doubles them, and around a small square that makes a thicket of posts
+// (six within a dozen metres of the well). The lanes keep their lamps a few metres off.
+const SQUARE_LIT = 4;
+test("no lane's street lamp crowds the lanterns of a square", () => {
+  const { props, plan } = island();
+  const wrong = [];
+  for (const lamp of props) {
+    if (lamp.name !== 'street lamp' || lamp.zone !== 'village') continue;
+    const x = lamp.matrix.elements[12];
+    const z = lamp.matrix.elements[14];
+    for (const pz of plan.piazzas) {
+      const out = Math.hypot(x - pz.x, z - pz.z) - pz.r;
+      // Its own lanterns stand inside the edge of the paving; a lane passing far above or below
+      // it is another street.
+      if (Math.abs(lamp.box.min.y - pz.level) > 3) continue;
+      if (out > -0.5 && out < SQUARE_LIT) wrong.push(`${lamp.label} stands ${out.toFixed(1)} m off the edge of the square at ${spot(pz.x, pz.z)}`);
+    }
+  }
+  expectNone(wrong, 'lane lamps crowding a square');
+});
