@@ -9,7 +9,7 @@
 // Every part is a unit shape instanced with its own matrix and colour: thousands of details,
 // a handful of draw calls.
 import * as THREE from 'three';
-import { pick, smoothstep } from './noise.js';
+import { mulberry32, pick, smoothstep } from './noise.js';
 import { PAL, WATER_LEVEL, paint } from './style.js';
 import { at, bake, lamplight, lantern, seat } from './kit.js';
 import { festoon, gozzo } from './zones.js';
@@ -169,6 +169,56 @@ function windowOn(parts, rng, face, w, d, across, y) {
   }
 }
 
+/** `hex` with each channel moved toward `to` by `t` (0 keeps it, 1 is `to`). */
+function tint(hex, to, t) {
+  const c = new THREE.Color(hex).lerp(new THREE.Color(to), t);
+  return c.getHex();
+}
+// What shows where the render has fallen off: rubble stone, old brick, the grey of a lime patch.
+const UNDER = [0xb9ab98, 0xc2b29a, 0xb47a62, 0xaaa092];
+
+/**
+ * The wear of an old house: rising damp darkening the render in a ragged band over the stone
+ * footing, a corner or two where the render has fallen and the stone shows, and now and then a
+ * square of newer render in another shade of the wall. On its own seed, taken from where the
+ * house stands, so that the draws of the village after it do not move.
+ */
+function weather(parts, w, d, H, wall) {
+  const at = parts.world(0, 0, 0);
+  const r = mulberry32((Math.round(at.x * 97) * 73856093) ^ (Math.round(at.z * 97) * 19349663));
+  const damp = tint(wall, 0x6f6458, 0.24);
+  for (const face of [0, 1, 2]) {
+    const span = face === 0 ? w : d;
+    const pieces = Math.max(2, Math.round(span / 1.1));
+    for (let i = 0; i < pieces; i++) {
+      const h = 0.18 + r() * 0.42;
+      parts.onFace(face, w, d, 'box', -span / 2 + ((i + 0.5) * span) / pieces, 1.2 + h / 2, 0.006, span / pieces + 0.004, h, 0.02, damp);
+    }
+  }
+  // Where the render has come away it comes away from a corner, in a ragged patch: a larger
+  // piece with two smaller ones bitten out of its edges.
+  const flakes = r() < 0.3 ? 0 : r() < 0.65 ? 1 : 2;
+  for (let k = 0; k < flakes; k++) {
+    const face = pick(r, [0, 0, 1, 2]);
+    const span = face === 0 ? w : d;
+    const pw = 0.38 + r() * 0.3;
+    const ph = 0.4 + r() * 0.4;
+    const side = r() < 0.5 ? -1 : 1;
+    const y = 1.5 + ph / 2 + r() * Math.max(0, H - 2.3 - ph);
+    const bare = tint(wall, pick(r, UNDER), 0.6);
+    const x = side * (span / 2 - 0.02 - pw / 2);
+    parts.onFace(face, w, d, 'box', x, y, 0.01, pw, ph, 0.02, bare);
+    parts.onFace(face, w, d, 'box', x - side * (pw / 2 + 0.07), y + (r() - 0.6) * ph * 0.5, 0.01, 0.16, ph * (0.35 + r() * 0.3), 0.02, bare);
+    parts.onFace(face, w, d, 'box', x + side * (r() - 0.5) * pw * 0.4, y + ph / 2 + 0.06, 0.01, pw * (0.3 + r() * 0.3), 0.14, 0.02, bare);
+  }
+  if (r() < 0.25) {
+    const face = pick(r, [0, 1, 2]);
+    const span = face === 0 ? w : d;
+    const pw = 0.5 + r() * 0.5;
+    parts.onFace(face, w, d, 'box', (r() - 0.5) * (span - pw), 1.45 + r() * Math.max(0, H - 2.6), 0.008, pw, 0.4 + r() * 0.4, 0.02, tint(wall, r() < 0.5 ? 0xffffff : 0x8a7a6a, 0.12));
+  }
+}
+
 /** A climber rooted by the wall and spreading as it goes up: leaves, then flowers on top. */
 function climber(parts, rng, face, w, d, across, top) {
   const [leaf, flower, bright] = pick(rng, CLIMBERS);
@@ -197,6 +247,7 @@ function house(parts, rng, w, d, floors, { plinth = 0, terrace = false, door = 0
   parts.shutter = pick(rng, SHUTTER);
   parts.add('box', 0, H / 2, 0, w, H, d, wall);
   parts.add('box', 0, 0.6, 0, w + 0.12, 1.2, d + 0.12, STONE);
+  weather(parts, w, d, H, wall);
   // Where the ground falls away a storey or more below the street, the house goes on down the
   // slope: the floors under the street are lived in too, with windows wherever they stand
   // clear of the ground, over a stone footing. A shallower drop is only the footing.
